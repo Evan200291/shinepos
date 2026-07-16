@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shine Digital Store POS</title>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.9), transparent 35%),
+                linear-gradient(160deg, #edf6fb, #d7eaf5);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .boot-splash {
+            position: fixed;
+            inset: 0;
+            z-index: 95;
+            display: grid;
+            place-items: center;
+            padding: 1.5rem;
+            background:
+                radial-gradient(circle at top left, rgba(255, 255, 255, 0.9), transparent 35%),
+                linear-gradient(160deg, #edf6fb, #d7eaf5);
+        }
+
+        .boot-card {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.9rem;
+            padding: 1rem 1.1rem;
+            border-radius: 1.4rem;
+            background: rgba(255, 255, 255, 0.94);
+            border: 1px solid rgba(19, 67, 98, 0.14);
+            box-shadow: 0 20px 45px rgba(18, 63, 92, 0.12);
+        }
+
+        .boot-spinner {
+            width: 18px;
+            height: 18px;
+            border-radius: 999px;
+            border: 3px solid rgba(21, 107, 138, 0.18);
+            border-top-color: rgba(21, 107, 138, 0.82);
+            animation: bootspin 0.9s linear infinite;
+        }
+
+        @keyframes bootspin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .h-4, .w-4 { width: 1rem; height: 1rem; }
+        .h-5, .w-5 { width: 1.25rem; height: 1.25rem; }
+        .h-6, .w-6 { width: 1.5rem; height: 1.5rem; }
+    </style>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="theme-body">
+    <div id="notification" class="notification hidden"></div>
+
+    <div id="boot-splash" class="boot-splash">
+        <div class="boot-card">
+            <div class="boot-spinner"></div>
+            <div class="boot-title">Loading...</div>
+        </div>
+    </div>
+
+    <section id="login-screen" class="login-screen hidden">
+        <div class="login-shell">
+            <div class="login-head">
+                <div class="brand-lockup">
+                    <div class="brand-mark">SDS</div>
+                    <div>
+                        <p class="brand-label" data-i18n="vendor_label">Pharmacy POS</p>
+                        <h1 class="brand-name">Shine Digital Store</h1>
+                    </div>
+                </div>
+                <div class="lang-switch">
+                    <button type="button" class="lang-button" data-lang="en">EN</button>
+                    <button type="button" class="lang-button" data-lang="mm">MM</button>
+                </div>
+            </div>
+
+            <div class="login-grid">
+                <div class="surface-panel hero-panel">
+                    <div class="hero-badge">
+                        <i data-lucide="shield-check" class="h-4 w-4"></i>
+                        <span data-i18n="app_name">Pharmacy POS System</span>
+                    </div>
+                    <h2 class="hero-title" data-i18n="login_title">Secure pharmacy operations</h2>
+                    <p class="hero-subtitle" data-i18n="login_subtitle">Inventory, sales, admin control, receipt printing, and audit history.</p>
+
+                    <div class="credential-card">
+                        <p class="credential-label" data-i18n="default_admin">Default Admin</p>
+                        <div class="credential-row">
+                            <span data-i18n="username">Username</span>
+                            <strong>admin</strong>
+                        </div>
+                        <div class="credential-row">
+                            <span data-i18n="password">Password</span>
+                            <strong>Admin@123</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="login-form" class="surface-panel form-panel">
+                    <div class="section-heading">
+                        <h2 data-i18n="sign_in">Sign In</h2>
+                    </div>
+
+                    <label class="field-label" for="login-username" data-i18n="username">Username</label>
+                    <input id="login-username" name="username" type="text" value="admin" class="field-input" required>
+
+                    <label class="field-label" for="login-password" data-i18n="password">Password</label>
+                    <input id="login-password" name="password" type="password" value="Admin@123" class="field-input" required>
+
+                    <button type="submit" class="primary-btn full-width" data-i18n="sign_in">Sign In</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <section id="app-shell" class="app-shell hidden">
+        <div id="drawer-overlay" class="drawer-overlay hidden"></div>
+
+        <aside id="app-sidebar" class="app-sidebar">
+            <div class="sidebar-head">
+                <div class="brand-lockup store-lockup">
+                    <div>
+                        <h2 class="brand-name small store-title">Shine Digital Store</h2>
+                    </div>
+                </div>
+                <button id="sidebar-close-button" class="icon-btn mobile-only-inline" type="button">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+
+            <nav id="sidebar-nav" class="nav-stack">
+                <button type="button" data-tab="dashboard" class="nav-button nav-button-active">
+                    <i data-lucide="layout-dashboard" class="h-5 w-5"></i>
+                    <span data-i18n="dashboard">Dashboard</span>
+                </button>
+                <button type="button" data-tab="pos" class="nav-button">
+                    <i data-lucide="shopping-cart" class="h-5 w-5"></i>
+                    <span data-i18n="pos">POS</span>
+                </button>
+                <button type="button" data-tab="inventory" class="nav-button">
+                    <i data-lucide="boxes" class="h-5 w-5"></i>
+                    <span data-i18n="inventory">Inventory</span>
+                </button>
+                <button type="button" data-tab="sales" class="nav-button">
+                    <i data-lucide="file-bar-chart-2" class="h-5 w-5"></i>
+                    <span data-i18n="sales">Sales</span>
+                </button>
+                <button type="button" data-tab="alerts" class="nav-button">
+                    <i data-lucide="shield-alert" class="h-5 w-5"></i>
+                    <span data-i18n="alerts">Alerts</span>
+                </button>
+                <button type="button" data-tab="inbound" class="nav-button admin-only">
+                    <i data-lucide="package-plus" class="h-5 w-5"></i>
+                    <span data-i18n="inbound">Inbound</span>
+                </button>
+                <button type="button" data-tab="history" class="nav-button admin-only">
+                    <i data-lucide="history" class="h-5 w-5"></i>
+                    <span data-i18n="history">Stock History</span>
+                </button>
+                <button type="button" data-tab="users" class="nav-button admin-only">
+                    <i data-lucide="users" class="h-5 w-5"></i>
+                    <span data-i18n="users">Users</span>
+                </button>
+                <button type="button" data-tab="account" class="nav-button">
+                    <i data-lucide="settings-2" class="h-5 w-5"></i>
+                    <span data-i18n="account">Account</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-user surface-card">
+                <p id="current-user-name" class="sidebar-user-name">-</p>
+                <p id="current-user-role" class="sidebar-user-role">-</p>
+            </div>
+        </aside>
+
+        <div class="app-main">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <div class="topbar-kicker">Shine Digital Store</div>
+                    <h2 id="page-title" class="topbar-title">Dashboard</h2>
+                </div>
+                <div class="topbar-actions">
+                    <div class="lang-switch compact">
+                        <button type="button" class="lang-button" data-lang="en">EN</button>
+                        <button type="button" class="lang-button" data-lang="mm">MM</button>
+                    </div>
+                    <button id="topbar-account-button" class="icon-btn" type="button">
+                        <i data-lucide="settings-2" class="h-5 w-5"></i>
+                    </button>
+                    <button id="logout-button" class="ghost-btn desktop-only-inline" type="button" data-i18n="logout">Logout</button>
+                    <button id="mobile-menu-button" class="icon-btn mobile-only-inline" type="button">
+                        <i data-lucide="menu" class="h-5 w-5"></i>
+                    </button>
+                </div>
+            </header>
+
+            <main class="content-scroll">
+                <section data-view="dashboard" class="view-section section-stack">
+                    <div id="summary-cards" class="metric-grid"></div>
+
+                    <div class="surface-panel">
+                        <div class="section-heading row">
+                            <h3 data-i18n="recent_sales">Recent Sales</h3>
+                            <button id="dashboard-print-report-button" type="button" class="secondary-btn">
+                                <i data-lucide="file-output" class="h-4 w-4"></i>
+                                <span data-i18n="pdf_report">PDF Report</span>
+                            </button>
+                        </div>
+                        <div class="table-wrap">
+                            <table class="data-table inventory-table">
+                                <thead>
+                                    <tr>
+                                        <th data-i18n="invoice">Invoice</th>
+                                        <th data-i18n="date">Date</th>
+                                        <th data-i18n="cashier">Cashier</th>
+                                        <th class="text-right" data-i18n="total">Total</th>
+                                        <th class="text-right" data-i18n="profit">Profit</th>
+                                        <th class="text-center" data-i18n="actions">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dashboard-sales-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <section data-view="pos" class="view-section hidden">
+                    <div class="two-column-grid">
+                        <div class="section-stack">
+                            <div class="surface-panel">
+                                <div class="toolbar-grid">
+                                    <input id="pos-search" type="text" class="field-input" data-i18n-placeholder="search_products" placeholder="Search products">
+                                    <input id="pos-sale-date" type="date" class="field-input">
+                                </div>
+                            </div>
+                            <div id="pos-products-grid" class="product-grid"></div>
+                        </div>
+
+                        <div class="surface-panel cart-panel">
+                            <div class="section-heading">
+                                <h3 data-i18n="current_cart">Current Cart</h3>
+                            </div>
+
+                            <div id="cart-items" class="cart-items"></div>
+
+                            <div class="cart-summary">
+                                <div class="summary-row">
+                                    <span data-i18n="subtotal">Subtotal</span>
+                                    <strong id="cart-subtotal">0 MMK</strong>
+                                </div>
+                                <label class="field-label" for="pos-discount" data-i18n="discount">Discount</label>
+                                <input id="pos-discount" type="number" min="0" value="0" class="field-input">
+                                <div class="summary-row total">
+                                    <span data-i18n="total">Total</span>
+                                    <strong id="cart-total">0 MMK</strong>
+                                </div>
+                                <button id="checkout-button" type="button" class="primary-btn full-width" data-i18n="complete_sale">Complete Sale</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section data-view="inventory" class="view-section section-stack hidden">
+                    <div class="surface-panel">
+                        <div class="section-heading row">
+                            <h3 data-i18n="inventory_register">Inventory Register</h3>
+                            <input id="inventory-search" type="text" class="field-input search-field" data-i18n-placeholder="search_inventory" placeholder="Search inventory">
+                        </div>
+                        <div class="table-wrap">
+                            <table class="data-table inventory-table">
+                                <thead>
+                                    <tr>
+                                        <th data-i18n="product_code">Code</th>
+                                        <th data-i18n="brand">Brand</th>
+                                        <th data-i18n="product_name">Name</th>
+                                        <th data-i18n="category">Category</th>
+                                        <th data-i18n="expiry_date">Expiry</th>
+                                        <th class="text-right" data-i18n="sell_price">Price</th>
+                                        <th class="text-right" data-i18n="quantity">Qty</th>
+                                        <th data-i18n="status">Status</th>
+                                        <th class="text-center admin-only" data-i18n="actions">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="inventory-table-body"></tbody>
+                            </table>
+                        </div>
+                        <div id="inventory-pager" class="pager"></div>
+                    </div>
+                </section>
+
+                <section data-view="inbound" class="view-section hidden">
+                    <div class="surface-panel">
+                        <div class="section-heading">
+                            <h3 data-i18n="inbound_stock_entry">Inbound Stock Entry</h3>
+                        </div>
+                        <form id="inbound-form" class="form-grid">
+                            <div>
+                                <label class="field-label" for="inbound-code" data-i18n="product_code">Product Code</label>
+                                <input id="inbound-code" type="text" class="field-input" required>
+                            </div>
+                            <div>
+                                <label class="field-label" for="inbound-brand" data-i18n="brand">Brand</label>
+                                <input id="inbound-brand" type="text" class="field-input">
+                            </div>
+                            <div class="span-2">
+                                <label class="field-label" for="inbound-name" data-i18n="product_name">Product Name</label>
+                                <input id="inbound-name" type="text" class="field-input" required>
+                            </div>
+                            <div class="span-2">
+                                <label class="field-label" for="inbound-category" data-i18n="category">Category</label>
+                                <input id="inbound-category" type="text" class="field-input">
+                            </div>
+                            <div>
+                                <label class="field-label" for="inbound-expiry" data-i18n="expiry_date">Expiry Date</label>
+                                <input id="inbound-expiry" type="date" class="field-input" required>
+                            </div>
+                            <div>
+                                <label class="field-label" for="inbound-quantity" data-i18n="quantity">Quantity</label>
+                                <input id="inbound-quantity" type="number" min="1" class="field-input" required>
+                            </div>
+                            <div>
+                                <label class="field-label" for="inbound-cost" data-i18n="cost_price">Cost Price</label>
+                                <input id="inbound-cost" type="number" min="0" class="field-input" required>
+                            </div>
+                            <div>
+                                <label class="field-label" for="inbound-price" data-i18n="sell_price">Sell Price</label>
+                                <input id="inbound-price" type="number" min="0" class="field-input" required>
+                            </div>
+                            <div class="span-2">
+                                <label class="field-label" for="inbound-threshold" data-i18n="low_stock_threshold">Low Stock Threshold</label>
+                                <input id="inbound-threshold" type="number" min="1" value="10" class="field-input">
+                            </div>
+                            <div class="span-2">
+                                <button type="submit" class="primary-btn full-width" data-i18n="save_inbound">Save Inbound</button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+
+                <section data-view="sales" class="view-section section-stack hidden">
+                    <div class="surface-panel">
+                        <div class="section-heading row wrap">
+                            <h3 data-i18n="sales_report">Sales Report</h3>
+                            <div class="toolbar-grid compact">
+                                <select id="sales-report-type" class="field-input">
+                                    <option value="daily" data-i18n="daily">Daily</option>
+                                    <option value="monthly" data-i18n="monthly">Monthly</option>
+                                </select>
+                                <input id="sales-date-filter" type="date" class="field-input">
+                                <input id="sales-month-filter" type="month" class="field-input hidden">
+                                <button id="sales-print-report-button" type="button" class="secondary-btn">
+                                    <i data-lucide="printer" class="h-4 w-4"></i>
+                                    <span data-i18n="pdf_report">PDF Report</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="sales-summary-strip" class="summary-strip"></div>
+
+                        <div class="table-wrap">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th data-i18n="invoice">Invoice</th>
+                                        <th data-i18n="date">Date</th>
+                                        <th data-i18n="cashier">Cashier</th>
+                                        <th data-i18n="items">Items</th>
+                                        <th class="text-right" data-i18n="total">Total</th>
+                                        <th class="text-right" data-i18n="profit">Profit</th>
+                                        <th class="text-center" data-i18n="actions">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sales-table-body"></tbody>
+                            </table>
+                        </div>
+                        <div id="sales-pager" class="pager"></div>
+                    </div>
+                </section>
+
+                <section data-view="alerts" class="view-section hidden">
+                    <div class="alert-grid">
+                        <div class="surface-panel">
+                            <div class="section-heading">
+                                <h3 data-i18n="low_stock">Low Stock</h3>
+                            </div>
+                            <div class="table-wrap">
+                                <table class="data-table compact">
+                                    <thead>
+                                        <tr>
+                                            <th data-i18n="product_name">Product</th>
+                                            <th data-i18n="expiry_date">Expiry</th>
+                                            <th class="text-right" data-i18n="quantity">Qty</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="low-stock-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="surface-panel">
+                            <div class="section-heading">
+                                <h3 data-i18n="expired">Expired</h3>
+                            </div>
+                            <div class="table-wrap">
+                                <table class="data-table compact">
+                                    <thead>
+                                        <tr>
+                                            <th data-i18n="product_name">Product</th>
+                                            <th data-i18n="expiry_date">Expiry</th>
+                                            <th class="text-right" data-i18n="quantity">Qty</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="expired-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="surface-panel">
+                            <div class="section-heading">
+                                <h3 data-i18n="expiring_soon">Expiring Soon</h3>
+                            </div>
+                            <div class="table-wrap">
+                                <table class="data-table compact">
+                                    <thead>
+                                        <tr>
+                                            <th data-i18n="product_name">Product</th>
+                                            <th data-i18n="expiry_date">Expiry</th>
+                                            <th class="text-right" data-i18n="quantity">Qty</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="expiring-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section data-view="history" class="view-section hidden">
+                    <div class="surface-panel">
+                        <div class="section-heading">
+                            <h3 data-i18n="stock_history">Stock History</h3>
+                        </div>
+                        <div class="table-wrap">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th data-i18n="time">Time</th>
+                                        <th data-i18n="product_name">Product</th>
+                                        <th data-i18n="type">Type</th>
+                                        <th class="text-right" data-i18n="qty_change">Qty Change</th>
+                                        <th class="text-right" data-i18n="balance">Balance</th>
+                                        <th data-i18n="actor">Actor</th>
+                                        <th data-i18n="note">Note</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="history-table-body"></tbody>
+                            </table>
+                        </div>
+                        <div id="history-pager" class="pager"></div>
+                    </div>
+                </section>
+
+                <section data-view="users" class="view-section hidden">
+                    <div class="user-grid">
+                        <div class="surface-panel">
+                            <div class="section-heading">
+                                <h3 data-i18n="create_user">Create User</h3>
+                            </div>
+                            <form id="user-form" class="stack-form">
+                                <div>
+                                    <label class="field-label" for="user-full-name" data-i18n="full_name">Full Name</label>
+                                    <input id="user-full-name" type="text" class="field-input" required>
+                                </div>
+                                <div>
+                                    <label class="field-label" for="user-username" data-i18n="username">Username</label>
+                                    <input id="user-username" type="text" class="field-input" required>
+                                </div>
+                                <div>
+                                    <label class="field-label" for="user-password" data-i18n="password">Password</label>
+                                    <input id="user-password" type="password" class="field-input" required>
+                                </div>
+                                <div>
+                                    <label class="field-label" for="user-role" data-i18n="role">Role</label>
+                                    <select id="user-role" class="field-input">
+                                        <option value="cashier" data-i18n="role_cashier">Cashier</option>
+                                        <option value="admin" data-i18n="role_admin">Admin</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="primary-btn full-width" data-i18n="create_user">Create User</button>
+                            </form>
+                        </div>
+
+                        <div class="surface-panel">
+                            <div class="section-heading">
+                                <h3 data-i18n="user_accounts">User Accounts</h3>
+                            </div>
+                            <div class="table-wrap">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th data-i18n="full_name">Name</th>
+                                            <th data-i18n="username">Username</th>
+                                            <th data-i18n="role">Role</th>
+                                            <th data-i18n="status">Status</th>
+                                            <th data-i18n="created">Created</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="users-table-body"></tbody>
+                                </table>
+                            </div>
+                            <div id="users-pager" class="pager"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section data-view="account" class="view-section hidden">
+                    <div class="account-grid">
+                        <div class="surface-panel">
+                            <div class="section-heading">
+                                <h3 data-i18n="account_security">Account Security</h3>
+                            </div>
+                            <div class="account-card">
+                                <div class="account-row">
+                                    <span data-i18n="full_name">Full Name</span>
+                                    <strong id="account-name">-</strong>
+                                </div>
+                                <div class="account-row">
+                                    <span data-i18n="username">Username</span>
+                                    <strong id="account-username">-</strong>
+                                </div>
+                                <div class="account-row">
+                                    <span data-i18n="role">Role</span>
+                                    <strong id="account-role">-</strong>
+                                </div>
+                            </div>
+
+                            <form id="password-form" class="stack-form mt-6">
+                                <div>
+                                    <label class="field-label" for="current-password" data-i18n="current_password">Current Password</label>
+                                    <input id="current-password" type="password" class="field-input" required>
+                                </div>
+                                <div>
+                                    <label class="field-label" for="new-password" data-i18n="new_password">New Password</label>
+                                    <input id="new-password" type="password" class="field-input" required>
+                                </div>
+                                <div>
+                                    <label class="field-label" for="confirm-password" data-i18n="confirm_password">Confirm Password</label>
+                                    <input id="confirm-password" type="password" class="field-input" required>
+                                </div>
+                                <button type="submit" class="primary-btn full-width" data-i18n="change_password">Change Password</button>
+                            </form>
+                        </div>
+
+                        <div class="surface-panel admin-only">
+                            <div class="section-heading">
+                                <h3 data-i18n="system_tools">System Tools</h3>
+                            </div>
+                            <div class="stack-form">
+                                <button id="account-export-excel" type="button" class="secondary-btn full-width">
+                                    <i data-lucide="sheet" class="h-4 w-4"></i>
+                                    <span data-i18n="export_excel">Export Excel</span>
+                                </button>
+                                <button id="account-backup-json" type="button" class="secondary-btn full-width">
+                                    <i data-lucide="database-backup" class="h-4 w-4"></i>
+                                    <span data-i18n="backup_json">Backup JSON</span>
+                                </button>
+                                <button id="account-print-report" type="button" class="secondary-btn full-width">
+                                    <i data-lucide="file-output" class="h-4 w-4"></i>
+                                    <span data-i18n="pdf_report">PDF Report</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <nav id="mobile-footer" class="mobile-footer">
+                <button type="button" data-tab="dashboard" class="footer-button footer-button-active">
+                    <i data-lucide="layout-dashboard" class="h-5 w-5"></i>
+                    <span data-i18n="dashboard">Dashboard</span>
+                </button>
+                <button type="button" data-tab="pos" class="footer-button">
+                    <i data-lucide="shopping-cart" class="h-5 w-5"></i>
+                    <span data-i18n="pos">POS</span>
+                </button>
+                <button type="button" data-tab="inventory" class="footer-button">
+                    <i data-lucide="boxes" class="h-5 w-5"></i>
+                    <span data-i18n="inventory">Inventory</span>
+                </button>
+                <button type="button" data-tab="sales" class="footer-button">
+                    <i data-lucide="file-bar-chart-2" class="h-5 w-5"></i>
+                    <span data-i18n="sales">Sales</span>
+                </button>
+                <button type="button" data-tab="account" class="footer-button">
+                    <i data-lucide="settings-2" class="h-5 w-5"></i>
+                    <span data-i18n="account">Account</span>
+                </button>
+            </nav>
+        </div>
+    </section>
+
+    <div id="product-modal" class="modal-shell hidden">
+        <div class="modal-card">
+            <div class="section-heading row">
+                <h3 data-i18n="edit_product">Edit Product</h3>
+                <button id="close-product-modal" class="icon-btn" type="button">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+            <form id="product-form" class="form-grid">
+                <input id="product-id" type="hidden">
+                <div>
+                    <label class="field-label" for="product-code" data-i18n="product_code">Code</label>
+                    <input id="product-code" type="text" class="field-input" required>
+                </div>
+                <div>
+                    <label class="field-label" for="product-brand" data-i18n="brand">Brand</label>
+                    <input id="product-brand" type="text" class="field-input">
+                </div>
+                <div class="span-2">
+                    <label class="field-label" for="product-name" data-i18n="product_name">Name</label>
+                    <input id="product-name" type="text" class="field-input" required>
+                </div>
+                <div class="span-2">
+                    <label class="field-label" for="product-category" data-i18n="category">Category</label>
+                    <input id="product-category" type="text" class="field-input">
+                </div>
+                <div>
+                    <label class="field-label" for="product-expiry" data-i18n="expiry_date">Expiry</label>
+                    <input id="product-expiry" type="date" class="field-input" required>
+                </div>
+                <div>
+                    <label class="field-label" for="product-quantity" data-i18n="quantity">Qty</label>
+                    <input id="product-quantity" type="number" min="0" class="field-input" required>
+                </div>
+                <div>
+                    <label class="field-label" for="product-cost" data-i18n="cost_price">Cost Price</label>
+                    <input id="product-cost" type="number" min="0" class="field-input" required>
+                </div>
+                <div>
+                    <label class="field-label" for="product-price" data-i18n="sell_price">Sell Price</label>
+                    <input id="product-price" type="number" min="0" class="field-input" required>
+                </div>
+                <div class="span-2">
+                    <label class="field-label" for="product-threshold" data-i18n="low_stock_threshold">Low Stock Threshold</label>
+                    <input id="product-threshold" type="number" min="1" class="field-input" required>
+                </div>
+                <div class="span-2 button-pair">
+                    <button id="cancel-product-modal" type="button" class="ghost-btn" data-i18n="cancel">Cancel</button>
+                    <button type="submit" class="primary-btn" data-i18n="save_changes">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="receipt-modal" class="modal-shell hidden">
+        <div class="modal-card receipt-modal-card">
+            <div class="section-heading row">
+                <h3 data-i18n="receipt_preview">Receipt Preview</h3>
+                <button id="receipt-close-button" class="icon-btn" type="button">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+            <div id="receipt-content" class="receipt-preview"></div>
+            <div class="button-pair">
+                <button id="receipt-print-button" type="button" class="primary-btn" data-i18n="print_receipt">Print Receipt</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>

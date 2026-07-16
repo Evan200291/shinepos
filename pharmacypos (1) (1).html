@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pharmacy POS System</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Google Fonts for Myanmar Text -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Padauk:wght@400;700&display=swap');
+        body { font-family: 'Padauk', sans-serif; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        
+        /* Modal Transitions */
+        .modal { transition: opacity 0.25s ease; }
+        .modal-active { overflow: hidden; }
+        
+        /* Remove arrows from number input */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen flex overflow-hidden text-gray-800">
+
+    <!-- Sidebar -->
+    <div class="w-64 bg-white border-r border-gray-200 p-4 flex flex-col flex-shrink-0">
+        <div class="flex items-center space-x-2 px-4 mb-8">
+            <div class="bg-teal-600 p-2 rounded-lg">
+                <i data-lucide="receipt" class="text-white w-6 h-6"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold text-gray-800">POS SYSTEM</h1>
+                <p class="text-xs text-gray-500">System Management</p>
+            </div>
+        </div>
+        
+        <nav class="space-y-2 flex-1">
+            <button onclick="switchTab('pos')" id="btn-pos" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors bg-teal-600 text-white shadow-lg">
+                <i data-lucide="shopping-cart" class="w-5 h-5"></i>
+                <span class="font-medium">အရောင်းကောင်တာ (POS)</span>
+            </button>
+            <button onclick="switchTab('inventory')" id="btn-inventory" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-gray-600 hover:bg-teal-50">
+                <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                <span class="font-medium">ဂိုဒေါင်စာရင်း (Inventory)</span>
+            </button>
+            <button onclick="switchTab('inbound')" id="btn-inbound" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-gray-600 hover:bg-teal-50">
+                <i data-lucide="package-plus" class="w-5 h-5"></i>
+                <span class="font-medium">ပစ္စည်းသွင်း (Inbound)</span>
+            </button>
+            <!-- Alerts Button -->
+            <button onclick="switchTab('alerts')" id="btn-alerts" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-gray-600 hover:bg-teal-50">
+                <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                <span class="font-medium">သတိပေးချက်များ (Alerts)</span>
+            </button>
+            <button onclick="switchTab('sales')" id="btn-sales" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-gray-600 hover:bg-teal-50">
+                <i data-lucide="file-bar-chart-2" class="w-5 h-5"></i>
+                <span class="font-medium">အရောင်းစာရင်း (Reports)</span>
+            </button>
+        </nav>
+
+        <div class="text-xs text-center text-gray-400 mt-auto">
+            v1.0 Pharmacy Edition (HTML)
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col h-full overflow-hidden relative">
+        
+        <!-- Notification Toast -->
+        <div id="notification" class="hidden absolute top-4 right-4 z-50 px-4 py-2 rounded shadow-lg text-white transition-opacity duration-300"></div>
+
+        <!-- Content Area -->
+        <div class="flex-1 overflow-auto p-6" id="main-container">
+            
+            <!-- 1. POS View -->
+            <div id="view-pos" class="flex h-full gap-6">
+                <!-- Product List Section -->
+                <div class="flex-1 flex flex-col h-full">
+                    <div class="mb-4 relative">
+                        <i data-lucide="search" class="absolute left-3 top-3 text-gray-400 w-5 h-5"></i>
+                        <input 
+                            type="text" 
+                            id="pos-search"
+                            oninput="renderPOS()"
+                            placeholder="ပစ္စည်းအမည်၊ အမျိုးအစား သို့မဟုတ် ကုဒ်နံပါတ် ရှာဖွေရန်..." 
+                            class="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        >
+                    </div>
+                    <div id="pos-products-grid" class="grid grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto pb-4">
+                        <!-- Products will be injected here via JS -->
+                    </div>
+                </div>
+
+                <!-- Cart Section -->
+                <div class="w-96 bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-full">
+                    <div class="p-4 border-b border-gray-100">
+                        <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2 mb-3">
+                            <i data-lucide="shopping-cart" class="w-5 h-5"></i> အရောင်းဘောင်ချာ
+                        </h2>
+                        <!-- Date Picker in POS -->
+                        <div class="flex items-center gap-2 bg-gray-50 p-2 rounded-lg border border-gray-200">
+                            <i data-lucide="calendar" class="w-4 h-4 text-gray-500"></i>
+                            <span class="text-xs font-bold text-gray-500">ရက်စွဲ:</span>
+                            <input 
+                                type="date" 
+                                id="pos-date" 
+                                onchange="setCartDate(this.value)"
+                                class="flex-1 bg-transparent text-sm font-medium focus:outline-none text-gray-700"
+                            >
+                        </div>
+                    </div>
+                    
+                    <div id="cart-items" class="flex-1 overflow-y-auto p-4 space-y-3">
+                        <!-- Cart Items injected via JS -->
+                    </div>
+
+                    <div class="p-4 bg-gray-50 border-t border-gray-200 space-y-3">
+                        <!-- Subtotal -->
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-gray-600">သင့်ငွေ (Subtotal)</span>
+                            <span id="cart-subtotal" class="font-medium text-gray-800">0 ကျပ်</span>
+                        </div>
+                        
+                        <!-- Discount Input -->
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-gray-600 flex items-center gap-1">
+                                <i data-lucide="tag" class="w-3 h-3"></i> လျှော့ဈေး (Discount)
+                            </span>
+                            <div class="flex items-center gap-1">
+                                <span class="text-gray-500">-</span>
+                                <input 
+                                    type="number" 
+                                    id="pos-discount" 
+                                    value="0" 
+                                    oninput="updateDiscount(this.value)" 
+                                    class="w-24 p-1 text-right border border-gray-300 rounded text-sm focus:outline-none focus:border-teal-500"
+                                    placeholder="0"
+                                >
+                            </div>
+                        </div>
+
+                        <div class="border-t border-gray-200 pt-2">
+                            <div class="flex justify-between items-center mb-4">
+                                <span class="text-gray-600 font-bold">စုစုပေါင်း</span>
+                                <span id="cart-total" class="text-xl font-bold text-teal-600">0 ကျပ်</span>
+                            </div>
+                            <button 
+                                onclick="handleCheckout()"
+                                id="checkout-btn"
+                                disabled
+                                class="w-full bg-teal-600 text-white py-3 rounded-lg font-bold hover:bg-teal-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                            >
+                                ငွေလက်ခံမည် (Checkout)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Inventory View -->
+            <div id="view-inventory" class="hidden h-full flex-col">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden">
+                    <div class="p-6 border-b border-gray-100 flex justify-between items-center flex-shrink-0">
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-800">ဂိုဒေါင် လက်ကျန်စာရင်း</h2>
+                            <p class="text-sm text-gray-500 mt-1">စုစုပေါင်း တန်ဖိုး (ဝယ်ဈေး x အရေအတွက်): <span id="inventory-total-value" class="font-bold text-teal-600 text-lg">0 ကျပ်</span></p>
+                        </div>
+                        <div class="relative w-64">
+                            <i data-lucide="search" class="absolute left-3 top-2.5 text-gray-400 w-4 h-4"></i>
+                            <input 
+                                type="text" 
+                                id="inventory-search"
+                                oninput="renderInventory()"
+                                placeholder="Search inventory..." 
+                                class="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-teal-500"
+                            >
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-auto flex-1">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-50 text-gray-500 text-sm sticky top-0 z-10">
+                                <tr>
+                                    <th class="p-4">ကုဒ်</th>
+                                    <th class="p-4">Brand</th>
+                                    <th class="p-4">ပစ္စည်းအမည်</th>
+                                    <th class="p-4">အမျိုးအစား</th>
+                                    <th class="p-4">သက်တမ်းကုန်ရက်</th>
+                                    <th class="p-4 text-right">ရောင်းဈေး</th>
+                                    <th class="p-4 text-right">Stock</th>
+                                    <th class="p-4">အခြေအနေ</th>
+                                    <th class="p-4 text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-table-body" class="divide-y divide-gray-100">
+                                <!-- Inventory Rows injected via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Inbound View -->
+            <div id="view-inbound" class="hidden">
+                <div class="max-w-2xl mx-auto">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                        <div class="flex items-center gap-3 mb-6">
+                            <div class="p-3 bg-teal-100 rounded-full text-teal-600">
+                                <i data-lucide="package-plus" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-xl font-bold text-gray-800">ပစ္စည်းအသစ် ထည့်သွင်းခြင်း</h2>
+                                <p class="text-gray-500 text-sm">Product Registration & Stock Entry</p>
+                            </div>
+                        </div>
+
+                        <form id="inbound-form" onsubmit="handleAddItem(event)" class="space-y-4">
+                            <!-- Code and BIN Row -->
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Product Code</label>
+                                    <input required type="text" id="in-code" placeholder="MED001" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Brand Name</label>
+                                    <input type="text" id="in-bin" placeholder="A-01" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                                </div>
+                            </div>
+
+                            <!-- Name Row -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Item Name (ပစ္စည်းအမည်)</label>
+                                <input required type="text" id="in-name" placeholder="ဆေးအမည် အပြည့်အစုံ" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                            </div>
+
+                            <!-- Chemical Name Row -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Class Name (အမျိုးအစား)</label>
+                                <input type="text" id="in-chemical" placeholder="Generic Name (e.g., Paracetamol)" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                            </div>
+
+                            <!-- Expiry and Pricing Row -->
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Expire Date</label>
+                                    <input required type="date" id="in-expiry" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">အရေအတွက် (EA)</label>
+                                    <input required type="number" id="in-qty" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">ဝယ်ရင်းဈေး</label>
+                                    <input required type="number" id="in-cost" oninput="calculateProfitPreview()" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">ရောင်းဈေး</label>
+                                    <input required type="number" id="in-price" oninput="calculateProfitPreview()" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:outline-none">
+                                </div>
+                            </div>
+
+                            <div class="bg-gray-50 p-3 rounded-lg flex justify-between items-center text-sm">
+                                <span class="text-gray-600">ခန့်မှန်း အမြတ်ငွေ:</span>
+                                <span id="profit-preview" class="font-bold text-green-600">0 ကျပ်</span>
+                            </div>
+
+                            <button type="submit" class="w-full bg-teal-600 text-white py-3 rounded-lg font-bold hover:bg-teal-700 flex justify-center items-center gap-2 transition-colors">
+                                <i data-lucide="save" class="w-5 h-5"></i> သိမ်းဆည်းမည်
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Alerts View -->
+            <div id="view-alerts" class="hidden h-full flex-col">
+                <div class="max-w-6xl mx-auto w-full space-y-6">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="p-3 bg-red-100 rounded-full text-red-600">
+                            <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-800">သတိပေးချက်များ (Stock Alerts)</h2>
+                            <p class="text-gray-500 text-sm">Expired items and Out of Stock items</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full overflow-hidden">
+                        <!-- Expired Items -->
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[500px]">
+                            <div class="p-4 border-b border-gray-100 bg-red-50 flex items-center justify-between">
+                                <div class="flex items-center gap-2 text-red-700 font-bold">
+                                    <i data-lucide="calendar-off" class="w-5 h-5"></i>
+                                    <h3>သက်တမ်းကုန် ပစ္စည်းများ (Expired)</h3>
+                                </div>
+                                <span id="expired-count" class="bg-red-200 text-red-800 text-xs font-bold px-2 py-1 rounded-full">0</span>
+                            </div>
+                            <div class="overflow-auto flex-1">
+                                <table class="w-full text-left">
+                                    <thead class="bg-white text-gray-500 text-xs uppercase sticky top-0">
+                                        <tr>
+                                            <th class="p-3">အမည်</th>
+                                            <th class="p-3">Brand</th>
+                                            <th class="p-3 text-right">သက်တမ်း</th>
+                                            <th class="p-3 text-right">Stock</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="expired-table-body" class="divide-y divide-gray-100 text-sm"></tbody>
+                                </table>
+                                <div id="no-expired-msg" class="p-8 text-center text-gray-400 hidden">သက်တမ်းကုန် ပစ္စည်းမရှိပါ</div>
+                            </div>
+                        </div>
+
+                        <!-- Out of Stock Items -->
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[500px]">
+                            <div class="p-4 border-b border-gray-100 bg-orange-50 flex items-center justify-between">
+                                <div class="flex items-center gap-2 text-orange-700 font-bold">
+                                    <i data-lucide="package-x" class="w-5 h-5"></i>
+                                    <h3>လက်ကျန်ကုန် ပစ္စည်းများ (Out of Stock)</h3>
+                                </div>
+                                <span id="stockout-count" class="bg-orange-200 text-orange-800 text-xs font-bold px-2 py-1 rounded-full">0</span>
+                            </div>
+                            <div class="overflow-auto flex-1">
+                                <table class="w-full text-left">
+                                    <thead class="bg-white text-gray-500 text-xs uppercase sticky top-0">
+                                        <tr>
+                                            <th class="p-3">အမည်</th>
+                                            <th class="p-3">Brand</th>
+                                            <th class="p-3 text-right">သက်တမ်း</th>
+                                            <th class="p-3 text-right">Stock</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="stockout-table-body" class="divide-y divide-gray-100 text-sm"></tbody>
+                                </table>
+                                <div id="no-stockout-msg" class="p-8 text-center text-gray-400 hidden">လက်ကျန်ကုန် ပစ္စည်းမရှိပါ</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Sales Report View -->
+            <div id="view-sales" class="hidden h-full flex-col">
+                <div class="max-w-6xl mx-auto w-full space-y-6">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+                        <div class="flex items-center gap-3">
+                            <div class="p-3 bg-teal-100 rounded-full text-teal-600">
+                                <i data-lucide="file-bar-chart-2" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-xl font-bold text-gray-800">အရောင်းစာရင်း နှင့် အမြတ်ငွေ</h2>
+                                <p class="text-gray-500 text-sm">Sales Report & Profit Analysis</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Report Controls -->
+                        <div class="flex items-center gap-2 bg-white p-2 rounded-lg shadow-sm border border-gray-200">
+                            <select id="report-type" onchange="toggleReportType()" class="p-2 bg-transparent font-bold text-teal-700 text-sm focus:outline-none cursor-pointer">
+                                <option value="daily">နေ့စဉ် (Daily)</option>
+                                <option value="monthly">လစဉ် (Monthly)</option>
+                            </select>
+                            <div class="h-6 w-px bg-gray-200 mx-1"></div>
+                            <input type="date" id="sales-date-filter" onchange="renderSales()" class="p-1 text-gray-700 focus:outline-none focus:text-teal-600 font-medium text-sm">
+                            <input type="month" id="sales-month-filter" onchange="renderSales()" class="hidden p-1 text-gray-700 focus:outline-none focus:text-teal-600 font-medium text-sm">
+                        </div>
+                    </div>
+
+                    <!-- Summary Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-teal-100 flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm font-medium">စုစုပေါင်း ရောင်းရငွေ (Total Sales)</p>
+                                <h3 id="report-total-sales" class="text-3xl font-bold text-teal-600 mt-2">0 ကျပ်</h3>
+                            </div>
+                            <div class="p-4 bg-teal-50 rounded-full text-teal-600">
+                                <i data-lucide="banknote" class="w-8 h-8"></i>
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-green-100 flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm font-medium">စုစုပေါင်း အမြတ်ငွေ (Total Profit)</p>
+                                <h3 id="report-total-profit" class="text-3xl font-bold text-green-600 mt-2">0 ကျပ်</h3>
+                            </div>
+                            <div class="p-4 bg-green-50 rounded-full text-green-600">
+                                <i data-lucide="trending-up" class="w-8 h-8"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transactions Table -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div class="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                            <h3 class="font-bold text-gray-800">အရောင်းမှတ်တမ်းများ (Transactions)</h3>
+                            <span id="sales-date-display" class="text-sm font-mono bg-white px-2 py-1 rounded border text-gray-600"></span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="bg-white border-b border-gray-100">
+                                    <tr>
+                                        <th class="p-4 text-sm font-medium text-gray-500">အချိန်</th>
+                                        <th class="p-4 text-sm font-medium text-gray-500">Invoice ID</th>
+                                        <th class="p-4 text-sm font-medium text-gray-500">ပစ္စည်းများ</th>
+                                        <th class="p-4 text-sm font-medium text-gray-500 text-right">ရောင်းဈေး</th>
+                                        <th class="p-4 text-sm font-medium text-gray-500 text-right">အမြတ်ငွေ</th>
+                                        <th class="p-4 text-sm font-medium text-gray-500 text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sales-table-body" class="divide-y divide-gray-100">
+                                    <!-- Sales Rows -->
+                                </tbody>
+                            </table>
+                            <div id="no-sales-msg" class="p-8 text-center text-gray-400 hidden">
+                                ရွေးချယ်ထားသော ကာလအတွက် အရောင်းမှတ်တမ်း မရှိသေးပါ
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Edit Inventory Modal -->
+    <div id="edit-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl shadow-lg w-full max-w-lg p-6 m-4 overflow-y-auto max-h-[90vh]">
+            <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                <i data-lucide="edit" class="w-5 h-5 text-teal-600"></i> ပြင်ဆင်ရန်
+            </h3>
+            <form id="edit-form" onsubmit="handleSaveEdit(event)" class="space-y-4">
+                <input type="hidden" id="edit-id">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Code</label>
+                        <input required type="text" id="edit-code" class="w-full p-2 border border-gray-300 rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Brand</label>
+                        <input type="text" id="edit-bin" class="w-full p-2 border border-gray-300 rounded-lg">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                    <input required type="text" id="edit-name" class="w-full p-2 border border-gray-300 rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Chemical Name</label>
+                    <input type="text" id="edit-chemical" class="w-full p-2 border border-gray-300 rounded-lg">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Expiry</label>
+                        <input required type="date" id="edit-expiry" class="w-full p-2 border border-gray-300 rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Qty</label>
+                        <input required type="number" id="edit-qty" class="w-full p-2 border border-gray-300 rounded-lg">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Cost</label>
+                        <input required type="number" id="edit-cost" class="w-full p-2 border border-gray-300 rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Price</label>
+                        <input required type="number" id="edit-price" class="w-full p-2 border border-gray-300 rounded-lg">
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-6">
+                    <button type="button" onclick="closeEditModal()" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">မလုပ်တော့ပါ</button>
+                    <button type="submit" class="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">သိမ်းမည်</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Sales Transaction Modal -->
+    <div id="sale-edit-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl shadow-lg w-full max-w-2xl p-6 m-4 overflow-y-auto max-h-[90vh]">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold flex items-center gap-2">
+                    <i data-lucide="file-edit" class="w-5 h-5 text-teal-600"></i> ဘောင်ချာ ပြင်ဆင်ရန်
+                </h3>
+                <button onclick="closeSaleEditModal()" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-6 h-6"></i></button>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="flex items-center gap-2 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                    <span class="text-sm font-bold text-gray-600">ရက်စွဲ:</span>
+                    <input type="date" id="sale-edit-date" class="bg-transparent font-medium focus:outline-none text-gray-700">
+                </div>
+
+                <div class="overflow-hidden border border-gray-200 rounded-lg">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-gray-50 text-gray-600 font-medium">
+                            <tr>
+                                <th class="p-3">ပစ္စည်း</th>
+                                <th class="p-3 text-right">ဈေးနှုန်း</th>
+                                <th class="p-3 text-center">အရေအတွက်</th>
+                                <th class="p-3 text-right">Total</th>
+                                <th class="p-3 text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sale-edit-items" class="divide-y divide-gray-100">
+                            <!-- Items injected via JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="flex justify-between items-center bg-teal-50 p-3 rounded-lg text-teal-800 font-bold">
+                    <span>Total (New):</span>
+                    <span id="sale-edit-total">0 ကျပ်</span>
+                </div>
+
+                <div class="flex gap-3 mt-4">
+                    <button onclick="closeSaleEditModal()" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">မလုပ်တော့ပါ</button>
+                    <button onclick="saveSaleChanges()" class="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">သိမ်းဆည်းမည်</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal (Shared) -->
+    <div id="delete-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl shadow-lg w-full max-w-sm p-6 m-4 text-center">
+            <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i data-lucide="alert-triangle" class="text-red-600 w-6 h-6"></i>
+            </div>
+            <h3 class="text-lg font-bold text-gray-900 mb-2">အတည်ပြုပါ</h3>
+            <p class="text-gray-500 mb-6 text-sm" id="delete-msg">ဤလုပ်ဆောင်ချက်ကို ပြန်ပြင်၍မရပါ။ သေချာပါသလား?</p>
+            <input type="hidden" id="delete-id">
+            <input type="hidden" id="delete-type"> <!-- 'inventory' or 'sale' -->
+            <div class="flex gap-3">
+                <button onclick="closeDeleteModal()" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">မလုပ်တော့ပါ</button>
+                <button onclick="confirmDelete()" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">ဖျက်မည်</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- State Management ---
+        
+        // Default Mock Data
+        const defaultInventory = [
+            { id: 1, code: 'MED001', name: 'Biogesic (Paracetamol)', chemical: 'Paracetamol 500mg', bin: 'A-01', expiry: '2026-05-20', cost: 50, price: 100, profit: 50, qty: 500 },
+            { id: 2, code: 'MED002', name: 'Decolgen', chemical: 'Paracetamol, Phenylephrine, Chlorpheniramine', bin: 'A-02', expiry: '2024-03-15', cost: 80, price: 150, profit: 70, qty: 200 },
+            { id: 3, code: 'MED003', name: 'Amoxicillin 500mg', chemical: 'Amoxicillin', bin: 'B-01', expiry: '2023-12-01', cost: 150, price: 300, profit: 150, qty: 50 },
+            { id: 4, code: 'VIT001', name: 'Enervon C', chemical: 'Vitamin C, B Complex', bin: 'C-05', expiry: '2025-10-10', cost: 300, price: 500, profit: 200, qty: 100 },
+        ];
+
+        let inventory = [];
+        let salesHistory = []; 
+        let cart = [];
+        let activeTab = 'pos';
+        let itemToDelete = null;
+        let deleteType = null; // 'inventory' or 'sale'
+        
+        // Sale Editing State
+        let currentEditingSaleId = null;
+        let tempSaleItems = [];
+
+        // POS Settings State
+        let currentCartDate = new Date().toISOString().split('T')[0];
+        let currentDiscount = 0;
+
+        // --- Load & Save Data Helper Functions ---
+        
+        function loadData() {
+            try {
+                const storedInv = localStorage.getItem('pharmacy_inventory');
+                inventory = storedInv ? JSON.parse(storedInv) : defaultInventory;
+            } catch (e) {
+                console.error("Error loading inventory:", e);
+                inventory = defaultInventory;
+            }
+
+            try {
+                const storedSales = localStorage.getItem('pharmacy_sales');
+                salesHistory = storedSales ? JSON.parse(storedSales) : [];
+            } catch (e) {
+                console.error("Error loading sales:", e);
+                salesHistory = [];
+            }
+            
+            // Save back immediately to ensure localStorage structure exists
+            saveData();
+        }
+
+        function saveData() {
+            localStorage.setItem('pharmacy_inventory', JSON.stringify(inventory));
+            localStorage.setItem('pharmacy_sales', JSON.stringify(salesHistory));
+        }
+
+        // --- Other Helpers ---
+
+        function calculateProfit(cost, price) {
+            return price - cost;
+        }
+
+        function checkExpiryStatus(dateString) {
+            const today = new Date();
+            const expiryDate = new Date(dateString);
+            const monthsDiff = (expiryDate.getFullYear() - today.getFullYear()) * 12 + (expiryDate.getMonth() - today.getMonth());
+
+            if (expiryDate < today) return 'expired';
+            if (monthsDiff <= 6) return 'warning';
+            return 'good';
+        }
+
+        function showNotification(message, type = 'success') {
+            const notif = document.getElementById('notification');
+            notif.textContent = message;
+            notif.className = `absolute top-4 right-4 z-50 px-4 py-2 rounded shadow-lg text-white transition-opacity duration-300 ${type === 'error' ? 'bg-red-500' : 'bg-green-500'}`;
+            notif.classList.remove('hidden');
+            notif.style.opacity = '1';
+
+            setTimeout(() => {
+                notif.style.opacity = '0';
+                setTimeout(() => notif.classList.add('hidden'), 300);
+            }, 3000);
+        }
+
+        // --- Tab Switching ---
+        
+        function switchTab(tabId) {
+            activeTab = tabId;
+            
+            // Hide all views
+            ['pos', 'inventory', 'inbound', 'alerts', 'sales'].forEach(view => {
+                document.getElementById(`view-${view}`).classList.add('hidden');
+                document.getElementById(`view-${view}`).classList.remove('flex');
+            });
+            
+            // Show active view
+            const activeView = document.getElementById(`view-${tabId}`);
+            activeView.classList.remove('hidden');
+            
+            if(tabId === 'pos' || tabId === 'inventory' || tabId === 'alerts' || tabId === 'sales') {
+                activeView.classList.add('flex');
+            }
+
+            if(tabId === 'sales') {
+                // Initialize filters defaults
+                const dateInput = document.getElementById('sales-date-filter');
+                const monthInput = document.getElementById('sales-month-filter');
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const day = String(today.getDate()).padStart(2, '0');
+                if (!dateInput.value) dateInput.value = `${year}-${month}-${day}`;
+                if (!monthInput.value) monthInput.value = `${year}-${month}`;
+                renderSales(); 
+            }
+            if(tabId === 'alerts') renderAlerts();
+            if(tabId === 'inventory') renderInventory();
+
+            // Update Sidebar Buttons
+            ['pos', 'inventory', 'inbound', 'alerts', 'sales'].forEach(id => {
+                const btn = document.getElementById(`btn-${id}`);
+                if (id === tabId) {
+                    btn.className = "w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors bg-teal-600 text-white shadow-lg";
+                } else {
+                    btn.className = "w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors text-gray-600 hover:bg-teal-50";
+                }
+            });
+
+            if (tabId === 'pos') renderPOS();
+        }
+
+        // --- POS Logic ---
+        
+        function setCartDate(date) { currentCartDate = date; }
+        function updateDiscount(value) { currentDiscount = Number(value); renderCart(); }
+        function updateCartPrice(itemId, newPrice) {
+            const cartItem = cart.find(item => item.id === itemId);
+            if (cartItem) { cartItem.price = Number(newPrice); renderCart(); }
+        }
+
+        function renderPOS() {
+            const searchTerm = document.getElementById('pos-search').value.toLowerCase();
+            const container = document.getElementById('pos-products-grid');
+            const filteredItems = inventory.filter(item => 
+                item.name.toLowerCase().includes(searchTerm) || 
+                item.code.toLowerCase().includes(searchTerm) ||
+                (item.chemical && item.chemical.toLowerCase().includes(searchTerm))
+            );
+            
+            container.innerHTML = filteredItems.map(item => {
+                const status = checkExpiryStatus(item.expiry);
+                let borderClass = 'border-gray-200';
+                let statusBadge = '';
+                let clickable = true;
+                if (status === 'expired') {
+                    borderClass = 'border-red-200 opacity-60 cursor-not-allowed';
+                    statusBadge = '<span class="text-xs font-bold text-red-500">EXPIRED</span>';
+                    clickable = false;
+                } else if (status === 'warning') {
+                    borderClass = 'border-orange-300 ring-1 ring-orange-100';
+                    statusBadge = '<i data-lucide="badge-alert" class="text-orange-500 w-4 h-4"></i>';
+                }
+                return `
+                    <div 
+                        onclick="${clickable ? `addToCart(${item.id})` : ''}"
+                        class="bg-white p-4 rounded-xl border transition-all hover:shadow-md ${borderClass} ${clickable ? 'cursor-pointer' : ''}"
+                    >
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="text-xs font-mono bg-gray-100 px-2 py-1 rounded text-gray-600">${item.code}</span>
+                            ${statusBadge}
+                        </div>
+                        <h3 class="font-bold text-gray-800 mb-1">${item.name}</h3>
+                        ${item.chemical ? `<p class="text-xs text-gray-400 mb-1 truncate">${item.chemical}</p>` : ''}
+                        <div class="flex justify-between items-end mt-2">
+                            <div>
+                                <p class="text-teal-600 font-bold">${item.price} ကျပ်</p>
+                                <p class="text-xs text-gray-500">Stock: ${item.qty}</p>
+                            </div>
+                            <button class="bg-teal-50 text-teal-600 p-2 rounded-full hover:bg-teal-100"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            renderCart();
+            
+            const datePicker = document.getElementById('pos-date');
+            if (datePicker) datePicker.value = currentCartDate;
+            lucide.createIcons();
+        }
+
+        function addToCart(itemId) {
+            const product = inventory.find(p => p.id === itemId);
+            if (product.qty <= 0) { showNotification('လက်ကျန်ပစ္စည်း မရှိပါ', 'error'); return; }
+            
+            const existingItem = cart.find(item => item.id === itemId);
+            if (existingItem) {
+                if (existingItem.cartQty >= product.qty) { showNotification('စတော့လက်ကျန်ထက် ကျော်လွန်နေပါသည်', 'error'); return; }
+                existingItem.cartQty++;
+            } else { 
+                cart.push({ ...product, cartQty: 1 }); 
+            }
+            renderCart();
+        }
+
+        function updateCartQty(itemId, change) {
+            const cartItem = cart.find(item => item.id === itemId);
+            const product = inventory.find(p => p.id === itemId);
+            if (cartItem) {
+                const newQty = cartItem.cartQty + change;
+                if (newQty > 0 && newQty <= product.qty) { cartItem.cartQty = newQty; renderCart(); }
+            }
+        }
+
+        function setCartQty(itemId, val) {
+            const newQty = parseInt(val);
+            const product = inventory.find(p => p.id === itemId);
+            if (isNaN(newQty) || newQty < 1) { renderCart(); return; }
+            if (product && newQty > product.qty) { showNotification('စတော့လက်ကျန်ထက် ကျော်လွန်နေပါသည်', 'error'); renderCart(); return; }
+            const cartItem = cart.find(item => item.id === itemId);
+            if (cartItem) { cartItem.cartQty = newQty; renderCart(); }
+        }
+
+        function removeFromCart(itemId) { 
+            cart = cart.filter(item => item.id !== itemId); 
+            renderCart(); 
+        }
+
+        function renderCart() {
+            const container = document.getElementById('cart-items');
+            const totalEl = document.getElementById('cart-total');
+            const subtotalEl = document.getElementById('cart-subtotal');
+            const checkoutBtn = document.getElementById('checkout-btn');
+            
+            if (cart.length === 0) {
+                container.innerHTML = `<div class="text-center text-gray-400 mt-10"><p>ပစ္စည်း ရွေးချယ်ထားခြင်း မရှိပါ</p></div>`;
+                checkoutBtn.disabled = true;
+                totalEl.textContent = '0 ကျပ်';
+                subtotalEl.textContent = '0 ကျပ်';
+            } else {
+                checkoutBtn.disabled = false;
+                let subtotal = 0;
+                container.innerHTML = cart.map(item => {
+                    const lineTotal = item.price * item.cartQty;
+                    subtotal += lineTotal;
+                    return `
+                        <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
+                            <div class="flex-1 mr-2">
+                                <p class="font-medium text-gray-800 text-sm mb-1">${item.name}</p>
+                                <div class="flex items-center gap-1">
+                                    <span class="text-xs text-gray-500">Price:</span>
+                                    <input type="number" value="${item.price}" onchange="updateCartPrice(${item.id}, this.value)" class="w-20 p-1 text-xs border rounded bg-white text-teal-600 font-bold focus:outline-none focus:border-teal-500">
+                                    <span class="text-xs text-gray-400">Kyat</span>
+                                </div>
+                            </div>
+                            <div class="flex flex-col items-end gap-2">
+                                <p class="text-teal-600 text-xs font-bold">${lineTotal} ကျပ်</p>
+                                <div class="flex items-center gap-2 bg-white rounded border border-gray-200 p-0.5">
+                                    <button onclick="updateCartQty(${item.id}, -1)" class="p-1 hover:bg-gray-100 rounded text-gray-600"><i data-lucide="minus" class="w-3 h-3"></i></button>
+                                    <input type="number" value="${item.cartQty}" onchange="setCartQty(${item.id}, this.value)" class="w-10 text-center text-xs font-bold focus:outline-none bg-transparent">
+                                    <button onclick="updateCartQty(${item.id}, 1)" class="p-1 hover:bg-gray-100 rounded text-gray-600"><i data-lucide="plus" class="w-3 h-3"></i></button>
+                                </div>
+                                <button onclick="removeFromCart(${item.id})" class="text-red-400 hover:text-red-600 text-xs flex items-center gap-1"><i data-lucide="trash-2" class="w-3 h-3"></i> ဖျက်မည်</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                subtotalEl.textContent = `${subtotal.toLocaleString()} ကျပ်`;
+                const finalTotal = subtotal - currentDiscount;
+                totalEl.textContent = `${(finalTotal > 0 ? finalTotal : 0).toLocaleString()} ကျပ်`;
+            }
+            lucide.createIcons();
+        }
+
+        function handleCheckout() {
+            if (cart.length === 0) return;
+            
+            let subtotal = 0;
+            let transactionProfit = 0;
+            
+            cart.forEach(item => {
+                const lineTotal = item.price * item.cartQty;
+                const itemProfit = (item.price - item.cost) * item.cartQty;
+                subtotal += lineTotal;
+                transactionProfit += itemProfit;
+            });
+            
+            const total = subtotal - currentDiscount;
+            const finalProfit = transactionProfit - currentDiscount;
+            const dateObj = new Date(currentCartDate);
+            
+            const transaction = {
+                id: Date.now(),
+                date: dateObj.toLocaleDateString('en-GB'),
+                dateStr: currentCartDate,
+                items: JSON.parse(JSON.stringify(cart)), 
+                subtotal: subtotal,
+                discount: currentDiscount,
+                total: total,
+                profit: finalProfit
+            };
+            
+            salesHistory.unshift(transaction);
+            
+            inventory = inventory.map(item => {
+                const cartItem = cart.find(c => c.id === item.id);
+                if (cartItem) { return { ...item, qty: item.qty - cartItem.cartQty }; }
+                return item;
+            });
+            
+            // Explicitly Save Data
+            saveData();
+            
+            cart = [];
+            currentDiscount = 0;
+            document.getElementById('pos-discount').value = 0;
+            
+            renderCart();
+            renderPOS(); 
+            showNotification('ငွေရှင်းပြီးပါပြီ - အရောင်းစာရင်းသို့ ထည့်သွင်းလိုက်ပါပြီ');
+        }
+
+        // --- Sales Report Logic ---
+        
+        function toggleReportType() {
+            const reportType = document.getElementById('report-type').value;
+            const dateFilter = document.getElementById('sales-date-filter');
+            const monthFilter = document.getElementById('sales-month-filter');
+            if (reportType === 'daily') {
+                dateFilter.classList.remove('hidden');
+                monthFilter.classList.add('hidden');
+            } else {
+                dateFilter.classList.add('hidden');
+                monthFilter.classList.remove('hidden');
+            }
+            renderSales();
+        }
+
+        function renderSales() {
+            const reportType = document.getElementById('report-type').value;
+            const tableBody = document.getElementById('sales-table-body');
+            const noSalesMsg = document.getElementById('no-sales-msg');
+            const totalSalesEl = document.getElementById('report-total-sales');
+            const totalProfitEl = document.getElementById('report-total-profit');
+            const dateDisplay = document.getElementById('sales-date-display');
+            
+            let filteredSales = [];
+            let displayLabel = '';
+            
+            if (reportType === 'daily') {
+                const dateFilter = document.getElementById('sales-date-filter').value;
+                displayLabel = dateFilter || 'All Time';
+                filteredSales = salesHistory.filter(txn => txn.dateStr === dateFilter);
+            } else {
+                const monthFilter = document.getElementById('sales-month-filter').value;
+                displayLabel = monthFilter ? monthFilter : 'All Time';
+                filteredSales = salesHistory.filter(txn => txn.dateStr.startsWith(monthFilter));
+            }
+            
+            dateDisplay.textContent = displayLabel;
+            
+            if (filteredSales.length === 0) {
+                tableBody.innerHTML = '';
+                noSalesMsg.classList.remove('hidden');
+                totalSalesEl.textContent = '0 ကျပ်';
+                totalProfitEl.textContent = '0 ကျပ်';
+                return;
+            }
+            
+            noSalesMsg.classList.add('hidden');
+            
+            const grandTotalSales = filteredSales.reduce((sum, txn) => sum + txn.total, 0);
+            const grandTotalProfit = filteredSales.reduce((sum, txn) => sum + txn.profit, 0);
+            
+            totalSalesEl.textContent = `${grandTotalSales.toLocaleString()} ကျပ်`;
+            totalProfitEl.textContent = `${grandTotalProfit.toLocaleString()} ကျပ်`;
+            
+            tableBody.innerHTML = filteredSales.map(txn => {
+                const itemList = txn.items.map(i => `${i.name} (x${i.cartQty})`).join(', ');
+                return `
+                    <tr class="hover:bg-gray-50 border-b border-gray-100 group">
+                        <td class="p-4 text-sm text-gray-600">${txn.date}</td>
+                        <td class="p-4 text-sm font-mono text-gray-500">INV-${txn.id.toString().slice(-6)}</td>
+                        <td class="p-4 text-sm text-gray-800">
+                            <p class="truncate max-w-xs" title="${itemList}">${itemList}</p>
+                        </td>
+                        <td class="p-4 text-sm text-right font-medium text-gray-700">${txn.total.toLocaleString()}</td>
+                        <td class="p-4 text-sm text-right font-bold text-green-600">+${txn.profit.toLocaleString()}</td>
+                        <td class="p-4 text-center">
+                            <div class="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onclick="openSaleEditModal(${txn.id})" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title="Edit"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                                <button onclick="openDeleteSaleModal(${txn.id})" class="p-1.5 text-red-600 hover:bg-red-50 rounded-lg" title="Delete"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            
+            lucide.createIcons();
+        }
+
+        // --- Sales Edit & Delete Logic ---
+        
+        function openDeleteSaleModal(id) {
+            itemToDelete = id;
+            deleteType = 'sale';
+            document.getElementById('delete-msg').textContent = "ဤဘောင်ချာကို ဖျက်လိုက်ပါက စတော့များကို ဂိုဒေါင်ထဲသို့ ပြန်ထည့်ပေးပါမည်။ သေချာပါသလား?";
+            const modal = document.getElementById('delete-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function openSaleEditModal(id) {
+            const sale = salesHistory.find(s => s.id === id);
+            if (!sale) return;
+            currentEditingSaleId = id;
+            tempSaleItems = JSON.parse(JSON.stringify(sale.items)); // Deep copy
+            
+            document.getElementById('sale-edit-date').value = sale.dateStr;
+            renderSaleEditItems();
+            
+            const modal = document.getElementById('sale-edit-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function closeSaleEditModal() {
+            document.getElementById('sale-edit-modal').classList.add('hidden');
+            document.getElementById('sale-edit-modal').classList.remove('flex');
+            currentEditingSaleId = null;
+            tempSaleItems = [];
+        }
+
+        function renderSaleEditItems() {
+            const container = document.getElementById('sale-edit-items');
+            let total = 0;
+            container.innerHTML = tempSaleItems.map((item, index) => {
+                const lineTotal = item.price * item.cartQty;
+                total += lineTotal;
+                return `
+                    <tr class="border-b border-gray-50">
+                        <td class="p-3 text-gray-700">${item.name}</td>
+                        <td class="p-3 text-right text-gray-600">${item.price}</td>
+                        <td class="p-3 text-center">
+                            <input type="number" value="${item.cartQty}" min="1" 
+                                onchange="updateTempSaleItem(${index}, this.value)"
+                                class="w-16 p-1 border rounded text-center focus:outline-none focus:border-teal-500">
+                        </td>
+                        <td class="p-3 text-right font-medium">${lineTotal}</td>
+                        <td class="p-3 text-center">
+                            <button onclick="removeTempSaleItem(${index})" class="text-red-500 hover:text-red-700"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            
+            document.getElementById('sale-edit-total').textContent = `${total.toLocaleString()} ကျပ်`;
+            lucide.createIcons();
+        }
+
+        function updateTempSaleItem(index, val) {
+            const newQty = parseInt(val);
+            if (newQty > 0) {
+                tempSaleItems[index].cartQty = newQty;
+                renderSaleEditItems();
+            }
+        }
+
+        function removeTempSaleItem(index) {
+            tempSaleItems.splice(index, 1);
+            renderSaleEditItems();
+        }
+
+        function saveSaleChanges() {
+            const saleIndex = salesHistory.findIndex(s => s.id === currentEditingSaleId);
+            if (saleIndex === -1) return;
+
+            const oldSale = salesHistory[saleIndex];
+            const newDateStr = document.getElementById('sale-edit-date').value;
+            
+            // Revert Stock
+            oldSale.items.forEach(oldItem => {
+                const prod = inventory.find(p => p.id === oldItem.id);
+                if (prod) prod.qty += oldItem.cartQty;
+            });
+
+            // Deduct New Stock
+            tempSaleItems.forEach(newItem => {
+                const prod = inventory.find(p => p.id === newItem.id);
+                if (prod) prod.qty -= newItem.cartQty;
+            });
+
+            // Recalculate
+            let subtotal = 0;
+            let profit = 0;
+            tempSaleItems.forEach(item => {
+                subtotal += (item.price * item.cartQty);
+                profit += (item.price - item.cost) * item.cartQty;
+            });
+            const discount = oldSale.discount; 
+            const total = subtotal - discount;
+            const finalProfit = profit - discount;
+
+            salesHistory[saleIndex] = {
+                ...oldSale,
+                dateStr: newDateStr,
+                date: new Date(newDateStr).toLocaleDateString('en-GB'),
+                items: tempSaleItems,
+                subtotal: subtotal,
+                total: total,
+                profit: finalProfit
+            };
+            
+            saveData();
+            
+            closeSaleEditModal();
+            renderSales();
+            renderInventory(); 
+            renderPOS(); 
+            showNotification('ဘောင်ချာကို ပြင်ဆင်ပြီးပါပြီ');
+        }
+
+        // --- Shared Edit & Delete Logic ---
+        
+        function openEditModal(id) { 
+            const item = inventory.find(i => i.id === id);
+            if (!item) return;
+            
+            document.getElementById('edit-id').value = item.id;
+            document.getElementById('edit-code').value = item.code;
+            document.getElementById('edit-bin').value = item.bin || ''; 
+            document.getElementById('edit-name').value = item.name;
+            document.getElementById('edit-chemical').value = item.chemical || ''; 
+            document.getElementById('edit-expiry').value = item.expiry;
+            document.getElementById('edit-cost').value = item.cost;
+            document.getElementById('edit-price').value = item.price;
+            document.getElementById('edit-qty').value = item.qty;
+            
+            const modal = document.getElementById('edit-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            lucide.createIcons();
+        }
+
+        function closeEditModal() {
+            const modal = document.getElementById('edit-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function handleSaveEdit(e) {
+            e.preventDefault();
+            const id = Number(document.getElementById('edit-id').value);
+            const code = document.getElementById('edit-code').value;
+            const bin = document.getElementById('edit-bin').value;
+            const name = document.getElementById('edit-name').value;
+            const chemical = document.getElementById('edit-chemical').value;
+            const expiry = document.getElementById('edit-expiry').value;
+            const cost = Number(document.getElementById('edit-cost').value);
+            const price = Number(document.getElementById('edit-price').value);
+            const qty = Number(document.getElementById('edit-qty').value);
+            const profit = price - cost;
+            
+            inventory = inventory.map(item => {
+                if (item.id === id) { return { ...item, code, bin, name, chemical, expiry, cost, price, qty, profit }; }
+                return item;
+            });
+            
+            saveData();
+            
+            closeEditModal();
+            renderInventory();
+            renderPOS();
+            showNotification('ပစ္စည်းအချက်အလက် ပြင်ဆင်ပြီးပါပြီ');
+        }
+
+        function openDeleteModal(id) {
+            itemToDelete = id;
+            deleteType = 'inventory';
+            document.getElementById('delete-msg').textContent = "ဤလုပ်ဆောင်ချက်ကို ပြန်ပြင်၍မရပါ။ သေချာပါသလား?";
+            const modal = document.getElementById('delete-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeDeleteModal() {
+            itemToDelete = null;
+            deleteType = null;
+            const modal = document.getElementById('delete-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function confirmDelete() {
+            if (!itemToDelete) return;
+
+            if (deleteType === 'inventory') {
+                inventory = inventory.filter(item => item.id !== itemToDelete);
+                showNotification('ပစ္စည်းကို ဖျက်လိုက်ပါပြီ', 'error');
+            } else if (deleteType === 'sale') {
+                const sale = salesHistory.find(s => s.id === itemToDelete);
+                if (sale) {
+                    sale.items.forEach(cartItem => {
+                        const product = inventory.find(p => p.id === cartItem.id);
+                        if (product) product.qty += cartItem.cartQty;
+                    });
+                    salesHistory = salesHistory.filter(s => s.id !== itemToDelete);
+                    showNotification('ဘောင်ချာကို ဖျက်ပြီး စတော့များကို ပြန်လည်ဖြည့်တင်းပြီးပါပြီ', 'success');
+                }
+            }
+            
+            saveData();
+            
+            closeDeleteModal();
+            renderInventory();
+            renderPOS();
+            renderSales(); 
+        }
+
+        // --- Inventory Logic ---
+        
+        function renderInventory() {
+            const searchTerm = document.getElementById('inventory-search').value.toLowerCase();
+            const container = document.getElementById('inventory-table-body');
+            const totalValueEl = document.getElementById('inventory-total-value');
+            
+            const filteredItems = inventory.filter(item => 
+                item.name.toLowerCase().includes(searchTerm) || 
+                item.code.toLowerCase().includes(searchTerm) ||
+                (item.chemical && item.chemical.toLowerCase().includes(searchTerm)) ||
+                (item.bin && item.bin.toLowerCase().includes(searchTerm)) ||
+                item.expiry.includes(searchTerm)
+            );
+
+            const totalValue = filteredItems.reduce((acc, item) => acc + (item.cost * item.qty), 0);
+            if(totalValueEl) totalValueEl.textContent = `${totalValue.toLocaleString()} ကျပ်`;
+
+            container.innerHTML = filteredItems.map(item => {
+                const status = checkExpiryStatus(item.expiry);
+                let statusBadge = '';
+                if (status === 'expired') statusBadge = '<span class="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full font-bold">Expired</span>';
+                else if (status === 'warning') statusBadge = '<span class="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded-full font-bold">Expiring Soon</span>';
+                else statusBadge = '<span class="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full font-bold">Good</span>';
+
+                return `
+                    <tr class="hover:bg-gray-50 border-b border-gray-100 group">
+                        <td class="p-4 font-mono text-sm">${item.code}</td>
+                        <td class="p-4 text-sm text-gray-500">${item.bin || '-'}</td>
+                        <td class="p-4 font-medium text-gray-800">
+                            ${item.name}
+                        </td>
+                        <td class="p-4 text-sm text-gray-500 max-w-xs truncate" title="${item.chemical || ''}">${item.chemical || '-'}</td>
+                        <td class="p-4 text-gray-600">${item.expiry}</td>
+                        <td class="p-4 text-right text-teal-600 font-medium">${item.price}</td>
+                        <td class="p-4 text-right font-bold">${item.qty}</td>
+                        <td class="p-4 text-center">${statusBadge}</td>
+                        <td class="p-4 text-center">
+                            <div class="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onclick="openEditModal(${item.id})" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg" title="Edit">
+                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                </button>
+                                <button onclick="openDeleteModal(${item.id})" class="p-1.5 text-red-600 hover:bg-red-50 rounded-lg" title="Delete">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        // --- Inbound & Initialization ---
+        
+        function calculateProfitPreview() {
+            const cost = Number(document.getElementById('in-cost').value) || 0;
+            const price = Number(document.getElementById('in-price').value) || 0;
+            const profit = price - cost;
+            document.getElementById('profit-preview').textContent = `${profit} ကျပ်`;
+        }
+
+        function handleAddItem(event) {
+            event.preventDefault();
+            
+            const code = document.getElementById('in-code').value;
+            const bin = document.getElementById('in-bin').value;
+            const name = document.getElementById('in-name').value;
+            const chemical = document.getElementById('in-chemical').value;
+            const expiry = document.getElementById('in-expiry').value;
+            const cost = Number(document.getElementById('in-cost').value);
+            const price = Number(document.getElementById('in-price').value);
+            const qty = Number(document.getElementById('in-qty').value);
+            
+            if (!code || !name || !expiry || !cost || !price || !qty) return;
+            
+            const profit = price - cost;
+            const newItem = { id: Date.now(), code, bin, name, chemical, expiry, cost, price, qty, profit };
+            inventory.push(newItem);
+            
+            saveData();
+            
+            document.getElementById('inbound-form').reset();
+            document.getElementById('profit-preview').textContent = '0 ကျပ်';
+            showNotification('ပစ္စည်းအသစ် ထည့်သွင်းပြီးပါပြီ');
+        }
+        
+        // --- Alerts Render ---
+        
+        function renderAlerts() {
+            const expiredBody = document.getElementById('expired-table-body');
+            const stockoutBody = document.getElementById('stockout-table-body');
+            const noExpiredMsg = document.getElementById('no-expired-msg');
+            const noStockoutMsg = document.getElementById('no-stockout-msg');
+            const expiredCount = document.getElementById('expired-count');
+            const stockoutCount = document.getElementById('stockout-count');
+            
+            const expiredItems = inventory.filter(item => checkExpiryStatus(item.expiry) === 'expired');
+            const stockoutItems = inventory.filter(item => item.qty <= 5);
+            
+            expiredCount.textContent = expiredItems.length;
+            stockoutCount.textContent = stockoutItems.length;
+            
+            if (expiredItems.length === 0) { 
+                expiredBody.innerHTML = ''; 
+                noExpiredMsg.classList.remove('hidden'); 
+            } else {
+                noExpiredMsg.classList.add('hidden');
+                expiredBody.innerHTML = expiredItems.map(item => `<tr class="border-b border-gray-50 hover:bg-red-50/50"><td class="p-3 font-medium text-gray-700">${item.name}</td><td class="p-3 text-gray-500">${item.bin || '-'}</td><td class="p-3 text-right font-bold text-red-600">${item.expiry}</td><td class="p-3 text-right text-gray-600">${item.qty}</td></tr>`).join('');
+            }
+            
+            if (stockoutItems.length === 0) { 
+                stockoutBody.innerHTML = ''; 
+                noStockoutMsg.classList.remove('hidden'); 
+            } else {
+                noStockoutMsg.classList.add('hidden');
+                stockoutBody.innerHTML = stockoutItems.map(item => `<tr class="border-b border-gray-50 hover:bg-orange-50/50"><td class="p-3 font-medium text-gray-700">${item.name}</td><td class="p-3 text-gray-500">${item.bin || '-'}</td><td class="p-3 text-right text-gray-500">${item.expiry}</td><td class="p-3 text-right font-bold text-orange-600">${item.qty}</td></tr>`).join('');
+            }
+        }
+
+        // --- Application Init ---
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            loadData(); // Load data from localStorage on startup
+            
+            const today = new Date().toISOString().split('T')[0];
+            const datePicker = document.getElementById('pos-date');
+            if(datePicker) datePicker.value = today;
+            
+            renderPOS();
+        });
+
+    </script>
+</body>
+</html>

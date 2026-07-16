@@ -1,0 +1,21 @@
+{
+  "name": "pharmacy-pos-professional",
+  "version": "1.0.0",
+  "description": "Professional pharmacy POS system with Express, SQLite, authentication, and audit logs.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js",
+    "test": "echo \"No automated tests configured\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.11.1",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "xlsx": "^0.18.5"
+  }
+}
