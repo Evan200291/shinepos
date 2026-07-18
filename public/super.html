@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Admin - Shine Digital</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/application.css?v=20260718">
+    <link rel="stylesheet" href="/pos-theme.css?v=20260718-operations">
+    <style>
+        .hidden {
+            display: none !important;
+        }
+
+        .h-3, .w-3 { width: 0.75rem; height: 0.75rem; }
+        .h-4, .w-4 { width: 1rem; height: 1rem; }
+        .h-5, .w-5 { width: 1.25rem; height: 1.25rem; }
+        .h-6, .w-6 { width: 1.5rem; height: 1.5rem; }
+
+        /* Shop detail tabs */
+        .detail-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.25rem;
+            flex-wrap: wrap;
+        }
+
+        .detail-tab {
+            padding: 0.55rem 1.1rem;
+            border-radius: 0.25rem;
+            border: 1px solid var(--border);
+            background: var(--white);
+            color: var(--muted);
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.88rem;
+            transition: 0.2s;
+        }
+
+        .detail-tab.active {
+            background: var(--ocean-soft);
+            color: var(--navy);
+            border-color: var(--ocean);
+        }
+
+        .detail-panel {
+            display: none;
+        }
+
+        .detail-panel.active {
+            display: block;
+        }
+
+        /* Keep Super Admin operations visually consistent with the POS workspace. */
+        :root { --white: #ffffff; --gray: #b2aeae; --blue: #db0202; --red: #db0202; --black: #000000; --border: #b2aeae; --navy: #000000; --muted: #555555; --ocean: #db0202; --ocean-soft: #fff1f1; }
+        .detail-tab { border-color: var(--gray); background: var(--white); color: var(--black); font-weight: 800; }
+        .detail-tab:hover, .detail-tab:focus-visible, .detail-tab.active { border-color: var(--blue); background: var(--blue); color: var(--white); }
+        .table-actions-inline { display: flex; flex-wrap: wrap; gap: 7px; }
+        .status-active, .status-inactive, .status-suspended { display: inline-flex; align-items: center; gap: 7px; min-height: 26px; padding: 5px 9px; border: 1px solid var(--gray); border-radius: 999px; background: var(--white); color: var(--black); font-size: 10px; font-weight: 900; line-height: 1; text-transform: uppercase; }
+        .status-active .status-dot, .status-inactive .status-dot, .status-suspended .status-dot { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; }
+        .status-active .status-dot { background: var(--blue); }
+        .status-inactive .status-dot { background: var(--red); }
+        .status-suspended .status-dot { background: var(--black); }
+        .muted { color: var(--black); font-weight: 600; }
+        .expand-form-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+        .super-admin-page .expand-form.collapsed { display: none; }
+        @media (max-width: 720px) { .detail-tabs { gap: 6px; } .detail-tab { flex: 1 1 140px; } .expand-form-actions > button { flex: 1; } }
+    </style>
+</head>
+<body class="theme-body super-admin-page">
+    <div id="notification" class="notification hidden" role="status" aria-live="polite"></div>
+
+    <!-- App Shell -->
+    <section id="app-shell" class="app-shell hidden">
+        <div id="drawer-overlay" class="drawer-overlay hidden"></div>
+
+        <aside id="app-sidebar" class="app-sidebar">
+            <input type="checkbox" id="sidebar-toggle" class="sidebar-toggle-input">
+            <div class="sidebar-head">
+                <div class="brand-lockup store-lockup">
+                    <span class="store-mark" aria-hidden="true"><i data-lucide="shield-check" class="h-5 w-5"></i></span>
+                    <div class="store-copy">
+                        <span>Administration</span>
+                        <h2 class="brand-name small store-title">Shine Digital Store</h2>
+                    </div>
+                </div>
+                <label for="sidebar-toggle" class="sidebar-toggle-btn desktop-only-inline" title="Collapse or expand sidebar" aria-label="Collapse or expand sidebar" role="button" tabindex="0">
+                    <i data-lucide="menu" class="h-5 w-5 sidebar-toggle-icon" aria-hidden="true"></i>
+                </label>
+                <button id="sidebar-close-button" class="sidebar-close-btn mobile-sidebar-close mobile-only-inline" type="button" title="Close sidebar">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+
+            <nav id="sidebar-nav" class="nav-stack">
+                <button type="button" data-view="shops" class="nav-button nav-button-active">
+                    <i data-lucide="store" class="h-5 w-5"></i>
+                    <span>Shops</span>
+                </button>
+                <button type="button" data-view="backups" class="nav-button">
+                    <i data-lucide="database-backup" class="h-5 w-5"></i>
+                    <span>System Backup</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-user surface-card">
+                <p id="current-user-name" class="sidebar-user-name">-</p>
+                <p id="current-user-role" class="sidebar-user-role">Super Admin</p>
+            </div>
+        </aside>
+
+        <div class="app-main">
+            <header class="app-header">
+                <div class="app-header-left">
+                    <button id="mobile-menu-button" class="icon-btn mobile-nav-trigger mobile-only-inline" type="button" aria-label="Open navigation menu">
+                        <span class="menu-glyph" aria-hidden="true"><span></span><span></span><span></span></span>
+                    </button>
+                    <div class="app-title-block">
+                        <p class="app-title-kicker">Super Admin</p>
+                        <h1 id="page-title" class="app-header-title">Shops</h1>
+                    </div>
+                </div>
+                <div class="app-header-actions">
+                    <button id="logout-button" class="header-logout-btn" type="button" aria-label="Logout">
+                        <i data-lucide="log-out" class="h-4 w-4"></i>
+                        <span>Logout</span>
+                    </button>
+                </div>
+            </header>
+
+            <main class="content-scroll">
+                <!-- ===== SHOPS VIEW ===== -->
+                <section id="shops-view" data-view="shops" class="view-section section-stack">
+                    <div class="surface-panel">
+                        <div class="section-heading row">
+                            <h3>All Shops</h3>
+                            <button class="secondary-btn" id="add-shop-btn">
+                                <i data-lucide="plus" class="h-4 w-4"></i>
+                                Add Shop
+                            </button>
+                        </div>
+
+                        <!-- Inline expandable Add Shop form -->
+                        <div id="add-shop-expand" class="expand-form collapsed">
+                            <div class="surface-panel expand-form-panel">
+                                <form id="add-shop-form">
+                                    <div class="form-grid">
+                                        <div class="span-2">
+                                            <label class="field-label" for="new-shop-name">Shop Name</label>
+                                            <input type="text" id="new-shop-name" class="field-input" required placeholder="Enter shop name">
+                                        </div>
+
+                                        <hr class="span-2" style="margin: 0.25rem 0; border: none; border-top: 1px solid var(--border);">
+                                        <p class="span-2 muted" style="margin: 0;">Optional: set up an initial subscription</p>
+
+                                        <div>
+                                            <label class="field-label" for="new-shop-sub-start">Subscription Start Date</label>
+                                            <input type="date" id="new-shop-sub-start" class="field-input">
+                                        </div>
+                                        <div>
+                                            <label class="field-label" for="new-shop-sub-end">Subscription End Date</label>
+                                            <input type="date" id="new-shop-sub-end" class="field-input">
+                                        </div>
+                                        <div class="span-2">
+                                            <label class="field-label" for="new-shop-sub-remarks">Subscription Remarks</label>
+                                            <input type="text" id="new-shop-sub-remarks" class="field-input" placeholder="Optional remarks">
+                                        </div>
+
+                                        <hr class="span-2" style="margin: 0.25rem 0; border: none; border-top: 1px solid var(--border);">
+                                        <p class="span-2 muted" style="margin: 0;">Optional: create an initial admin user</p>
+
+                                        <div class="span-2">
+                                            <label class="field-label" for="new-shop-admin-fullname">Admin Full Name</label>
+                                            <input type="text" id="new-shop-admin-fullname" class="field-input" placeholder="Full name">
+                                        </div>
+                                        <div>
+                                            <label class="field-label" for="new-shop-admin-username">Admin Username</label>
+                                            <input type="text" id="new-shop-admin-username" class="field-input" placeholder="Username">
+                                        </div>
+                                        <div>
+                                            <label class="field-label" for="new-shop-admin-password">Admin Password</label>
+                                            <input type="password" id="new-shop-admin-password" class="field-input" placeholder="Password">
+                                        </div>
+
+                                        <div class="span-2 expand-form-actions">
+                                            <button type="button" class="ghost-btn" id="cancel-add-shop">Cancel</button>
+                                            <button type="submit" class="primary-btn">Add Shop</button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <div class="table-wrap" style="margin-top: 0.75rem;">
+                            <table class="data-table responsive-table shops-table">
+                                <thead>
+                                    <tr>
+                                        <th>Shop Name</th>
+                                        <th>Status</th>
+                                        <th>Days Left</th>
+                                        <th class="text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="shops-table"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ===== SYSTEM BACKUP VIEW ===== -->
+                <section id="backups-view" data-view="backups" class="view-section section-stack hidden">
+                    <div class="surface-panel">
+                        <div class="section-heading">
+                            <h3>System Database Backup</h3>
+                        </div>
+                        <p class="hero-subtitle">Create a complete, portable backup of all shops and their users, products, sales, sale items, stock movements, subscriptions, and audit records.</p>
+                        <div class="account-card mt-6">
+                            <div class="account-row"><span>Coverage</span><strong>All shops and system records</strong></div>
+                            <div class="account-row"><span>Format</span><strong>JSON or Excel workbook</strong></div>
+                            <div class="account-row"><span>Access</span><strong>Super Admin only</strong></div>
+                        </div>
+                        <div class="button-pair mt-6">
+                            <button id="download-system-backup-json" type="button" class="primary-btn">
+                                <i data-lucide="database-backup" class="h-4 w-4"></i>
+                                Download Full JSON Backup
+                            </button>
+                            <button id="download-system-backup-excel" type="button" class="secondary-btn">
+                                <i data-lucide="sheet" class="h-4 w-4"></i>
+                                Download Full Excel Backup
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ===== SHOP DETAILS VIEW ===== -->
+                <section id="shop-details-view" data-view="shop-details" class="view-section section-stack hidden">
+                    <div class="back-row">
+                        <button class="icon-btn" id="back-btn" type="button" aria-label="Back to shops">
+                            <i data-lucide="undo-2" class="h-5 w-5"></i>
+                        </button>
+                        <h2 id="shop-name" style="color: var(--navy); margin: 0;">Shop Details</h2>
+                    </div>
+
+                    <div class="surface-panel">
+                        <div class="section-heading row">
+                            <h3 id="shop-detail-title">Shop Details</h3>
+                            <div class="button-pair">
+                                <button class="secondary-btn" id="edit-shop-btn">
+                                    <i data-lucide="pencil" class="h-4 w-4"></i>
+                                    Edit Shop
+                                </button>
+                                <button class="secondary-btn" id="add-sub-btn">
+                                    <i data-lucide="calendar-plus" class="h-4 w-4"></i>
+                                    Edit Subscription
+                                </button>
+                                <button class="primary-btn" id="add-30-days-btn">
+                                    <i data-lucide="plus-circle" class="h-4 w-4"></i>
+                                    Add 30 Days
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Detail Tabs -->
+                        <div class="detail-tabs">
+                            <button class="detail-tab active" data-detail-tab="users">Users</button>
+                            <button class="detail-tab" data-detail-tab="products">Products</button>
+                            <button class="detail-tab" data-detail-tab="movements">Stock Movements</button>
+                            <button class="detail-tab" data-detail-tab="subscriptions">Subscriptions</button>
+                        </div>
+
+                        <!-- Users Panel -->
+                        <div id="detail-users" class="detail-panel active">
+                            <div style="margin-bottom: 1rem;">
+                                <button class="secondary-btn" id="add-user-btn">
+                                    <i data-lucide="user-plus" class="h-4 w-4"></i>
+                                    Add User
+                                </button>
+                            </div>
+                            <div class="table-wrap">
+                                <table class="data-table responsive-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Username</th>
+                                            <th>Role</th>
+                                            <th>Status</th>
+                                            <th class="text-center">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="users-table"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Products Panel -->
+                        <div id="detail-products" class="detail-panel">
+                            <div class="table-wrap">
+                                <table class="data-table responsive-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Code</th>
+                                            <th>Name</th>
+                                            <th class="text-right">Quantity</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="products-table"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Stock Movements Panel -->
+                        <div id="detail-movements" class="detail-panel">
+                            <div class="table-wrap">
+                                <table class="data-table responsive-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Product</th>
+                                            <th>Type</th>
+                                            <th class="text-right">Qty Change</th>
+                                            <th class="text-right">Balance</th>
+                                            <th>Note</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="movements-table"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Subscriptions Panel -->
+                        <div id="detail-subscriptions" class="detail-panel">
+                            <div class="table-wrap">
+                                <table class="data-table responsive-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Start Date</th>
+                                            <th>End Date</th>
+                                            <th>Remarks</th>
+                                            <th>Created</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="subscriptions-table"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <!-- Mobile Footer -->
+            <nav id="mobile-footer" class="mobile-footer">
+                <button type="button" data-view="shops" class="footer-button footer-button-active">
+                    <i data-lucide="store" class="h-5 w-5"></i>
+                    <span>Shops</span>
+                </button>
+                <button type="button" data-view="backups" class="footer-button">
+                    <i data-lucide="database-backup" class="h-5 w-5"></i>
+                    <span>Backup</span>
+                </button>
+            </nav>
+        </div>
+    </section>
+
+    <!-- Modals (for edit shop, add user, add subscription, edit user) -->
+    <div id="modal-overlay" class="modal-shell hidden">
+        <div class="modal-card" id="modal-content"></div>
+    </div>
+
+    <script>
+        // ---- State ----
+        let state = {
+            token: localStorage.getItem('super_token') || '',
+            user: null,
+            shops: [],
+            selectedShop: null
+        };
+
+        // ---- Utility ----
+        async function api(url, options = {}) {
+            const res = await fetch(url, {
+                method: options.method || 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(state.token ? { 'Authorization': 'Bearer ' + state.token } : {})
+                },
+                body: options.body ? JSON.stringify(options.body) : undefined
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.message || 'Request failed');
+            return data;
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('en-GB');
+        }
+
+        function formatDaysLeft(dateStr) {
+            if (!dateStr) return 'No subscription';
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const end = new Date(dateStr);
+            end.setHours(0, 0, 0, 0);
+            const diffDays = Math.ceil((end - today) / 86400000);
+            if (diffDays < 0) return 'Expired';
+            if (diffDays === 0) return 'Expires today';
+            return diffDays + (diffDays === 1 ? ' day' : ' days');
+        }
+
+        function escapeHtml(str) {
+            return String(str || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function notify(msg, isError = false) {
+            const el = document.getElementById('notification');
+            el.textContent = msg;
+            el.className = 'notification' + (isError ? ' error' : '');
+            el.setAttribute('role', isError ? 'alert' : 'status');
+            el.classList.remove('hidden');
+            clearTimeout(el._timer);
+            el._timer = setTimeout(() => el.classList.add('hidden'), 3500);
+        }
+
+        // ---- Modal helpers ----
+        function showModal(content, options = {}) {
+            const modal = document.getElementById('modal-overlay');
+            const modalContent = document.getElementById('modal-content');
+            modalContent.innerHTML = content;
+            modalContent.style.maxWidth = options.wide ? '640px' : '500px';
+            modal.classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function hideModal() {
+            document.getElementById('modal-overlay').classList.add('hidden');
+        }
+
+        // ---- Expandable form ----
+        function expandForm(el) {
+            el.classList.remove('collapsed');
+        }
+
+        function collapseForm(el) {
+            el.classList.add('collapsed');
+        }
+
+        // ---- Sidebar / Mobile ----
+        function openSidebar() {
+            if (window.innerWidth <= 980) document.getElementById('sidebar-toggle').checked = false;
+            document.getElementById('app-sidebar').classList.add('open');
+            document.getElementById('drawer-overlay').classList.remove('hidden');
+        }
+
+        function closeSidebar() {
+            document.getElementById('app-sidebar').classList.remove('open');
+            document.getElementById('drawer-overlay').classList.add('hidden');
+        }
+
+        function setActiveNav(view) {
+            document.querySelectorAll('.nav-button, .footer-button').forEach(btn => {
+                btn.classList.toggle('nav-button-active', btn.dataset.view === view);
+                btn.classList.toggle('footer-button-active', btn.dataset.view === view);
+            });
+        }
+
+        // ---- RENDER: Shops list ----
+        function renderShops() {
+            const tbody = document.getElementById('shops-table');
+            tbody.innerHTML = state.shops.map(shop => {
+                const subscriptionText = shop.subscription ? formatDaysLeft(shop.subscription.end_date) : 'No subscription';
+                const isSuspended = shop.is_active && (!shop.subscription || subscriptionText === 'Expired');
+                const statusClass = !shop.is_active ? 'status-inactive' : isSuspended ? 'status-suspended' : 'status-active';
+                const statusText = !shop.is_active ? 'Disabled' : isSuspended ? 'Suspended' : 'Active';
+                return `
+                    <tr>
+                        <td data-label="Shop"><strong class="shop-name">${escapeHtml(shop.name)}</strong></td>
+                        <td data-label="Status">
+                            <span class="${statusClass}"><span class="status-dot" aria-hidden="true"></span>${statusText}</span>
+                        </td>
+                        <td data-label="Subscription">${shop.subscription ? '<strong>' + escapeHtml(subscriptionText) + '</strong>' : '<span class="muted">No subscription</span>'}</td>
+                        <td data-label="Actions" class="text-center">
+                            <div class="table-actions-inline shop-actions">
+                                <button class="mini-btn edit-action" data-view-shop="${shop.id}"><i data-lucide="pencil" class="h-3 w-3"></i><span>Edit</span></button>
+                                <button class="mini-btn ${shop.is_active ? 'disable-action' : 'enable-action'}" data-toggle-shop="${shop.id}"><i data-lucide="${shop.is_active ? 'ban' : 'power'}" class="h-3 w-3"></i><span>${shop.is_active ? 'Disable' : 'Enable'}</span></button>
+                                <button class="mini-btn delete-action" data-delete-shop="${shop.id}"><i data-lucide="trash-2" class="h-3 w-3"></i><span>Delete</span></button>
+                            </div>
+                        </td>
+                    </tr>`;
+            }).join('') || '<tr><td colspan="4" class="empty-state">No shops found. Click "Add Shop" to create one.</td></tr>';
+            lucide.createIcons();
+        }
+
+        // ---- RENDER: Shop details ----
+        function renderShopDetails() {
+            const shop = state.selectedShop;
+            if (!shop) return;
+            document.getElementById('shop-name').textContent = shop.name;
+            document.getElementById('shop-detail-title').textContent = shop.name;
+
+            // Refresh shop data for latest subscription info
+            api('/api/super/shops').then(data => {
+                const updated = data.shops.find(s => s.id === shop.id);
+                if (updated) state.selectedShop = updated;
+            });
+
+            Promise.all([
+                api('/api/super/shops/' + shop.id + '/users'),
+                api('/api/super/shops/' + shop.id + '/products'),
+                api('/api/super/shops/' + shop.id + '/stock-movements'),
+                api('/api/super/shops/' + shop.id + '/subscriptions')
+            ]).then(([usersData, productsData, movementsData, subsData]) => {
+                // Update subscription button text based on existing subscriptions
+                const hasSub = subsData.subscriptions && subsData.subscriptions.length > 0;
+                const subBtn = document.getElementById('add-sub-btn');
+                subBtn.innerHTML = hasSub
+                    ? '<i data-lucide="pencil" class="h-4 w-4"></i> Edit Subscription'
+                    : '<i data-lucide="calendar-plus" class="h-4 w-4"></i> Add Subscription';
+                lucide.createIcons();
+                // Users
+                document.getElementById('users-table').innerHTML = usersData.users.map(user => `
+                    <tr>
+                        <td data-label="Name">${escapeHtml(user.fullName)}</td>
+                        <td data-label="Username">${escapeHtml(user.username)}</td>
+                        <td data-label="Role">${escapeHtml(user.role)}</td>
+                        <td data-label="Status"><span class="${user.isActive ? 'status-active' : 'status-inactive'}"><span class="status-dot" aria-hidden="true"></span>${user.isActive ? 'Active' : 'Disabled'}</span></td>
+                        <td data-label="Actions" class="text-center">
+                            <div class="table-actions-inline" style="justify-content: center;">
+                                <button class="mini-btn" data-edit-user="${user.id}">Edit</button>
+                                <button class="mini-btn danger-btn" data-delete-user="${user.id}">Disable</button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('') || '<tr><td colspan="5" class="empty-state">No users in this shop.</td></tr>';
+
+                // Products
+                document.getElementById('products-table').innerHTML = productsData.products.map(p => `
+                    <tr>
+                        <td data-label="Code">${escapeHtml(p.code)}</td>
+                        <td data-label="Product">${escapeHtml(p.name)}</td>
+                        <td data-label="Quantity" class="text-right">${p.quantity}</td>
+                        <td data-label="Status">
+                            <span class="status-pill ${p.status === 'expired' ? 'status-expired' : p.status === 'low' ? 'status-low' : 'status-good'}">
+                                ${p.status}
+                            </span>
+                        </td>
+                    </tr>
+                `).join('') || '<tr><td colspan="4" class="empty-state">No products in this shop.</td></tr>';
+
+                // Movements
+                document.getElementById('movements-table').innerHTML = movementsData.movements.map(m => `
+                    <tr>
+                        <td data-label="Date">${formatDate(m.createdAt)}</td>
+                        <td data-label="Product">${escapeHtml(m.productName)}</td>
+                        <td data-label="Type">${escapeHtml(m.movementType)}</td>
+                        <td data-label="Change" class="text-right">${m.quantityChange > 0 ? '+' + m.quantityChange : m.quantityChange}</td>
+                        <td data-label="Balance" class="text-right">${m.balanceAfter}</td>
+                        <td data-label="Note">${escapeHtml(m.note || '')}</td>
+                    </tr>
+                `).join('') || '<tr><td colspan="6" class="empty-state">No stock movements recorded.</td></tr>';
+
+                // Subscriptions
+                document.getElementById('subscriptions-table').innerHTML = subsData.subscriptions.map(s => `
+                    <tr>
+                        <td data-label="Start">${formatDate(s.start_date)}</td>
+                        <td data-label="End">${formatDate(s.end_date)}</td>
+                        <td data-label="Remarks">${escapeHtml(s.remarks || '')}</td>
+                        <td data-label="Created">${formatDate(s.created_at)}</td>
+                    </tr>
+                `).join('') || '<tr><td colspan="4" class="empty-state">No subscriptions found.</td></tr>';
+
+                lucide.createIcons();
+            });
+
+            document.getElementById('shops-view').classList.add('hidden');
+            document.getElementById('shop-details-view').classList.remove('hidden');
+            const pt = document.getElementById('page-title');
+            if (pt) pt.textContent = shop.name;
+            setActiveNav(null);
+        }
+
+        // ---- Navigation ----
+        function showShopsView() {
+            document.getElementById('backups-view').classList.add('hidden');
+            document.getElementById('shop-details-view').classList.add('hidden');
+            document.getElementById('shops-view').classList.remove('hidden');
+            const pt = document.getElementById('page-title');
+            if (pt) pt.textContent = 'Shops';
+            state.selectedShop = null;
+            setActiveNav('shops');
+        }
+
+        function showBackupsView() {
+            document.getElementById('shops-view').classList.add('hidden');
+            document.getElementById('shop-details-view').classList.add('hidden');
+            document.getElementById('backups-view').classList.remove('hidden');
+            document.getElementById('page-title').textContent = 'System Backup';
+            state.selectedShop = null;
+            setActiveNav('backups');
+        }
+
+        async function downloadSystemBackup(format) {
+            const response = await fetch('/api/super/export/' + format, {
+                headers: { Authorization: 'Bearer ' + state.token }
+            });
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.message || 'Unable to create system backup.');
+            }
+            const blob = await response.blob();
+            const disposition = response.headers.get('Content-Disposition') || '';
+            const filename = (disposition.match(/filename="?([^";]+)"?/) || [])[1] || `shine-digital-system-backup.${format === 'excel' ? 'xlsx' : 'json'}`;
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function clearSession() {
+            state.token = '';
+            state.user = null;
+            state.shops = [];
+            state.selectedShop = null;
+            localStorage.removeItem('super_token');
+            document.getElementById('app-shell').classList.add('hidden');
+            window.location.assign('/');
+        }
+
+        function showApp() {
+            document.getElementById('app-shell').classList.remove('hidden');
+            document.getElementById('current-user-name').textContent = state.user.fullName;
+            loadShops();
+        }
+
+        async function loadShops() {
+            try {
+                const data = await api('/api/super/shops');
+                state.shops = data.shops;
+                renderShops();
+            } catch (err) {
+                notify(err.message, true);
+            }
+        }
+
+        // ---- EVENT BINDINGS ----
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+
+            // Auto-login check
+            if (state.token) {
+                api('/api/auth/me').then(data => {
+                    if (data.user.role !== 'super_admin') throw new Error('Not authorized');
+                    state.user = data.user;
+                    showApp();
+                }).catch(() => clearSession());
+            } else {
+                window.location.replace('/');
+            }
+
+            // Logout
+            document.getElementById('logout-button').addEventListener('click', clearSession);
+
+            // Mobile menu
+            document.getElementById('mobile-menu-button').addEventListener('click', openSidebar);
+            document.getElementById('sidebar-close-button').addEventListener('click', closeSidebar);
+            document.getElementById('drawer-overlay').addEventListener('click', closeSidebar);
+
+            // Sidebar nav
+            document.querySelectorAll('.nav-button[data-view]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const view = btn.dataset.view;
+                    if (view === 'shops') showShopsView();
+                    if (view === 'backups') showBackupsView();
+                    closeSidebar();
+                });
+            });
+
+            // Footer nav
+            document.querySelectorAll('.footer-button[data-view]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const view = btn.dataset.view;
+                    if (view === 'shops') showShopsView();
+                    if (view === 'backups') showBackupsView();
+                });
+            });
+
+            document.getElementById('download-system-backup-json').addEventListener('click', async () => {
+                try { await downloadSystemBackup('backup'); notify('System JSON backup downloaded.'); }
+                catch (err) { notify(err.message, true); }
+            });
+            document.getElementById('download-system-backup-excel').addEventListener('click', async () => {
+                try { await downloadSystemBackup('excel'); notify('System Excel backup downloaded.'); }
+                catch (err) { notify(err.message, true); }
+            });
+
+            // ---- Add Shop (inline expandable) ----
+            const addShopBtn = document.getElementById('add-shop-btn');
+            const addShopExpand = document.getElementById('add-shop-expand');
+            const cancelAddShop = document.getElementById('cancel-add-shop');
+            const addShopForm = document.getElementById('add-shop-form');
+
+            addShopBtn.addEventListener('click', () => {
+                if (addShopExpand.classList.contains('collapsed')) {
+                    // Pre-fill today's date
+                    const today = new Date().toISOString().split('T')[0];
+                    document.getElementById('new-shop-sub-start').value = today;
+                    document.getElementById('new-shop-sub-end').value = '';
+                    document.getElementById('new-shop-sub-remarks').value = '';
+                    document.getElementById('new-shop-name').value = '';
+                    document.getElementById('new-shop-admin-fullname').value = '';
+                    document.getElementById('new-shop-admin-username').value = '';
+                    document.getElementById('new-shop-admin-password').value = '';
+                    expandForm(addShopExpand);
+                } else {
+                    collapseForm(addShopExpand);
+                }
+            });
+
+            cancelAddShop.addEventListener('click', () => collapseForm(addShopExpand));
+
+            addShopForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const submitBtn = addShopForm.querySelector('button[type="submit"]');
+                submitBtn.disabled = true;
+                try {
+                    const name = document.getElementById('new-shop-name').value.trim();
+                    const subEnd = document.getElementById('new-shop-sub-end').value.trim();
+                    const adminFullName = document.getElementById('new-shop-admin-fullname').value.trim();
+                    const adminUsername = document.getElementById('new-shop-admin-username').value.trim();
+                    const adminPassword = document.getElementById('new-shop-admin-password').value;
+
+                    if (!name) throw new Error('Shop name is required.');
+
+                    const { shopId } = await api('/api/super/shops', {
+                        method: 'POST',
+                        body: { name }
+                    });
+
+                    if (subEnd) {
+                        await api('/api/super/shops/' + shopId + '/subscriptions', {
+                            method: 'POST',
+                            body: {
+                                startDate: document.getElementById('new-shop-sub-start').value,
+                                endDate: subEnd,
+                                remarks: document.getElementById('new-shop-sub-remarks').value
+                            }
+                        });
+                    }
+
+                    if (adminFullName || adminUsername || adminPassword) {
+                        if (!adminFullName || !adminUsername || !adminPassword) {
+                            throw new Error('Full name, username, and password are all required to create the admin user.');
+                        }
+                        await api('/api/super/shops/' + shopId + '/users', {
+                            method: 'POST',
+                            body: {
+                                fullName: adminFullName,
+                                username: adminUsername,
+                                password: adminPassword,
+                                role: 'admin'
+                            }
+                        });
+                    }
+
+                    notify('Shop created successfully!');
+                    collapseForm(addShopExpand);
+                    await loadShops();
+                } catch (err) {
+                    notify(err.message, true);
+                } finally {
+                    submitBtn.disabled = false;
+                }
+            });
+
+            // ---- Modal overlay close ----
+            document.getElementById('modal-overlay').addEventListener('click', (e) => {
+                if (e.target.id === 'modal-overlay') hideModal();
+            });
+
+            // ---- Back button ----
+            document.getElementById('back-btn').addEventListener('click', showShopsView);
+
+            // ---- Detail tabs ----
+            document.querySelectorAll('.detail-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const target = tab.dataset.detailTab;
+                    document.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.detail-panel').forEach(p => p.classList.remove('active'));
+                    tab.classList.add('active');
+                    document.getElementById('detail-' + target).classList.add('active');
+                });
+            });
+
+            // ---- Edit Shop (modal) ----
+            document.getElementById('edit-shop-btn').addEventListener('click', () => {
+                const shop = state.selectedShop;
+                if (!shop) return;
+                showModal(`
+                    <div class="section-heading row">
+                        <h3>Edit Shop</h3>
+                        <button class="icon-btn" onclick="hideModal()" type="button">
+                            <i data-lucide="x" class="h-5 w-5"></i>
+                        </button>
+                    </div>
+                    <form id="edit-shop-form" class="stack-form">
+                        <div>
+                            <label class="field-label" for="edit-shop-name">Shop Name</label>
+                            <input type="text" id="edit-shop-name" class="field-input" value="${escapeHtml(shop.name)}" required>
+                        </div>
+                        <div>
+                            <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                <input type="checkbox" id="edit-shop-active" ${shop.is_active ? 'checked' : ''}>
+                                Active
+                            </label>
+                        </div>
+                        <div class="button-pair" style="justify-content: flex-end;">
+                            <button type="button" class="ghost-btn" onclick="hideModal()">Cancel</button>
+                            <button type="submit" class="primary-btn">Save Changes</button>
+                        </div>
+                    </form>
+                `);
+                document.getElementById('edit-shop-form').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    try {
+                        await api('/api/super/shops/' + shop.id, {
+                            method: 'PUT',
+                            body: {
+                                name: document.getElementById('edit-shop-name').value,
+                                isActive: document.getElementById('edit-shop-active').checked
+                            }
+                        });
+                        hideModal();
+                        notify('Shop updated.');
+                        await loadShops();
+                        // Refresh detail
+                        state.selectedShop = state.shops.find(s => s.id === shop.id);
+                        if (state.selectedShop) renderShopDetails();
+                    } catch (err) {
+                        notify(err.message, true);
+                    }
+                });
+            });
+
+            // ---- Add/Edit Subscription (modal) ----
+            document.getElementById('add-sub-btn').addEventListener('click', () => {
+                const shop = state.selectedShop;
+                if (!shop) return;
+                const today = new Date().toISOString().split('T')[0];
+                const hasSub = shop.subscription && shop.subscription.end_date;
+                const title = hasSub ? 'Edit Subscription' : 'Add Subscription';
+                const endVal = hasSub ? shop.subscription.end_date : '';
+                showModal(`
+                    <div class="section-heading row">
+                        <h3>${title}</h3>
+                        <button class="icon-btn" onclick="hideModal()" type="button">
+                            <i data-lucide="x" class="h-5 w-5"></i>
+                        </button>
+                    </div>
+                    <form id="add-sub-form" class="stack-form">
+                        <div>
+                            <label class="field-label" for="sub-start">Start Date</label>
+                            <input type="date" id="sub-start" class="field-input" value="${today}" required>
+                        </div>
+                        <div>
+                            <label class="field-label" for="sub-end">End Date</label>
+                            <input type="date" id="sub-end" class="field-input" value="${endVal}" required>
+                        </div>
+                        <div>
+                            <label class="field-label" for="sub-remarks">Remarks</label>
+                            <input type="text" id="sub-remarks" class="field-input" placeholder="Optional">
+                        </div>
+                        <div class="button-pair" style="justify-content: flex-end;">
+                            <button type="button" class="ghost-btn" onclick="hideModal()">Cancel</button>
+                            <button type="submit" class="primary-btn">${hasSub ? 'Update' : 'Add'} Subscription</button>
+                        </div>
+                    </form>
+                `);
+                document.getElementById('add-sub-form').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    try {
+                        await api('/api/super/shops/' + shop.id + '/subscriptions', {
+                            method: 'POST',
+                            body: {
+                                startDate: document.getElementById('sub-start').value,
+                                endDate: document.getElementById('sub-end').value,
+                                remarks: document.getElementById('sub-remarks').value
+                            }
+                        });
+                        hideModal();
+                        notify('Subscription ' + (hasSub ? 'updated' : 'added') + '.');
+                        renderShopDetails();
+                    } catch (err) {
+                        notify(err.message, true);
+                    }
+                });
+            });
+
+            // ---- Add 30 Days (quick action) ----
+            document.getElementById('add-30-days-btn').addEventListener('click', async () => {
+                const shop = state.selectedShop;
+                if (!shop) return;
+                try {
+                    const today = new Date().toISOString().split('T')[0];
+                    const thirtyDaysLater = new Date();
+                    thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
+                    const endDate = thirtyDaysLater.toISOString().split('T')[0];
+                    const startDate = shop.subscription && shop.subscription.end_date && shop.subscription.end_date >= today
+                        ? shop.subscription.end_date
+                        : today;
+                    await api('/api/super/shops/' + shop.id + '/subscriptions', {
+                        method: 'POST',
+                        body: {
+                            startDate: startDate,
+                            endDate: endDate,
+                            remarks: 'Quick 30-day extension'
+                        }
+                    });
+                    notify('Subscription extended by 30 days.');
+                    renderShopDetails();
+                } catch (err) {
+                    notify(err.message, true);
+                }
+            });
+
+            // ---- Add User (modal) ----
+            document.getElementById('add-user-btn').addEventListener('click', () => {
+                const shop = state.selectedShop;
+                if (!shop) return;
+                showModal(`
+                    <div class="section-heading row">
+                        <h3>Add User</h3>
+                        <button class="icon-btn" onclick="hideModal()" type="button">
+                            <i data-lucide="x" class="h-5 w-5"></i>
+                        </button>
+                    </div>
+                    <form id="add-user-form" class="stack-form">
+                        <div>
+                            <label class="field-label" for="user-fullname">Full Name</label>
+                            <input type="text" id="user-fullname" class="field-input" required>
+                        </div>
+                        <div>
+                            <label class="field-label" for="user-username">Username</label>
+                            <input type="text" id="user-username" class="field-input" required>
+                        </div>
+                        <div>
+                            <label class="field-label" for="user-password">Password</label>
+                            <input type="password" id="user-password" class="field-input" required>
+                        </div>
+                        <div>
+                            <label class="field-label" for="user-role">Role</label>
+                            <select id="user-role" class="field-input">
+                                <option value="admin">Admin</option>
+                                <option value="cashier">Cashier</option>
+                            </select>
+                        </div>
+                        <div class="button-pair" style="justify-content: flex-end;">
+                            <button type="button" class="ghost-btn" onclick="hideModal()">Cancel</button>
+                            <button type="submit" class="primary-btn">Add User</button>
+                        </div>
+                    </form>
+                `);
+                document.getElementById('add-user-form').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    try {
+                        await api('/api/super/shops/' + shop.id + '/users', {
+                            method: 'POST',
+                            body: {
+                                fullName: document.getElementById('user-fullname').value,
+                                username: document.getElementById('user-username').value,
+                                password: document.getElementById('user-password').value,
+                                role: document.getElementById('user-role').value
+                            }
+                        });
+                        hideModal();
+                        notify('User added.');
+                        renderShopDetails();
+                    } catch (err) {
+                        notify(err.message, true);
+                    }
+                });
+            });
+
+            // ---- Delegated click events ----
+            document.addEventListener('click', async (e) => {
+                // View shop
+                const viewBtn = e.target.closest('[data-view-shop]');
+                if (viewBtn) {
+                    const shopId = Number(viewBtn.dataset.viewShop);
+                    state.selectedShop = state.shops.find(s => s.id === shopId);
+                    if (state.selectedShop) renderShopDetails();
+                }
+
+                // Toggle shop active
+                const toggleBtn = e.target.closest('[data-toggle-shop]');
+                if (toggleBtn) {
+                    const shopId = Number(toggleBtn.dataset.toggleShop);
+                    const shop = state.shops.find(s => s.id === shopId);
+                    if (!shop) return;
+                    try {
+                        await api('/api/super/shops/' + shopId, {
+                            method: 'PUT',
+                            body: { isActive: !shop.is_active }
+                        });
+                        notify(shop.is_active ? 'Shop disabled.' : 'Shop enabled.');
+                        await loadShops();
+                    } catch (err) {
+                        notify(err.message, true);
+                    }
+                }
+
+                // Edit user
+                const editUserBtn = e.target.closest('[data-edit-user]');
+                if (editUserBtn) {
+                    const userId = Number(editUserBtn.dataset.editUser);
+                    const shop = state.selectedShop;
+                    if (!shop) return;
+                    try {
+                        const usersData = await api('/api/super/shops/' + shop.id + '/users');
+                        const user = usersData.users.find(u => u.id === userId);
+                        if (!user) return;
+                        showModal(`
+                            <div class="section-heading row">
+                                <h3>Edit User</h3>
+                                <button class="icon-btn" onclick="hideModal()" type="button">
+                                    <i data-lucide="x" class="h-5 w-5"></i>
+                                </button>
+                            </div>
+                            <form id="edit-user-form" class="stack-form">
+                                <div>
+                                    <label class="field-label" for="edit-user-fullname">Full Name</label>
+                                    <input type="text" id="edit-user-fullname" class="field-input" value="${escapeHtml(user.fullName)}" required>
+                                </div>
+                                <div>
+                                    <label class="field-label" for="edit-user-password">New Password (leave blank to keep)</label>
+                                    <input type="password" id="edit-user-password" class="field-input" placeholder="Leave blank to keep current">
+                                </div>
+                                <div>
+                                    <label class="field-label" for="edit-user-role">Role</label>
+                                    <select id="edit-user-role" class="field-input">
+                                        <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                                        <option value="cashier" ${user.role === 'cashier' ? 'selected' : ''}>Cashier</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <input type="checkbox" id="edit-user-active" ${user.isActive ? 'checked' : ''}>
+                                        Active
+                                    </label>
+                                </div>
+                                <div class="button-pair" style="justify-content: flex-end;">
+                                    <button type="button" class="ghost-btn" onclick="hideModal()">Cancel</button>
+                                    <button type="submit" class="primary-btn">Save Changes</button>
+                                </div>
+                            </form>
+                        `);
+                        document.getElementById('edit-user-form').addEventListener('submit', async (e) => {
+                            e.preventDefault();
+                            try {
+                                const body = {
+                                    fullName: document.getElementById('edit-user-fullname').value,
+                                    role: document.getElementById('edit-user-role').value,
+                                    isActive: document.getElementById('edit-user-active').checked
+                                };
+                                const pw = document.getElementById('edit-user-password').value;
+                                if (pw) body.password = pw;
+                                await api('/api/super/users/' + userId, { method: 'PUT', body });
+                                hideModal();
+                                notify('User updated.');
+                                renderShopDetails();
+                            } catch (err) {
+                                notify(err.message, true);
+                            }
+                        });
+                    } catch (err) {
+                        notify(err.message, true);
+                    }
+                }
+
+                // Delete/disable user
+                const deleteUserBtn = e.target.closest('[data-delete-user]');
+                if (deleteUserBtn) {
+                    if (!confirm('Are you sure you want to disable this user?')) return;
+                    const userId = Number(deleteUserBtn.dataset.deleteUser);
+                    try {
+                        await api('/api/super/users/' + userId, { method: 'DELETE' });
+                        notify('User disabled.');
+                        renderShopDetails();
+                    } catch (err) {
+                        notify(err.message, true);
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>

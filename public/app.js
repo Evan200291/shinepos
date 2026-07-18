@@ -7,7 +7,7 @@ function getInitialActiveTab() {
 
 const state = {
     token: localStorage.getItem("pharmacy_token") || "",
-    language: localStorage.getItem("pharmacy_lang") || "mm",
+    language: localStorage.getItem("pharmacy_lang") || "en",
     user: null,
     summary: {},
     products: [],
@@ -18,6 +18,10 @@ const state = {
     logs: [],
     users: [],
     cart: [],
+    posCategory: "all",
+    posCategoryOpen: false,
+    posSearchOpen: false,
+    posProductPage: 1,
     activeTab: getInitialActiveTab(),
     pagination: {
         inventory: 1,
@@ -25,11 +29,23 @@ const state = {
         history: 1,
         users: 1
     },
-    receiptSale: null
+    receiptSale: null,
+    activeAlertView: "low",
+    loadingRequests: 0
 };
 
-const adminTabs = new Set(["inbound", "history", "users"]);
-const availableTabs = new Set(["dashboard", "pos", "inventory", "sales", "alerts", "inbound", "history", "users", "account"]);
+const adminTabs = new Set(["history", "users"]);
+const availableTabs = new Set(["dashboard", "pos", "inventory", "sales", "alerts", "history", "users", "account"]);
+const POS_CATEGORIES = [
+    { id: "all", label: "All items", icon: "layout-grid", terms: [] },
+    { id: "tablets", label: "Tablets & Capsules", icon: "pill", terms: ["tablet", "capsule", "pill", "oral", "analgesic", "antibiotic", "vitamin", "supplement", "pain relief"] },
+    { id: "liquids", label: "Syrups & Liquids", icon: "flask-conical", terms: ["syrup", "liquid", "suspension", "solution", "drops", "cold relief", "cough", "flu"] },
+    { id: "injections", label: "Injections", icon: "syringe", terms: ["injection", "injectable", "ampoule", "vial", "vaccine"] },
+    { id: "supplies", label: "Syringes & Supplies", icon: "briefcase-medical", terms: ["syringe", "needle", "cannula", "glove", "mask", "medical supply"] },
+    { id: "electronics", label: "Medical Electronics", icon: "activity", terms: ["electronic", "device", "machine", "monitor", "nebulizer", "thermometer", "oximeter", "glucometer"] },
+    { id: "first-aid", label: "First Aid", icon: "cross", terms: ["first aid", "bandage", "gauze", "plaster", "antiseptic", "dressing"] },
+    { id: "personal-care", label: "Personal Care", icon: "heart-pulse", terms: ["personal care", "hygiene", "skin", "cream", "ointment", "lotion", "soap"] }
+];
 const PAGE_SIZES = {
     inventory: 8,
     sales: 8,
@@ -349,26 +365,49 @@ function t(key) {
 function setDefaultDates() {
     const today = new Date().toISOString().split("T")[0];
     const month = today.slice(0, 7);
-    $("pos-sale-date").value = today;
     $("sales-date-filter").value = today;
     $("sales-month-filter").value = month;
 }
 
 function bindEvents() {
     $("login-form").addEventListener("submit", handleLogin);
+    document.querySelectorAll("[data-login-role]").forEach((button) => {
+        button.addEventListener("click", () => setLoginRole(button.dataset.loginRole));
+    });
     $("logout-button").addEventListener("click", handleLogout);
     $("topbar-account-button").addEventListener("click", () => switchTab("account"));
     $("mobile-menu-button").addEventListener("click", openSidebar);
+    $("mobile-more-button").addEventListener("click", openSidebar);
     $("sidebar-close-button").addEventListener("click", closeSidebar);
     $("drawer-overlay").addEventListener("click", closeSidebar);
     $("sidebar-nav").addEventListener("click", handleNavigationClick);
     $("mobile-footer").addEventListener("click", handleNavigationClick);
-    $("pos-search").addEventListener("input", renderPOSProducts);
+    $("pos-search").addEventListener("focus", () => {
+        state.posSearchOpen = true;
+        state.posCategoryOpen = false;
+        state.posCategory = "all";
+        state.posProductPage = 1;
+        renderPOSCategories();
+        renderPOSProducts();
+    });
+    $("pos-search").addEventListener("input", () => {
+        state.posSearchOpen = true;
+        state.posProductPage = 1;
+        renderPOSProducts();
+    });
+    $("pos-categories").addEventListener("click", handlePOSCategoryClick);
+    $("pos-product-dots").addEventListener("click", handlePOSProductPageClick);
+    $("login-password-toggle").addEventListener("click", toggleLoginPassword);
     $("pos-discount").addEventListener("input", renderCart);
     $("checkout-button").addEventListener("click", handleCheckout);
     $("inventory-search").addEventListener("input", () => {
         state.pagination.inventory = 1;
         renderInventory();
+    });
+    $("open-inbound-button").addEventListener("click", openInboundModal);
+    $("close-inbound-modal").addEventListener("click", closeInboundModal);
+    $("inbound-modal").addEventListener("click", (event) => {
+        if (event.target === $("inbound-modal")) closeInboundModal();
     });
     $("inbound-form").addEventListener("submit", handleInboundSubmit);
     $("sales-report-type").addEventListener("change", handleSalesFilterChange);
@@ -387,12 +426,24 @@ function bindEvents() {
     $("receipt-print-button").addEventListener("click", handlePrintReceipt);
     $("password-form").addEventListener("submit", handlePasswordChange);
     document.addEventListener("click", handlePagerClick);
+    document.addEventListener("pointerdown", (event) => {
+        if (state.posSearchOpen && !event.target.closest(".pos-browser")) {
+            state.posSearchOpen = false;
+            renderPOSProducts();
+        }
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && state.posSearchOpen) {
+            state.posSearchOpen = false;
+            renderPOSProducts();
+        }
+    });
 
     document.querySelectorAll("[data-lang]").forEach((button) => {
         button.addEventListener("click", () => setLanguage(button.dataset.lang));
     });
 
-    $("pos-products-grid").addEventListener("click", (event) => {
+    document.querySelector(".pos-browser").addEventListener("click", (event) => {
         const button = event.target.closest("[data-add-id]");
         if (button) {
             addToCart(Number(button.dataset.addId));
@@ -418,12 +469,7 @@ function bindEvents() {
     });
 
     $("cart-items").addEventListener("change", (event) => {
-        const priceInput = event.target.closest("[data-cart-price]");
         const quantityInput = event.target.closest("[data-cart-quantity]");
-
-        if (priceInput) {
-            setCartPrice(Number(priceInput.dataset.id), Number(priceInput.value));
-        }
 
         if (quantityInput) {
             setCartQuantity(Number(quantityInput.dataset.id), Number(quantityInput.value));
@@ -443,8 +489,16 @@ function bindEvents() {
         }
     });
 
+    $("history-table-body").addEventListener("click", handleHistoryRowAction);
     $("dashboard-sales-body").addEventListener("click", handleSaleActionClick);
     $("sales-table-body").addEventListener("click", handleSaleActionClick);
+    $("summary-cards").addEventListener("click", handleSummaryCardClick);
+    document.querySelector(".alert-view-switch")?.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-alert-view]");
+        if (button) {
+            setAlertView(button.dataset.alertView);
+        }
+    });
 
     window.addEventListener("resize", () => {
         if (window.innerWidth > 900) {
@@ -543,6 +597,7 @@ function showNotification(message, type = "success") {
     const notification = $("notification");
     notification.textContent = message;
     notification.className = `notification ${type === "error" ? "error" : ""}`;
+    notification.setAttribute("role", type === "error" ? "alert" : "status");
     notification.classList.remove("hidden");
 
     setTimeout(() => {
@@ -550,27 +605,37 @@ function showNotification(message, type = "success") {
     }, 3200);
 }
 
+function setLoading(isLoading) {
+    state.loadingRequests = Math.max(0, state.loadingRequests + (isLoading ? 1 : -1));
+    document.body.classList.toggle("is-loading", state.loadingRequests > 0);
+}
+
 async function api(url, options = {}) {
-    const response = await fetch(url, {
-        method: options.method || "GET",
-        headers: {
-            Accept: "application/json",
-            ...(options.body ? { "Content-Type": "application/json" } : {}),
-            ...(state.token ? { Authorization: `Bearer ${state.token}` } : {})
-        },
-        body: options.body ? JSON.stringify(options.body) : undefined
-    });
-
-    const payload = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-        if (response.status === 401 && !options.ignoreUnauthorized) {
-            clearSession();
+    let loadingShown = false;
+    const delayTimer = window.setTimeout(() => {
+        loadingShown = true;
+        setLoading(true);
+    }, 180);
+    try {
+        const response = await fetch(url, {
+            method: options.method || "GET",
+            headers: {
+                Accept: "application/json",
+                ...(options.body ? { "Content-Type": "application/json" } : {}),
+                ...(state.token ? { Authorization: `Bearer ${state.token}` } : {})
+            },
+            body: options.body ? JSON.stringify(options.body) : undefined
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            if (response.status === 401 && !options.ignoreUnauthorized) clearSession();
+            throw new Error(payload.message || "Request failed.");
         }
-        throw new Error(payload.message || "Request failed.");
+        return payload;
+    } finally {
+        window.clearTimeout(delayTimer);
+        if (loadingShown) setLoading(false);
     }
-
-    return payload;
 }
 
 function clearSession() {
@@ -581,6 +646,14 @@ function clearSession() {
     showLogin();
 }
 
+function redirectToSuperAdmin(token) {
+    if (token) {
+        localStorage.setItem("super_token", token);
+    }
+    localStorage.removeItem("pharmacy_token");
+    window.location.assign("/super");
+}
+
 async function bootstrapAuth() {
     if (!state.token) {
         showLogin();
@@ -589,6 +662,10 @@ async function bootstrapAuth() {
 
     try {
         const response = await api("/api/auth/me");
+        if (response.user?.role === "super_admin") {
+            redirectToSuperAdmin(state.token);
+            return;
+        }
         state.user = response.user;
         showApp();
         await loadInitialData();
@@ -660,6 +737,9 @@ function handleNavigationClick(event) {
 }
 
 function normalizeTab(tab) {
+    if (tab === "inbound") {
+        return "inventory";
+    }
     if (!availableTabs.has(tab)) {
         return "dashboard";
     }
@@ -670,6 +750,7 @@ function normalizeTab(tab) {
 }
 
 function switchTab(tab) {
+    closeInboundModal();
     state.activeTab = normalizeTab(tab);
     localStorage.setItem("pharmacy_active_tab", state.activeTab);
     const nextUrl = `${window.location.pathname}${window.location.search}#${state.activeTab}`;
@@ -692,6 +773,9 @@ function switchTab(tab) {
 }
 
 function openSidebar() {
+    if (window.innerWidth <= 980) {
+        $("sidebar-toggle").checked = false;
+    }
     $("app-sidebar").classList.add("open");
     $("drawer-overlay").classList.remove("hidden");
 }
@@ -713,6 +797,11 @@ async function handleLogin(event) {
             }
         });
 
+        if (response.user?.role === "super_admin") {
+            redirectToSuperAdmin(response.token);
+            return;
+        }
+
         state.token = response.token;
         state.user = response.user;
         localStorage.setItem("pharmacy_token", state.token);
@@ -722,6 +811,49 @@ async function handleLogin(event) {
     } catch (error) {
         showNotification(error.message, "error");
     }
+}
+
+function setLoginRole(role) {
+    const isAdmin = role === "admin";
+    document.querySelectorAll("[data-login-role]").forEach((button) => {
+        const active = button.dataset.loginRole === (isAdmin ? "admin" : "cashier");
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-pressed", String(active));
+    });
+    $("login-role-kicker").textContent = isAdmin ? "Administrator workspace" : "Staff workspace";
+    $("login-form-title").textContent = isAdmin ? "Administrator Sign In" : "Staff Sign In";
+    $("login-role-description").textContent = isAdmin
+        ? "Access inventory controls, reporting, user management, and operational oversight."
+        : "Sign in to process sales, manage your cart, and view your daily work.";
+    $("login-form").classList.toggle("admin-login", isAdmin);
+}
+
+function handleSummaryCardClick(event) {
+    const card = event.target.closest("[data-summary-target]");
+    if (!card) {
+        return;
+    }
+
+    const target = card.dataset.summaryTarget;
+    switchTab(target === "low" || target === "expired" ? "alerts" : target);
+    if (target === "low" || target === "expired") {
+        setAlertView(target);
+    }
+}
+
+function setAlertView(view) {
+    const validView = ["low", "expired", "expiring"].includes(view) ? view : "low";
+    state.activeAlertView = validView;
+    document.querySelectorAll("[data-alert-view]").forEach((button) => {
+        const active = button.dataset.alertView === validView;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-selected", String(active));
+    });
+    document.querySelectorAll("[data-alert-panel]").forEach((panel) => {
+        const active = panel.dataset.alertPanel === validView;
+        panel.classList.toggle("active", active);
+        panel.hidden = !active;
+    });
 }
 
 async function handleLogout() {
@@ -800,6 +932,7 @@ function renderAll() {
     renderUserPanels();
     renderSummary();
     renderRecentSales();
+    renderPOSCategories();
     renderPOSProducts();
     renderCart();
     renderInventory();
@@ -812,7 +945,7 @@ function renderAll() {
 }
 
 function getPageSlice(rows, key) {
-    const pageSize = PAGE_SIZES[key] || 8;
+    const pageSize = key === "history" && window.innerWidth <= 720 ? 6 : (PAGE_SIZES[key] || 8);
     const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
     state.pagination[key] = Math.min(Math.max(state.pagination[key] || 1, 1), totalPages);
     const start = (state.pagination[key] - 1) * pageSize;
@@ -891,16 +1024,16 @@ function handlePagerClick(event) {
 
 function renderSummary() {
     const cards = [
-        { key: "metric_total_products", value: state.summary.totalProducts || 0, icon: "boxes" },
-        { key: "metric_inventory_value", value: formatCurrency(state.summary.inventoryValue || 0), icon: "wallet" },
-        { key: "metric_low_stock", value: state.summary.lowStockCount || 0, icon: "triangle-alert" },
-        { key: "metric_expired", value: state.summary.expiredCount || 0, icon: "shield-alert" },
-        { key: "metric_today_sales", value: formatCurrency(state.summary.todaySales || 0), icon: "banknote" },
-        { key: "metric_today_profit", value: formatCurrency(state.summary.todayProfit || 0), icon: "trending-up" }
+        { key: "metric_total_products", value: state.summary.totalProducts || 0, icon: "boxes", target: "inventory" },
+        { key: "metric_inventory_value", value: formatCurrency(state.summary.inventoryValue || 0), icon: "wallet", target: "inventory" },
+        { key: "metric_low_stock", value: state.summary.lowStockCount || 0, icon: "triangle-alert", target: "low" },
+        { key: "metric_expired", value: state.summary.expiredCount || 0, icon: "shield-alert", target: "expired" },
+        { key: "metric_today_sales", value: formatCurrency(state.summary.todaySales || 0), icon: "banknote", target: "sales" },
+        { key: "metric_today_profit", value: formatCurrency(state.summary.todayProfit || 0), icon: "trending-up", target: "sales" }
     ];
 
     $("summary-cards").innerHTML = cards.map((card) => `
-        <div class="metric-card">
+        <button type="button" class="metric-card metric-card-button" data-summary-target="${card.target}" aria-label="View ${escapeHtml(t(card.key))} details">
             <div>
                 <div class="metric-label">${escapeHtml(t(card.key))}</div>
                 <div class="metric-value">${escapeHtml(card.value)}</div>
@@ -908,7 +1041,7 @@ function renderSummary() {
             <div class="metric-icon">
                 <i data-lucide="${card.icon}" class="h-6 w-6"></i>
             </div>
-        </div>
+        </button>
     `).join("");
     lucide.createIcons();
 }
@@ -918,14 +1051,14 @@ function renderRecentSales() {
     $("dashboard-sales-body").innerHTML = rows.length
         ? rows.map((sale) => `
             <tr>
-                <td>
+                <td data-label="${escapeHtml(t("invoice"))}">
                     <strong>${escapeHtml(sale.invoiceNo)}</strong>
                 </td>
-                <td>${escapeHtml(sale.saleDate)}</td>
-                <td>${escapeHtml(sale.cashierName)}</td>
-                <td class="text-right">${escapeHtml(formatCurrency(sale.total))}</td>
-                <td class="text-right">${escapeHtml(formatCurrency(sale.profit))}</td>
-                <td class="text-center">
+                <td data-label="${escapeHtml(t("date"))}">${escapeHtml(sale.saleDate)}</td>
+                <td data-label="${escapeHtml(t("cashier"))}">${escapeHtml(sale.cashierName)}</td>
+                <td data-label="${escapeHtml(t("total"))}" class="text-right">${escapeHtml(formatCurrency(sale.total))}</td>
+                <td data-label="${escapeHtml(t("profit"))}" class="text-right">${escapeHtml(formatCurrency(sale.profit))}</td>
+                <td data-label="${escapeHtml(t("actions"))}" class="text-center">
                     <button type="button" class="mini-btn" data-print-sale="${sale.id}">
                         ${escapeHtml(t("print"))}
                     </button>
@@ -938,10 +1071,14 @@ function renderRecentSales() {
 
 function filteredProducts() {
     const search = $("pos-search").value.trim().toLowerCase();
-    if (!search) {
-        return state.products;
-    }
+    const category = state.posCategory || "all";
     return state.products.filter((product) => {
+        if (category !== "all" && getPOSCategory(product)?.id !== category) {
+            return false;
+        }
+        if (!search) {
+            return true;
+        }
         const fields = [product.name, product.code, product.brand, product.category]
             .filter(Boolean)
             .map((value) => value.toLowerCase().trim());
@@ -952,48 +1089,157 @@ function filteredProducts() {
     });
 }
 
-function renderStatusBadge(status) {
-    if (status === "expired") {
-        return `<span class="status-pill status-expired">${escapeHtml(t("expired_status"))}</span>`;
-    }
-    if (status === "low") {
-        return `<span class="status-pill status-low">${escapeHtml(t("low_stock_status"))}</span>`;
-    }
-    return `<span class="status-pill status-good">${escapeHtml(t("good"))}</span>`;
+function normalizeProductCategory(category) {
+    return String(category || "").trim().toLowerCase();
 }
 
-function renderPOSProducts() {
-    const products = filteredProducts();
-    if (!products.length) {
-        $("pos-products-grid").innerHTML = `<div class="surface-panel empty-state">${escapeHtml(t("no_products"))}</div>`;
-        return;
+function getPOSCategory(product) {
+    const source = normalizeProductCategory([product.category, product.name, product.brand].filter(Boolean).join(" "));
+    return POS_CATEGORIES.find((category) => category.id !== "all" && category.terms.some((term) => source.includes(term))) || null;
+}
+
+function renderPOSCategories() {
+    if (!POS_CATEGORIES.some((category) => category.id === state.posCategory)) {
+        state.posCategory = "all";
     }
 
-    $("pos-products-grid").innerHTML = products.map((product) => {
-        const disabled = product.quantity <= 0 || product.status === "expired";
+    $("pos-categories").innerHTML = POS_CATEGORIES.map((category) => {
+        const count = category.id === "all"
+            ? state.products.length
+            : state.products.filter((product) => getPOSCategory(product)?.id === category.id).length;
+        const active = state.posCategoryOpen && category.id === state.posCategory;
         return `
-            <article class="product-card ${disabled ? "disabled" : ""}">
-                <div class="product-top">
-                    <span class="pill">${escapeHtml(product.code)}</span>
-                    ${renderStatusBadge(product.status)}
-                </div>
-                <div>
-                    <h3 class="product-title">${escapeHtml(product.name)}</h3>
-                    <div class="product-meta">${escapeHtml(product.brand || t("no_brand"))} · ${escapeHtml(product.category || t("general"))}</div>
-                </div>
-                <div class="product-bottom">
-                    <div>
-                        <div class="product-title">${escapeHtml(formatCurrency(product.sellPrice))}</div>
-                        <div class="product-meta">${escapeHtml(t("stock"))}: ${escapeHtml(product.quantity)}</div>
-                    </div>
-                    <button type="button" class="primary-btn add-icon-btn" data-add-id="${product.id}" ${disabled ? "disabled" : ""}>
-                        <i data-lucide="plus" class="h-5 w-5"></i>
-                    </button>
-                </div>
-            </article>
+            <button type="button" class="pos-category-card ${active ? "active" : ""}" data-pos-category="${escapeHtml(category.id)}" aria-pressed="${active}">
+                <span class="pos-category-icon"><i data-lucide="${category.icon}" class="h-5 w-5" aria-hidden="true"></i></span>
+                <span class="pos-category-copy">
+                    <span class="pos-category-name">${escapeHtml(category.label)}</span>
+                    <span class="pos-category-count">${count} items</span>
+                </span>
+            </button>
         `;
     }).join("");
     lucide.createIcons();
+}
+
+function handlePOSCategoryClick(event) {
+    const button = event.target.closest("[data-pos-category]");
+    if (!button) {
+        return;
+    }
+    const categoryId = button.dataset.posCategory;
+    const closing = state.posCategoryOpen && state.posCategory === categoryId;
+    state.posCategory = closing ? "all" : categoryId;
+    state.posCategoryOpen = !closing;
+    state.posSearchOpen = false;
+    state.posProductPage = 1;
+    $("pos-search").value = "";
+    renderPOSCategories();
+    renderPOSProducts();
+}
+
+function handlePOSProductPageClick(event) {
+    const button = event.target.closest("[data-pos-product-page]");
+    if (!button) {
+        return;
+    }
+    state.posProductPage = Number(button.dataset.posProductPage) || 1;
+    renderPOSProducts();
+    $("pos-products-grid").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function toggleLoginPassword() {
+    const input = $("login-password");
+    const toggle = $("login-password-toggle");
+    const visible = input.type === "text";
+    input.type = visible ? "password" : "text";
+    toggle.setAttribute("aria-label", visible ? "Show password" : "Hide password");
+    toggle.setAttribute("title", visible ? "Show password" : "Hide password");
+    toggle.innerHTML = `<i data-lucide="${visible ? "eye" : "eye-off"}" class="h-4 w-4"></i>`;
+    lucide.createIcons();
+}
+
+function renderStatusBadge(status) {
+    if (status === "expired") {
+        return `<span class="status-pill status-expired"><span class="status-dot" aria-hidden="true"></span>${escapeHtml(t("expired_status"))}</span>`;
+    }
+    if (status === "low") {
+        return `<span class="status-pill status-low"><span class="status-dot" aria-hidden="true"></span>${escapeHtml(t("low_stock_status"))}</span>`;
+    }
+    return `<span class="status-pill status-good"><span class="status-dot" aria-hidden="true"></span>${escapeHtml(t("good"))}</span>`;
+}
+
+function buildPOSProductCards(products) {
+    return products.map((product) => {
+        const disabled = product.quantity <= 0 || product.status === "expired";
+        const category = getPOSCategory(product);
+        return `
+            <article class="pos-product-card ${disabled ? "disabled" : ""}">
+                <div class="pos-product-visual" aria-hidden="true">
+                    <i data-lucide="${category?.icon || "package"}" class="h-6 w-6"></i>
+                </div>
+                <div class="pos-product-info">
+                    <h3>${escapeHtml(product.name)}</h3>
+                    <p>${escapeHtml(product.category || t("general"))}</p>
+                    <div class="pos-product-price">${escapeHtml(formatCurrency(product.sellPrice))}</div>
+                </div>
+                <span class="pos-product-stock">${escapeHtml(product.quantity)} ${escapeHtml(t("stock"))}</span>
+                <button type="button" class="pos-product-add" data-add-id="${product.id}" ${disabled ? "disabled" : ""} aria-label="Add ${escapeHtml(product.name)}">
+                    <i data-lucide="plus" class="h-5 w-5"></i>
+                </button>
+            </article>
+        `;
+    }).join("");
+}
+
+function renderRecentPOSProducts() {
+    const recentProducts = [...state.products]
+        .sort((left, right) => Number(right.id) - Number(left.id))
+        .slice(0, 8);
+    $("pos-recent-products").innerHTML = recentProducts.length
+        ? buildPOSProductCards(recentProducts)
+        : `<div class="pos-products-empty">${escapeHtml(t("no_products"))}</div>`;
+}
+
+function renderPOSProducts() {
+    const query = $("pos-search").value.trim();
+    const container = $("pos-products-grid");
+    const popover = $("pos-results-popover");
+    const recentSection = $("pos-recent-section");
+    const shouldShowResults = state.posSearchOpen || Boolean(query) || state.posCategoryOpen;
+    popover.classList.toggle("hidden", !shouldShowResults);
+    recentSection.classList.toggle("hidden", shouldShowResults);
+    if (!shouldShowResults) {
+        container.innerHTML = "";
+        $("pos-product-dots").classList.add("hidden");
+        $("pos-product-dots").innerHTML = "";
+        renderRecentPOSProducts();
+        lucide.createIcons();
+        return;
+    }
+
+    const products = filteredProducts();
+    const pageSize = 8;
+    const totalPages = Math.max(1, Math.ceil(products.length / pageSize));
+    state.posProductPage = Math.min(Math.max(state.posProductPage, 1), totalPages);
+    const start = (state.posProductPage - 1) * pageSize;
+    const visibleProducts = products.slice(start, start + pageSize);
+    container.innerHTML = visibleProducts.length
+        ? buildPOSProductCards(visibleProducts)
+        : `<div class="pos-products-empty">${escapeHtml(t("no_products"))}</div>`;
+    renderPOSProductDots(products.length ? totalPages : 0);
+    lucide.createIcons();
+}
+
+function renderPOSProductDots(totalPages) {
+    const dots = $("pos-product-dots");
+    dots.classList.toggle("hidden", totalPages <= 1);
+    dots.innerHTML = totalPages > 1
+        ? Array.from({ length: totalPages }, (_, index) => {
+            const page = index + 1;
+            const active = page === state.posProductPage;
+            return `<button type="button" class="pos-product-dot ${active ? "active" : ""}" data-pos-product-page="${page}" aria-label="Show product page ${page}" aria-current="${active ? "page" : "false"}"></button>`;
+        }).join("")
+        : "";
 }
 
 function addToCart(productId) {
@@ -1028,6 +1274,13 @@ function addToCart(productId) {
             maxQuantity: product.quantity
         });
     }
+    state.posCategory = "all";
+    state.posCategoryOpen = false;
+    state.posSearchOpen = false;
+    state.posProductPage = 1;
+    $("pos-search").value = "";
+    renderPOSCategories();
+    renderPOSProducts();
     renderCart();
 }
 
@@ -1064,15 +1317,6 @@ function setCartQuantity(productId, quantity) {
     renderCart();
 }
 
-function setCartPrice(productId, sellPrice) {
-    const item = state.cart.find((entry) => entry.productId === productId);
-    if (!item) {
-        return;
-    }
-    item.sellPrice = Math.max(0, Number(sellPrice) || 0);
-    renderCart();
-}
-
 function removeFromCart(productId) {
     state.cart = state.cart.filter((item) => item.productId !== productId);
     renderCart();
@@ -1087,48 +1331,61 @@ function getCartTotals() {
 function renderCart() {
     const container = $("cart-items");
     const { subtotal, total } = getCartTotals();
+    const itemCount = state.cart.reduce((sum, item) => sum + item.quantity, 0);
+
     $("cart-subtotal").textContent = formatCurrency(subtotal);
     $("cart-total").textContent = formatCurrency(total);
     $("checkout-button").disabled = state.cart.length === 0;
+    $("cart-item-count").textContent = `${itemCount} ${itemCount === 1 ? "item" : "items"}`;
 
     if (!state.cart.length) {
-        container.innerHTML = `<div class="surface-card empty-state">${escapeHtml(t("no_cart"))}</div>`;
+        container.innerHTML = `
+            <div class="pos-cart-empty">
+                <span><i data-lucide="shopping-bag" class="h-6 w-6"></i></span>
+                <strong>${escapeHtml(t("no_cart"))}</strong>
+                <span>${escapeHtml(t("search_products"))}</span>
+            </div>
+        `;
+        lucide.createIcons();
         return;
     }
 
     container.innerHTML = state.cart.map((item) => `
-        <div class="cart-row">
-            <div class="cart-item-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
-            <input
-                data-cart-price
-                data-id="${item.productId}"
-                type="number"
-                min="0"
-                value="${item.sellPrice}"
-                class="field-input cart-price-input"
-            >
-            <div class="qty-control">
-                <button type="button" class="qty-button" data-cart-action="decrease" data-id="${item.productId}">
-                    <i data-lucide="minus" class="h-4 w-4"></i>
-                </button>
-                <input
-                    data-cart-quantity
-                    data-id="${item.productId}"
-                    type="number"
-                    min="1"
-                    max="${item.maxQuantity}"
-                    value="${item.quantity}"
-                    class="qty-input"
-                >
-                <button type="button" class="qty-button" data-cart-action="increase" data-id="${item.productId}">
-                    <i data-lucide="plus" class="h-4 w-4"></i>
-                </button>
+        <article class="pos-cart-item" aria-label="${escapeHtml(item.name)}">
+            <div class="pos-cart-item-visual" aria-hidden="true">
+                <i data-lucide="pill" class="h-5 w-5"></i>
             </div>
-            <strong class="cart-line-total">${escapeHtml(formatCurrency(item.sellPrice * item.quantity))}</strong>
-            <button type="button" class="cart-remove-btn" data-cart-action="remove" data-id="${item.productId}" aria-label="Remove item">
-                <i data-lucide="x" class="h-4 w-4"></i>
+            <div class="pos-cart-item-info">
+                <div class="pos-cart-item-name">${escapeHtml(item.name)}</div>
+                <div class="pos-cart-item-meta">
+                    <span>${escapeHtml(item.code)}</span>
+                    <span>${escapeHtml(formatCurrency(item.sellPrice))} each</span>
+                </div>
+            </div>
+            <button type="button" class="pos-cart-remove" data-cart-action="remove" data-id="${item.productId}" aria-label="Remove ${escapeHtml(item.name)}">
+                <i data-lucide="trash-2" class="h-4 w-4"></i>
             </button>
-        </div>
+            <div class="pos-cart-item-footer">
+                <div class="pos-cart-stepper">
+                    <button type="button" data-cart-action="decrease" data-id="${item.productId}" aria-label="Decrease quantity">
+                        <i data-lucide="minus" class="h-4 w-4"></i>
+                    </button>
+                    <input
+                        data-cart-quantity
+                        data-id="${item.productId}"
+                        type="number"
+                        min="1"
+                        max="${item.maxQuantity}"
+                        value="${item.quantity}"
+                        aria-label="Quantity"
+                    >
+                    <button type="button" data-cart-action="increase" data-id="${item.productId}" aria-label="Increase quantity">
+                        <i data-lucide="plus" class="h-4 w-4"></i>
+                    </button>
+                </div>
+                <strong class="pos-cart-line-total">${escapeHtml(formatCurrency(item.sellPrice * item.quantity))}</strong>
+            </div>
+        </article>
     `).join("");
     lucide.createIcons();
 }
@@ -1142,7 +1399,7 @@ async function handleCheckout() {
         const response = await api("/api/sales", {
             method: "POST",
             body: {
-                saleDate: $("pos-sale-date").value,
+                saleDate: new Date().toISOString().split("T")[0],
                 discount: Number($("pos-discount").value) || 0,
                 items: state.cart.map((item) => ({
                     productId: item.productId,
@@ -1184,16 +1441,16 @@ function renderInventory() {
     $("inventory-table-body").innerHTML = rows.length
         ? page.rows.map((product) => `
             <tr>
-                <td><strong>${escapeHtml(product.code)}</strong></td>
-                <td>${escapeHtml(product.brand || "-")}</td>
-                <td>${escapeHtml(product.name)}</td>
-                <td>${escapeHtml(product.category || "-")}</td>
-                <td>${escapeHtml(product.expiryDate)}</td>
-                <td class="text-right">${escapeHtml(formatCurrency(product.sellPrice))}</td>
-                <td class="text-right">${escapeHtml(product.quantity)}</td>
-                <td>${renderStatusBadge(product.status)}</td>
+                <td data-label="${escapeHtml(t("product_code"))}"><strong>${escapeHtml(product.code)}</strong></td>
+                <td data-label="${escapeHtml(t("brand"))}">${escapeHtml(product.brand || "-")}</td>
+                <td data-label="${escapeHtml(t("product_name"))}">${escapeHtml(product.name)}</td>
+                <td data-label="${escapeHtml(t("category"))}">${escapeHtml(product.category || "-")}</td>
+                <td data-label="${escapeHtml(t("expiry_date"))}" class="expiry-cell">${escapeHtml(product.expiryDate)}</td>
+                <td data-label="${escapeHtml(t("sell_price"))}" class="text-right">${escapeHtml(formatCurrency(product.sellPrice))}</td>
+                <td data-label="${escapeHtml(t("quantity"))}" class="text-right">${escapeHtml(product.quantity)}</td>
+                <td data-label="${escapeHtml(t("status"))}">${renderStatusBadge(product.status)}</td>
                 ${isAdmin ? `
-                    <td class="text-center">
+                    <td data-label="${escapeHtml(t("actions"))}" class="text-center">
                         <div class="table-actions">
                             <button type="button" class="mini-btn" data-edit-product="${product.id}">${escapeHtml(t("edit"))}</button>
                             <button type="button" class="danger-btn" data-delete-product="${product.id}">${escapeHtml(t("archive"))}</button>
@@ -1269,6 +1526,15 @@ async function deleteProduct(productId) {
     }
 }
 
+function openInboundModal() {
+    $("inbound-modal").classList.remove("hidden");
+    $("inbound-code").focus();
+}
+
+function closeInboundModal() {
+    $("inbound-modal").classList.add("hidden");
+}
+
 async function handleInboundSubmit(event) {
     event.preventDefault();
     try {
@@ -1288,6 +1554,7 @@ async function handleInboundSubmit(event) {
         });
         $("inbound-form").reset();
         $("inbound-threshold").value = 10;
+        closeInboundModal();
         await loadInitialData();
         showNotification(t("msg_inbound_saved"));
     } catch (error) {
@@ -1309,15 +1576,15 @@ function renderSales() {
     const page = getPageSlice(state.sales, "sales");
 
     $("sales-summary-strip").innerHTML = `
-        <div class="summary-chip">
+        <div class="sales-report-metric">
             <div class="metric-label">${escapeHtml(t("sales_count"))}</div>
             <strong>${escapeHtml(state.sales.length)}</strong>
         </div>
-        <div class="summary-chip">
+        <div class="sales-report-metric">
             <div class="metric-label">${escapeHtml(t("report_total_sales"))}</div>
             <strong>${escapeHtml(formatCurrency(totalSales))}</strong>
         </div>
-        <div class="summary-chip">
+        <div class="sales-report-metric">
             <div class="metric-label">${escapeHtml(t("report_total_profit"))}</div>
             <strong>${escapeHtml(formatCurrency(totalProfit))}</strong>
         </div>
@@ -1328,13 +1595,13 @@ function renderSales() {
             const itemSummary = sale.items.map((item) => `${item.productName} x${item.quantity}`).join(", ");
             return `
                 <tr>
-                    <td><strong>${escapeHtml(sale.invoiceNo)}</strong></td>
-                    <td>${escapeHtml(sale.saleDate)}</td>
-                    <td>${escapeHtml(sale.cashierName)}</td>
-                    <td>${escapeHtml(itemSummary)}</td>
-                    <td class="text-right">${escapeHtml(formatCurrency(sale.total))}</td>
-                    <td class="text-right">${escapeHtml(formatCurrency(sale.profit))}</td>
-                    <td class="text-center">
+                    <td data-label="${escapeHtml(t("invoice"))}"><strong>${escapeHtml(sale.invoiceNo)}</strong></td>
+                    <td data-label="${escapeHtml(t("date"))}">${escapeHtml(sale.saleDate)}</td>
+                    <td data-label="${escapeHtml(t("cashier"))}">${escapeHtml(sale.cashierName)}</td>
+                    <td data-label="${escapeHtml(t("items"))}">${escapeHtml(itemSummary)}</td>
+                    <td data-label="${escapeHtml(t("total"))}" class="text-right">${escapeHtml(formatCurrency(sale.total))}</td>
+                    <td data-label="${escapeHtml(t("profit"))}" class="text-right">${escapeHtml(formatCurrency(sale.profit))}</td>
+                    <td data-label="${escapeHtml(t("actions"))}" class="text-center">
                         <button type="button" class="mini-btn" data-print-sale="${sale.id}">
                             ${escapeHtml(t("print"))}
                         </button>
@@ -1351,12 +1618,12 @@ function renderAlertRows(items) {
     return items.length
         ? items.map((item) => `
             <tr>
-                <td>
+                <td data-label="${escapeHtml(t("product_name"))}">
                     <strong>${escapeHtml(item.name)}</strong>
                     <div class="table-sub">${escapeHtml(item.code)}</div>
                 </td>
-                <td>${escapeHtml(item.expiryDate)}</td>
-                <td class="text-right">${escapeHtml(item.quantity)}</td>
+                <td data-label="${escapeHtml(t("expiry_date"))}" class="expiry-cell">${escapeHtml(item.expiryDate)}</td>
+                <td data-label="${escapeHtml(t("quantity"))}" class="text-right">${escapeHtml(item.quantity)}</td>
             </tr>
         `).join("")
         : `<tr><td colspan="3" class="empty-state">${escapeHtml(t("no_alerts"))}</td></tr>`;
@@ -1366,6 +1633,7 @@ function renderAlerts() {
     $("low-stock-body").innerHTML = renderAlertRows(state.alerts.lowStock);
     $("expired-body").innerHTML = renderAlertRows(state.alerts.expired);
     $("expiring-body").innerHTML = renderAlertRows(state.alerts.expiringSoon);
+    setAlertView(state.activeAlertView);
 }
 
 function renderMovements() {
@@ -1374,20 +1642,33 @@ function renderMovements() {
     $("history-table-body").innerHTML = state.movements.length
         ? page.rows.map((movement) => `
             <tr>
-                <td>${escapeHtml(formatDateTime(movement.createdAt))}</td>
-                <td>
+                <td data-label="${escapeHtml(t("time"))}">${escapeHtml(formatDateTime(movement.createdAt))}</td>
+                <td data-label="${escapeHtml(t("product_name"))}">
                     <strong>${escapeHtml(movement.productName)}</strong>
                     <div class="table-sub">${escapeHtml(movement.productCode)}</div>
                 </td>
-                <td>${escapeHtml(movement.movementType)}</td>
-                <td class="text-right">${escapeHtml(movement.quantityChange)}</td>
-                <td class="text-right">${escapeHtml(movement.balanceAfter)}</td>
-                <td>${escapeHtml(movement.actorName)}</td>
-                <td>${escapeHtml(movement.note)}</td>
+                <td data-label="${escapeHtml(t("type"))}">${escapeHtml(movement.movementType)}</td>
+                <td data-label="${escapeHtml(t("qty_change"))}" class="text-right">${escapeHtml(movement.quantityChange)}</td>
+                <td data-label="${escapeHtml(t("balance"))}" class="text-right">${escapeHtml(movement.balanceAfter)}</td>
+                <td data-label="${escapeHtml(t("actor"))}">${escapeHtml(movement.actorName)}</td>
+                <td data-label="${escapeHtml(t("note"))}">${escapeHtml(movement.note)}</td>
+                <td data-label="${escapeHtml(t("actions"))}" class="history-action-cell">
+                    <button type="button" class="history-more-button" data-history-more aria-expanded="false" aria-label="View more movement details">...</button>
+                </td>
             </tr>
         `).join("")
-        : `<tr><td colspan="7" class="empty-state">${escapeHtml(t("no_history"))}</td></tr>`;
+        : `<tr><td colspan="8" class="empty-state">${escapeHtml(t("no_history"))}</td></tr>`;
     renderPager("history-pager", "history", page.totalPages);
+}
+
+function handleHistoryRowAction(event) {
+    const button = event.target.closest("[data-history-more]");
+    if (!button) {
+        return;
+    }
+    const row = button.closest("tr");
+    const expanded = row.classList.toggle("history-row-expanded");
+    button.setAttribute("aria-expanded", String(expanded));
 }
 
 function renderUsers() {
@@ -1396,11 +1677,11 @@ function renderUsers() {
     $("users-table-body").innerHTML = state.users.length
         ? page.rows.map((user) => `
             <tr>
-                <td><strong>${escapeHtml(user.fullName)}</strong></td>
-                <td>${escapeHtml(user.username)}</td>
-                <td>${escapeHtml(user.role === "admin" ? t("role_admin") : t("role_cashier"))}</td>
-                <td>${user.isActive ? `<span class="status-pill status-good">${escapeHtml(t("active"))}</span>` : `<span class="status-pill status-expired">${escapeHtml(t("inactive"))}</span>`}</td>
-                <td>${escapeHtml(formatDateTime(user.createdAt))}</td>
+                <td data-label="${escapeHtml(t("full_name"))}"><strong>${escapeHtml(user.fullName)}</strong></td>
+                <td data-label="${escapeHtml(t("username"))}">${escapeHtml(user.username)}</td>
+                <td data-label="${escapeHtml(t("role"))}">${escapeHtml(user.role === "admin" ? t("role_admin") : t("role_cashier"))}</td>
+                <td data-label="${escapeHtml(t("status"))}">${user.isActive ? `<span class="status-pill status-good"><span class="status-dot" aria-hidden="true"></span>${escapeHtml(t("active"))}</span>` : `<span class="status-pill status-expired"><span class="status-dot" aria-hidden="true"></span>${escapeHtml(t("inactive"))}</span>`}</td>
+                <td data-label="${escapeHtml(t("created"))}">${escapeHtml(formatDateTime(user.createdAt))}</td>
             </tr>
         `).join("")
         : `<tr><td colspan="5" class="empty-state">${escapeHtml(t("no_users"))}</td></tr>`;
@@ -1543,13 +1824,13 @@ function buildReceiptDocument(sale) {
             <meta charset="UTF-8">
             <title>${escapeHtml(sale.invoiceNo)}</title>
             <style>
-                body { font-family: Arial, sans-serif; padding: 24px; color: #102e45; }
+                body { font-family: Arial, sans-serif; padding: 24px; color: #000000; background: #ffffff; }
                 h1, h2, h3, p { margin: 0; }
                 .head { display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px; }
                 table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-                th, td { text-align: left; border-bottom: 1px dashed #bdd1dd; padding: 8px 0; }
+                th, td { text-align: left; border-bottom: 1px dashed #b2aeae; padding: 8px 0; color: #000000; }
                 .total-row { display: flex; justify-content: space-between; margin-top: 8px; }
-                .muted { color: #4d6a7d; }
+                .muted { color: #000000; }
             </style>
         </head>
         <body>
@@ -1604,15 +1885,15 @@ function printSalesReport() {
             <meta charset="UTF-8">
             <title>${escapeHtml(VENDOR_NAME)} Report</title>
             <style>
-                body { font-family: Arial, sans-serif; padding: 28px; color: #102e45; }
+                body { font-family: Arial, sans-serif; padding: 28px; color: #000000; background: #ffffff; }
                 h1, h2, p { margin: 0; }
                 .head { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
-                .muted { color: #4d6a7d; }
+                .muted { color: #000000; }
                 .strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 18px 0; }
-                .chip { padding: 14px; border: 1px solid #c5d7e2; border-radius: 14px; background: #f4f9fc; }
+                .chip { padding: 14px; border: 1px solid #b2aeae; border-radius: 14px; background: #ffffff; color: #000000; }
                 table { width: 100%; border-collapse: collapse; }
-                th, td { border-bottom: 1px solid #d7e3eb; padding: 10px 8px; text-align: left; vertical-align: top; }
-                th { color: #4d6a7d; font-size: 12px; text-transform: uppercase; }
+                th, td { border-bottom: 1px solid #b2aeae; padding: 10px 8px; text-align: left; vertical-align: top; color: #000000; }
+                th { color: #000000; font-size: 12px; text-transform: uppercase; }
             </style>
         </head>
         <body>

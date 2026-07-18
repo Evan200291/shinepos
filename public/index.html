@@ -1,69 +1,14 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shine Digital Store POS</title>
-    <style>
-        html, body {
-            height: 100%;
-            margin: 0;
-            background:
-                radial-gradient(circle at top left, rgba(255, 255, 255, 0.9), transparent 35%),
-                linear-gradient(160deg, #edf6fb, #d7eaf5);
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
-        .boot-splash {
-            position: fixed;
-            inset: 0;
-            z-index: 95;
-            display: grid;
-            place-items: center;
-            padding: 1.5rem;
-            background:
-                radial-gradient(circle at top left, rgba(255, 255, 255, 0.9), transparent 35%),
-                linear-gradient(160deg, #edf6fb, #d7eaf5);
-        }
-
-        .boot-card {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.9rem;
-            padding: 1rem 1.1rem;
-            border-radius: 1.4rem;
-            background: rgba(255, 255, 255, 0.94);
-            border: 1px solid rgba(19, 67, 98, 0.14);
-            box-shadow: 0 20px 45px rgba(18, 63, 92, 0.12);
-        }
-
-        .boot-spinner {
-            width: 18px;
-            height: 18px;
-            border-radius: 999px;
-            border: 3px solid rgba(21, 107, 138, 0.18);
-            border-top-color: rgba(21, 107, 138, 0.82);
-            animation: bootspin 0.9s linear infinite;
-        }
-
-        @keyframes bootspin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        .h-4, .w-4 { width: 1rem; height: 1rem; }
-        .h-5, .w-5 { width: 1.25rem; height: 1.25rem; }
-        .h-6, .w-6 { width: 1.5rem; height: 1.5rem; }
-    </style>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/application.css?v=20260718"><link rel="stylesheet" href="/pos-theme.css?v=20260718-operations">
 </head>
 <body class="theme-body">
-    <div id="notification" class="notification hidden"></div>
+    <div id="notification" class="notification hidden" role="status" aria-live="polite"></div>
 
     <div id="boot-splash" class="boot-splash">
         <div class="boot-card">
@@ -88,40 +33,34 @@
                 </div>
             </div>
 
-            <div class="login-grid">
-                <div class="surface-panel hero-panel">
-                    <div class="hero-badge">
-                        <i data-lucide="shield-check" class="h-4 w-4"></i>
-                        <span data-i18n="app_name">Pharmacy POS System</span>
-                    </div>
-                    <h2 class="hero-title" data-i18n="login_title">Secure pharmacy operations</h2>
-                    <p class="hero-subtitle" data-i18n="login_subtitle">Inventory, sales, admin control, receipt printing, and audit history.</p>
-
-                    <div class="credential-card">
-                        <p class="credential-label" data-i18n="default_admin">Default Admin</p>
-                        <div class="credential-row">
-                            <span data-i18n="username">Username</span>
-                            <strong>admin</strong>
-                        </div>
-                        <div class="credential-row">
-                            <span data-i18n="password">Password</span>
-                            <strong>Admin@123</strong>
-                        </div>
-                    </div>
-                </div>
-
+            <div class="login-grid login-grid-single">
                 <form id="login-form" class="surface-panel form-panel">
                     <div class="section-heading">
-                        <h2 data-i18n="sign_in">Sign In</h2>
+                        <div>
+                            <p id="login-role-kicker" class="login-role-kicker">Secure workspace</p>
+                            <h2 id="login-form-title" data-i18n="sign_in">Sign In</h2>
+                        </div>
+                    </div>
+                    <p id="login-role-description" class="login-role-description">Sign in with your assigned account to access the correct workspace.</p>
+
+                    <div class="form-group">
+                        <label class="field-label" for="login-username" data-i18n="username">Username</label>
+                        <input id="login-username" name="username" type="text" class="field-input" required>
                     </div>
 
-                    <label class="field-label" for="login-username" data-i18n="username">Username</label>
-                    <input id="login-username" name="username" type="text" value="admin" class="field-input" required>
+                    <div class="form-group">
+                        <label class="field-label" for="login-password" data-i18n="password">Password</label>
+                        <div class="password-field">
+                            <input id="login-password" name="password" type="password" class="field-input" required>
+                            <button id="login-password-toggle" type="button" class="password-toggle" aria-label="Show password" title="Show password">
+                                <i data-lucide="eye" class="h-4 w-4"></i>
+                            </button>
+                        </div>
+                    </div>
 
-                    <label class="field-label" for="login-password" data-i18n="password">Password</label>
-                    <input id="login-password" name="password" type="password" value="Admin@123" class="field-input" required>
-
-                    <button type="submit" class="primary-btn full-width" data-i18n="sign_in">Sign In</button>
+                    <div class="form-group">
+                        <button type="submit" class="primary-btn full-width" data-i18n="sign_in">Sign In</button>
+                    </div>
                 </form>
             </div>
         </div>
@@ -131,13 +70,19 @@
         <div id="drawer-overlay" class="drawer-overlay hidden"></div>
 
         <aside id="app-sidebar" class="app-sidebar">
+            <input type="checkbox" id="sidebar-toggle" class="sidebar-toggle-input">
             <div class="sidebar-head">
                 <div class="brand-lockup store-lockup">
-                    <div>
+                    <span class="store-mark" aria-hidden="true"><i data-lucide="cross" class="h-5 w-5"></i></span>
+                    <div class="store-copy">
+                        <span>Pharmacy workspace</span>
                         <h2 class="brand-name small store-title">Shine Digital Store</h2>
                     </div>
                 </div>
-                <button id="sidebar-close-button" class="icon-btn mobile-only-inline" type="button">
+                <label for="sidebar-toggle" class="sidebar-toggle-btn desktop-only-inline" title="Collapse or expand sidebar" aria-label="Collapse or expand sidebar" role="button" tabindex="0">
+                    <i data-lucide="menu" class="h-5 w-5 sidebar-toggle-icon" aria-hidden="true"></i>
+                </label>
+                <button id="sidebar-close-button" class="sidebar-close-btn mobile-sidebar-close mobile-only-inline" type="button" title="Close navigation" aria-label="Close navigation menu">
                     <i data-lucide="x" class="h-5 w-5"></i>
                 </button>
             </div>
@@ -163,10 +108,6 @@
                     <i data-lucide="shield-alert" class="h-5 w-5"></i>
                     <span data-i18n="alerts">Alerts</span>
                 </button>
-                <button type="button" data-tab="inbound" class="nav-button admin-only">
-                    <i data-lucide="package-plus" class="h-5 w-5"></i>
-                    <span data-i18n="inbound">Inbound</span>
-                </button>
                 <button type="button" data-tab="history" class="nav-button admin-only">
                     <i data-lucide="history" class="h-5 w-5"></i>
                     <span data-i18n="history">Stock History</span>
@@ -188,22 +129,27 @@
         </aside>
 
         <div class="app-main">
-            <header class="topbar">
-                <div class="topbar-left">
-                    <div class="topbar-kicker">Shine Digital Store</div>
-                    <h2 id="page-title" class="topbar-title">Dashboard</h2>
+            <header class="app-header">
+                <div class="app-header-left">
+                    <button id="mobile-menu-button" class="icon-btn mobile-nav-trigger mobile-only-inline" type="button" aria-label="Open navigation menu">
+                        <span class="menu-glyph" aria-hidden="true"><span></span><span></span><span></span></span>
+                    </button>
+                    <div class="app-title-block">
+                        <p class="app-title-kicker" data-i18n="vendor_label">Pharmacy POS</p>
+                        <h1 id="page-title" class="app-header-title">Dashboard</h1>
+                    </div>
                 </div>
-                <div class="topbar-actions">
+                <div class="app-header-actions">
                     <div class="lang-switch compact">
                         <button type="button" class="lang-button" data-lang="en">EN</button>
                         <button type="button" class="lang-button" data-lang="mm">MM</button>
                     </div>
-                    <button id="topbar-account-button" class="icon-btn" type="button">
+                    <button id="topbar-account-button" class="icon-btn desktop-only-inline" type="button">
                         <i data-lucide="settings-2" class="h-5 w-5"></i>
                     </button>
-                    <button id="logout-button" class="ghost-btn desktop-only-inline" type="button" data-i18n="logout">Logout</button>
-                    <button id="mobile-menu-button" class="icon-btn mobile-only-inline" type="button">
-                        <i data-lucide="menu" class="h-5 w-5"></i>
+                    <button id="logout-button" class="header-logout-btn" type="button" aria-label="Logout">
+                        <i data-lucide="log-out" class="h-4 w-4"></i>
+                        <span data-i18n="logout">Logout</span>
                     </button>
                 </div>
             </header>
@@ -221,7 +167,7 @@
                             </button>
                         </div>
                         <div class="table-wrap">
-                            <table class="data-table inventory-table">
+                            <table class="data-table dashboard-table responsive-table">
                                 <thead>
                                     <tr>
                                         <th data-i18n="invoice">Invoice</th>
@@ -239,49 +185,67 @@
                 </section>
 
                 <section data-view="pos" class="view-section hidden">
-                    <div class="two-column-grid">
-                        <div class="section-stack">
-                            <div class="surface-panel">
-                                <div class="toolbar-grid">
-                                    <input id="pos-search" type="text" class="field-input" data-i18n-placeholder="search_products" placeholder="Search products">
-                                    <input id="pos-sale-date" type="date" class="field-input">
-                                </div>
+                    <div class="pos-workspace">
+                        <div class="pos-browser">
+                            <div class="pos-search-bar">
+                                <i data-lucide="search" class="h-5 w-5" aria-hidden="true"></i>
+                                <input id="pos-search" type="text" class="pos-search-input" data-i18n-placeholder="search_products" placeholder="Search products" autocomplete="off">
                             </div>
-                            <div id="pos-products-grid" class="product-grid"></div>
+                            <div id="pos-categories" class="pos-category-grid" aria-label="Product types"></div>
+                            <div id="pos-results-popover" class="pos-results-popover hidden">
+                                <div id="pos-products-grid" class="pos-product-grid product-results" aria-live="polite"></div>
+                                <div id="pos-product-dots" class="pos-product-dots hidden" aria-label="Product result pages"></div>
+                            </div>
+                            <section id="pos-recent-section" class="pos-recent-section" aria-labelledby="pos-recent-title">
+                                <div class="pos-recent-heading">
+                                    <h3 id="pos-recent-title">Recent items</h3>
+                                    <span>Latest inventory</span>
+                                </div>
+                                <div id="pos-recent-products" class="pos-recent-grid"></div>
+                            </section>
                         </div>
 
-                        <div class="surface-panel cart-panel">
-                            <div class="section-heading">
-                                <h3 data-i18n="current_cart">Current Cart</h3>
-                            </div>
+                        <aside id="pos-cart" class="pos-cart" aria-labelledby="pos-cart-title">
+                            <header class="pos-cart-header">
+                                <div>
+                                    <p>Point of sale</p>
+                                    <h3 id="pos-cart-title" data-i18n="current_cart">Current Cart</h3>
+                                </div>
+                                <span id="cart-item-count" class="pos-cart-count" aria-live="polite">0 items</span>
+                            </header>
 
-                            <div id="cart-items" class="cart-items"></div>
+                            <div id="cart-items" class="pos-cart-list" aria-live="polite"></div>
 
-                            <div class="cart-summary">
-                                <div class="summary-row">
+                            <div class="pos-cart-summary">
+                                <div class="pos-cart-summary-row">
                                     <span data-i18n="subtotal">Subtotal</span>
                                     <strong id="cart-subtotal">0 MMK</strong>
                                 </div>
-                                <label class="field-label" for="pos-discount" data-i18n="discount">Discount</label>
-                                <input id="pos-discount" type="number" min="0" value="0" class="field-input">
-                                <div class="summary-row total">
+                                <label class="pos-cart-discount" for="pos-discount">
+                                    <span data-i18n="discount">Discount</span>
+                                    <input id="pos-discount" type="number" min="0" value="0" inputmode="numeric" aria-label="Discount amount">
+                                </label>
+                                <div class="pos-cart-summary-row pos-cart-grand-total">
                                     <span data-i18n="total">Total</span>
                                     <strong id="cart-total">0 MMK</strong>
                                 </div>
-                                <button id="checkout-button" type="button" class="primary-btn full-width" data-i18n="complete_sale">Complete Sale</button>
+                                <button id="checkout-button" type="button" class="primary-btn full-width pos-checkout-button" data-i18n="complete_sale">Complete Sale</button>
                             </div>
-                        </div>
+                        </aside>
                     </div>
                 </section>
 
                 <section data-view="inventory" class="view-section section-stack hidden">
-                    <div class="surface-panel">
-                        <div class="section-heading row">
-                            <h3 data-i18n="inventory_register">Inventory Register</h3>
+                    <div class="inventory-workspace">
+                        <div class="inventory-toolbar">
                             <input id="inventory-search" type="text" class="field-input search-field" data-i18n-placeholder="search_inventory" placeholder="Search inventory">
+                            <button id="open-inbound-button" type="button" class="inventory-inbound-button admin-only" aria-label="Add inbound stock">
+                                <i data-lucide="plus" class="h-5 w-5" aria-hidden="true"></i>
+                                <span>Add inbound</span>
+                            </button>
                         </div>
                         <div class="table-wrap">
-                            <table class="data-table inventory-table">
+                            <table class="data-table inventory-table responsive-table">
                                 <thead>
                                     <tr>
                                         <th data-i18n="product_code">Code</th>
@@ -302,10 +266,16 @@
                     </div>
                 </section>
 
-                <section data-view="inbound" class="view-section hidden">
-                    <div class="surface-panel">
-                        <div class="section-heading">
-                            <h3 data-i18n="inbound_stock_entry">Inbound Stock Entry</h3>
+                <div id="inbound-modal" class="modal-shell hidden" role="dialog" aria-modal="true" aria-labelledby="inbound-modal-title">
+                    <div class="modal-card inbound-modal-card">
+                        <div class="inbound-modal-header">
+                            <div>
+                                <p>Inventory registry</p>
+                                <h3 id="inbound-modal-title" data-i18n="inbound_stock_entry">Inbound Stock Entry</h3>
+                            </div>
+                            <button id="close-inbound-modal" type="button" class="icon-btn" aria-label="Close inbound form">
+                                <i data-lucide="x" class="h-5 w-5"></i>
+                            </button>
                         </div>
                         <form id="inbound-form" class="form-grid">
                             <div>
@@ -322,7 +292,16 @@
                             </div>
                             <div class="span-2">
                                 <label class="field-label" for="inbound-category" data-i18n="category">Category</label>
-                                <input id="inbound-category" type="text" class="field-input">
+                                <select id="inbound-category" class="field-input">
+                                    <option value="">Choose category (optional)</option>
+                                    <option value="Tablets & Capsules">Tablets & Capsules</option>
+                                    <option value="Syrups & Liquids">Syrups & Liquids</option>
+                                    <option value="Injections">Injections</option>
+                                    <option value="Syringes & Supplies">Syringes & Supplies</option>
+                                    <option value="Medical Electronics">Medical Electronics</option>
+                                    <option value="First Aid">First Aid</option>
+                                    <option value="Personal Care">Personal Care</option>
+                                </select>
                             </div>
                             <div>
                                 <label class="field-label" for="inbound-expiry" data-i18n="expiry_date">Expiry Date</label>
@@ -349,13 +328,11 @@
                             </div>
                         </form>
                     </div>
-                </section>
+                </div>
 
                 <section data-view="sales" class="view-section section-stack hidden">
-                    <div class="surface-panel">
-                        <div class="section-heading row wrap">
-                            <h3 data-i18n="sales_report">Sales Report</h3>
-                            <div class="toolbar-grid compact">
+                    <div class="sales-report-page">
+                        <div class="sales-report-toolbar">
                                 <select id="sales-report-type" class="field-input">
                                     <option value="daily" data-i18n="daily">Daily</option>
                                     <option value="monthly" data-i18n="monthly">Monthly</option>
@@ -366,13 +343,12 @@
                                     <i data-lucide="printer" class="h-4 w-4"></i>
                                     <span data-i18n="pdf_report">PDF Report</span>
                                 </button>
-                            </div>
                         </div>
 
                         <div id="sales-summary-strip" class="summary-strip"></div>
 
-                        <div class="table-wrap">
-                            <table class="data-table">
+                        <div class="sales-report-table-scroll">
+                            <table class="data-table sales-table responsive-table">
                                 <thead>
                                     <tr>
                                         <th data-i18n="invoice">Invoice</th>
@@ -392,13 +368,21 @@
                 </section>
 
                 <section data-view="alerts" class="view-section hidden">
-                    <div class="alert-grid">
-                        <div class="surface-panel">
-                            <div class="section-heading">
-                                <h3 data-i18n="low_stock">Low Stock</h3>
-                            </div>
-                            <div class="table-wrap">
-                                <table class="data-table compact">
+                    <div class="alerts-workspace">
+                        <div class="alert-view-switch" role="tablist" aria-label="Stock alert detail views">
+                            <button type="button" class="alert-view-button active" role="tab" aria-selected="true" data-alert-view="low">
+                                <i data-lucide="triangle-alert" class="h-4 w-4"></i><span data-i18n="low_stock">Low Stock</span>
+                            </button>
+                            <button type="button" class="alert-view-button" role="tab" aria-selected="false" data-alert-view="expired">
+                                <i data-lucide="shield-alert" class="h-4 w-4"></i><span data-i18n="expired">Expired</span>
+                            </button>
+                            <button type="button" class="alert-view-button" role="tab" aria-selected="false" data-alert-view="expiring">
+                                <i data-lucide="calendar-clock" class="h-4 w-4"></i><span data-i18n="expiring_soon">Expiring Soon</span>
+                            </button>
+                        </div>
+                        <div class="alert-detail-panel active" data-alert-panel="low">
+                            <div class="table-wrap alert-table-wrap">
+                                <table class="data-table compact alert-table">
                                     <thead>
                                         <tr>
                                             <th data-i18n="product_name">Product</th>
@@ -410,12 +394,9 @@
                                 </table>
                             </div>
                         </div>
-                        <div class="surface-panel">
-                            <div class="section-heading">
-                                <h3 data-i18n="expired">Expired</h3>
-                            </div>
-                            <div class="table-wrap">
-                                <table class="data-table compact">
+                        <div class="alert-detail-panel" data-alert-panel="expired" hidden>
+                            <div class="table-wrap alert-table-wrap">
+                                <table class="data-table compact alert-table">
                                     <thead>
                                         <tr>
                                             <th data-i18n="product_name">Product</th>
@@ -427,12 +408,9 @@
                                 </table>
                             </div>
                         </div>
-                        <div class="surface-panel">
-                            <div class="section-heading">
-                                <h3 data-i18n="expiring_soon">Expiring Soon</h3>
-                            </div>
-                            <div class="table-wrap">
-                                <table class="data-table compact">
+                        <div class="alert-detail-panel" data-alert-panel="expiring" hidden>
+                            <div class="table-wrap alert-table-wrap">
+                                <table class="data-table compact alert-table">
                                     <thead>
                                         <tr>
                                             <th data-i18n="product_name">Product</th>
@@ -448,21 +426,19 @@
                 </section>
 
                 <section data-view="history" class="view-section hidden">
-                    <div class="surface-panel">
-                        <div class="section-heading">
-                            <h3 data-i18n="stock_history">Stock History</h3>
-                        </div>
-                        <div class="table-wrap">
-                            <table class="data-table">
+                    <div class="history-page">
+                        <div class="table-wrap history-table-wrap">
+                            <table class="data-table history-table">
                                 <thead>
                                     <tr>
                                         <th data-i18n="time">Time</th>
                                         <th data-i18n="product_name">Product</th>
                                         <th data-i18n="type">Type</th>
-                                        <th class="text-right" data-i18n="qty_change">Qty Change</th>
+                                        <th class="text-right"><span class="history-qty-desktop" data-i18n="qty_change">Qty Change</span><span class="history-qty-mobile">Qty</span></th>
                                         <th class="text-right" data-i18n="balance">Balance</th>
                                         <th data-i18n="actor">Actor</th>
                                         <th data-i18n="note">Note</th>
+                                        <th class="history-action-heading" data-i18n="actions">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="history-table-body"></tbody>
@@ -507,7 +483,7 @@
                                 <h3 data-i18n="user_accounts">User Accounts</h3>
                             </div>
                             <div class="table-wrap">
-                                <table class="data-table">
+                                <table class="data-table users-table responsive-table">
                                     <thead>
                                         <tr>
                                             <th data-i18n="full_name">Name</th>
@@ -603,9 +579,9 @@
                     <i data-lucide="file-bar-chart-2" class="h-5 w-5"></i>
                     <span data-i18n="sales">Sales</span>
                 </button>
-                <button type="button" data-tab="account" class="footer-button">
-                    <i data-lucide="settings-2" class="h-5 w-5"></i>
-                    <span data-i18n="account">Account</span>
+                <button id="mobile-more-button" type="button" class="footer-button" aria-label="Open more navigation options">
+                    <i data-lucide="menu" class="h-5 w-5"></i>
+                    <span data-i18n="more">More</span>
                 </button>
             </nav>
         </div>
@@ -635,7 +611,16 @@
                 </div>
                 <div class="span-2">
                     <label class="field-label" for="product-category" data-i18n="category">Category</label>
-                    <input id="product-category" type="text" class="field-input">
+                    <input id="product-category" type="text" class="field-input" list="product-category-options" autocomplete="off">
+                    <datalist id="product-category-options">
+                        <option value="Tablets & Capsules"></option>
+                        <option value="Syrups & Liquids"></option>
+                        <option value="Injections"></option>
+                        <option value="Syringes & Supplies"></option>
+                        <option value="Medical Electronics"></option>
+                        <option value="First Aid"></option>
+                        <option value="Personal Care"></option>
+                    </datalist>
                 </div>
                 <div>
                     <label class="field-label" for="product-expiry" data-i18n="expiry_date">Expiry</label>
@@ -680,6 +665,6 @@
         </div>
     </div>
 
-    <script src="/app.js"></script>
+    <script src="/app.js?v=20260718-operations"></script>
 </body>
 </html>
