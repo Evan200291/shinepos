@@ -17,6 +17,10 @@ const state = {
     movements: [],
     logs: [],
     users: [],
+    suppliers: [],
+    customers: [],
+    expenses: [],
+    chart: { weeklySales: [], bestSellers: [] },
     cart: [],
     posCategory: "all",
     posCategoryOpen: false,
@@ -27,15 +31,18 @@ const state = {
         inventory: 1,
         sales: 1,
         history: 1,
-        users: 1
+        users: 1,
+        suppliers: 1,
+        customers: 1,
+        expenses: 1
     },
     receiptSale: null,
     activeAlertView: "low",
     loadingRequests: 0
 };
 
-const adminTabs = new Set(["history", "users"]);
-const availableTabs = new Set(["dashboard", "pos", "inventory", "sales", "alerts", "history", "users", "account"]);
+const adminTabs = new Set(["history", "users", "suppliers", "expenses"]);
+const availableTabs = new Set(["dashboard", "pos", "inventory", "sales", "alerts", "history", "suppliers", "customers", "expenses", "users", "account"]);
 const POS_CATEGORIES = [
     { id: "all", label: "All items", icon: "layout-grid", terms: [] },
     { id: "tablets", label: "Tablets & Capsules", icon: "pill", terms: ["tablet", "capsule", "pill", "oral", "analgesic", "antibiotic", "vitamin", "supplement", "pain relief"] },
@@ -50,7 +57,10 @@ const PAGE_SIZES = {
     inventory: 8,
     sales: 8,
     history: 8,
-    users: 8
+    users: 8,
+    suppliers: 8,
+    customers: 8,
+    expenses: 8
 };
 
 const translations = {
@@ -125,6 +135,23 @@ const translations = {
         role_admin: "Admin",
         user_accounts: "User Accounts",
         created: "Created",
+        suppliers: "Suppliers",
+        customers: "Customers",
+        expenses: "Expenses",
+        add_supplier: "Add Supplier",
+        add_customer: "Add Customer",
+        add_expense: "Add Expense",
+        supplier_name: "Supplier Name",
+        customer_name: "Customer Name",
+        phone: "Phone",
+        balance_owed: "Balance Owed",
+        credit_balance: "Credit Balance",
+        amount: "Amount",
+        page_suppliers: "Suppliers",
+        page_customers: "Customers",
+        page_expenses: "Expenses",
+        weekly_sales_chart: "Weekly Sales",
+        best_sellers: "Best-Sellers",
         account_security: "Account Security",
         current_password: "Current Password",
         new_password: "New Password",
@@ -377,6 +404,7 @@ function setDefaultDates() {
     const month = today.slice(0, 7);
     $("sales-date-filter").value = today;
     $("sales-month-filter").value = month;
+    $("expense-date").value = today;
 }
 
 function bindEvents() {
@@ -505,6 +533,31 @@ function bindEvents() {
             deleteProduct(Number(deleteButton.dataset.deleteProduct));
         }
     });
+
+    $("suppliers-table-body").addEventListener("click", (event) => {
+        const ledgerButton = event.target.closest("[data-ledger-type]");
+        const deleteButton = event.target.closest("[data-delete-supplier]");
+        if (ledgerButton) openLedgerModal(ledgerButton.dataset.ledgerType, Number(ledgerButton.dataset.ledgerId));
+        if (deleteButton) handleDeleteSupplier(Number(deleteButton.dataset.deleteSupplier));
+    });
+    $("customers-table-body").addEventListener("click", (event) => {
+        const ledgerButton = event.target.closest("[data-ledger-type]");
+        const deleteButton = event.target.closest("[data-delete-customer]");
+        if (ledgerButton) openLedgerModal(ledgerButton.dataset.ledgerType, Number(ledgerButton.dataset.ledgerId));
+        if (deleteButton) handleDeleteCustomer(Number(deleteButton.dataset.deleteCustomer));
+    });
+    $("expenses-table-body").addEventListener("click", (event) => {
+        const deleteButton = event.target.closest("[data-delete-expense]");
+        if (deleteButton) handleDeleteExpense(Number(deleteButton.dataset.deleteExpense));
+    });
+    $("supplier-form").addEventListener("submit", handleCreateSupplier);
+    $("customer-form").addEventListener("submit", handleCreateCustomer);
+    $("expense-form").addEventListener("submit", handleCreateExpense);
+    $("ledger-close-button").addEventListener("click", closeLedgerModal);
+    $("ledger-modal").addEventListener("click", (event) => {
+        if (event.target === $("ledger-modal")) closeLedgerModal();
+    });
+    $("ledger-form").addEventListener("submit", handleLedgerSubmit);
 
     $("history-table-body").addEventListener("click", handleHistoryRowAction);
     $("dashboard-sales-body").addEventListener("click", handleSaleActionClick);
@@ -893,12 +946,16 @@ async function loadInitialData() {
         api("/api/products"),
         api("/api/sales"),
         loadFilteredSalesData(),
-        api("/api/alerts")
+        api("/api/alerts"),
+        api("/api/customers"),
+        api("/api/dashboard/chart")
     ];
 
     if (state.user.role === "admin") {
         requests.push(api("/api/stock-movements"));
         requests.push(api("/api/users"));
+        requests.push(api("/api/suppliers"));
+        requests.push(api("/api/expenses"));
     }
 
     const results = await Promise.all(requests);
@@ -907,14 +964,20 @@ async function loadInitialData() {
     state.recentSales = results[2].sales.slice(0, 8);
     state.sales = results[3].sales;
     state.alerts = results[4];
+    state.customers = results[5].customers;
+    state.chart = results[6];
 
     if (state.user.role === "admin") {
-        state.movements = results[5].movements;
-        state.users = results[6].users;
+        state.movements = results[7].movements;
+        state.users = results[8].users;
+        state.suppliers = results[9].suppliers;
+        state.expenses = results[10].expenses;
     } else {
         state.movements = [];
         state.logs = [];
         state.users = [];
+        state.suppliers = [];
+        state.expenses = [];
     }
 
     renderAll();
@@ -958,6 +1021,11 @@ function renderAll() {
     renderAlerts();
     renderMovements();
     renderUsers();
+    renderSuppliers();
+    renderCustomers();
+    renderExpenses();
+    renderSalesChart();
+    renderBestSellers();
     switchTab(state.activeTab);
     lucide.createIcons();
 }
@@ -1037,6 +1105,12 @@ function handlePagerClick(event) {
         renderMovements();
     } else if (key === "users") {
         renderUsers();
+    } else if (key === "suppliers") {
+        renderSuppliers();
+    } else if (key === "customers") {
+        renderCustomers();
+    } else if (key === "expenses") {
+        renderExpenses();
     }
 }
 
@@ -1577,7 +1651,8 @@ async function handleInboundSubmit(event) {
                 quantity: Number($("inbound-quantity").value),
                 costPrice: Number($("inbound-cost").value),
                 sellPrice: Number($("inbound-price").value),
-                lowStockThreshold: Number($("inbound-threshold").value)
+                lowStockThreshold: Number($("inbound-threshold").value),
+                supplierId: $("inbound-supplier").value || null
             }
         });
         $("inbound-form").reset();
@@ -1715,6 +1790,286 @@ function renderUsers() {
         `).join("")
         : `<tr><td colspan="5" class="empty-state">${escapeHtml(t("no_users"))}</td></tr>`;
     renderPager("users-pager", "users", page.totalPages);
+}
+
+function renderSuppliers() {
+    const page = getPageSlice(state.suppliers, "suppliers");
+    $("suppliers-table-body").innerHTML = state.suppliers.length
+        ? page.rows.map((supplier) => `
+            <tr>
+                <td data-label="Name"><strong>${escapeHtml(supplier.name)}</strong></td>
+                <td data-label="Phone">${escapeHtml(supplier.phone || "-")}</td>
+                <td data-label="Balance Owed" class="text-right">${escapeHtml(formatCurrency(supplier.balance))}</td>
+                <td data-label="Actions" class="text-center">
+                    <button type="button" class="mini-btn" data-ledger-type="supplier" data-ledger-id="${supplier.id}">Ledger</button>
+                    <button type="button" class="danger-btn" data-delete-supplier="${supplier.id}">Remove</button>
+                </td>
+            </tr>
+        `).join("")
+        : `<tr><td colspan="4" class="empty-state">No suppliers yet.</td></tr>`;
+    renderPager("suppliers-pager", "suppliers", page.totalPages);
+    populateSupplierDropdown();
+}
+
+function populateSupplierDropdown() {
+    const select = $("inbound-supplier");
+    if (!select) return;
+    const current = select.value;
+    select.innerHTML = `<option value="">No supplier</option>` +
+        state.suppliers.map((s) => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join("");
+    select.value = current;
+}
+
+async function handleCreateSupplier(event) {
+    event.preventDefault();
+    try {
+        await api("/api/suppliers", {
+            method: "POST",
+            body: { name: $("supplier-name").value.trim(), phone: $("supplier-phone").value.trim() }
+        });
+        $("supplier-form").reset();
+        const response = await api("/api/suppliers");
+        state.suppliers = response.suppliers;
+        renderSuppliers();
+        showNotification("Supplier added.");
+    } catch (error) {
+        showNotification(error.message, "error");
+    }
+}
+
+async function handleDeleteSupplier(id) {
+    try {
+        await api(`/api/suppliers/${id}`, { method: "DELETE" });
+        const response = await api("/api/suppliers");
+        state.suppliers = response.suppliers;
+        renderSuppliers();
+        showNotification("Supplier removed.");
+    } catch (error) {
+        showNotification(error.message, "error");
+    }
+}
+
+function renderCustomers() {
+    const page = getPageSlice(state.customers, "customers");
+    $("customers-table-body").innerHTML = state.customers.length
+        ? page.rows.map((customer) => `
+            <tr>
+                <td data-label="Name"><strong>${escapeHtml(customer.name)}</strong></td>
+                <td data-label="Phone">${escapeHtml(customer.phone || "-")}</td>
+                <td data-label="Credit Balance" class="text-right">${escapeHtml(formatCurrency(customer.creditBalance))}</td>
+                <td data-label="Actions" class="text-center">
+                    <button type="button" class="mini-btn" data-ledger-type="customer" data-ledger-id="${customer.id}">Ledger</button>
+                    ${state.user?.role === "admin" ? `<button type="button" class="danger-btn" data-delete-customer="${customer.id}">Remove</button>` : ""}
+                </td>
+            </tr>
+        `).join("")
+        : `<tr><td colspan="4" class="empty-state">No customers yet.</td></tr>`;
+    renderPager("customers-pager", "customers", page.totalPages);
+}
+
+async function handleCreateCustomer(event) {
+    event.preventDefault();
+    try {
+        await api("/api/customers", {
+            method: "POST",
+            body: { name: $("customer-name").value.trim(), phone: $("customer-phone").value.trim() }
+        });
+        $("customer-form").reset();
+        const response = await api("/api/customers");
+        state.customers = response.customers;
+        renderCustomers();
+        showNotification("Customer added.");
+    } catch (error) {
+        showNotification(error.message, "error");
+    }
+}
+
+async function handleDeleteCustomer(id) {
+    try {
+        await api(`/api/customers/${id}`, { method: "DELETE" });
+        const response = await api("/api/customers");
+        state.customers = response.customers;
+        renderCustomers();
+        showNotification("Customer removed.");
+    } catch (error) {
+        showNotification(error.message, "error");
+    }
+}
+
+function renderExpenses() {
+    const page = getPageSlice(state.expenses, "expenses");
+    $("expenses-table-body").innerHTML = state.expenses.length
+        ? page.rows.map((expense) => `
+            <tr>
+                <td data-label="Date">${escapeHtml(formatDate(expense.expenseDate))}</td>
+                <td data-label="Category"><strong>${escapeHtml(expense.category)}</strong></td>
+                <td data-label="Description">${escapeHtml(expense.description || "-")}</td>
+                <td data-label="Amount" class="text-right">${escapeHtml(formatCurrency(expense.amount))}</td>
+                <td data-label="Actor">${escapeHtml(expense.actorName)}</td>
+                <td data-label="Actions" class="text-center">
+                    <button type="button" class="danger-btn" data-delete-expense="${expense.id}">Delete</button>
+                </td>
+            </tr>
+        `).join("")
+        : `<tr><td colspan="6" class="empty-state">No expenses recorded yet.</td></tr>`;
+    renderPager("expenses-pager", "expenses", page.totalPages);
+}
+
+async function handleCreateExpense(event) {
+    event.preventDefault();
+    try {
+        await api("/api/expenses", {
+            method: "POST",
+            body: {
+                category: $("expense-category").value.trim(),
+                description: $("expense-description").value.trim(),
+                amount: Number($("expense-amount").value) || 0,
+                expenseDate: $("expense-date").value
+            }
+        });
+        $("expense-form").reset();
+        const response = await api("/api/expenses");
+        state.expenses = response.expenses;
+        renderExpenses();
+        showNotification("Expense recorded.");
+    } catch (error) {
+        showNotification(error.message, "error");
+    }
+}
+
+async function handleDeleteExpense(id) {
+    try {
+        await api(`/api/expenses/${id}`, { method: "DELETE" });
+        const response = await api("/api/expenses");
+        state.expenses = response.expenses;
+        renderExpenses();
+        showNotification("Expense deleted.");
+    } catch (error) {
+        showNotification(error.message, "error");
+    }
+}
+
+// ---- Shared Supplier/Customer ledger modal ----
+const ledgerState = { type: null, id: null };
+
+async function openLedgerModal(type, id) {
+    ledgerState.type = type;
+    ledgerState.id = id;
+    const typeSelect = $("ledger-entry-type");
+    typeSelect.innerHTML = type === "supplier"
+        ? `<option value="due">Add Due (purchase)</option><option value="payment">Record Payment</option>`
+        : `<option value="credit_sale">Add Credit Sale</option><option value="payment">Record Payment</option>`;
+    $("ledger-form").reset();
+    $("ledger-modal").classList.remove("hidden");
+    await refreshLedgerModal();
+    lucide.createIcons();
+}
+
+async function refreshLedgerModal() {
+    const { type, id } = ledgerState;
+    const endpoint = type === "supplier" ? `/api/suppliers/${id}/ledger` : `/api/customers/${id}/ledger`;
+    const response = await api(endpoint);
+    const record = type === "supplier" ? response.supplier : response.customer;
+    const balance = type === "supplier" ? record.balance : record.creditBalance;
+
+    $("ledger-modal-title").textContent = `${record.name} — Ledger`;
+    $("ledger-modal-balance").textContent = `${type === "supplier" ? "Balance owed" : "Credit balance"}: ${formatCurrency(balance)}`;
+
+    $("ledger-entries-list").innerHTML = response.entries.length
+        ? response.entries.map((entry) => `
+            <div class="ledger-entry-row">
+                <div>
+                    <strong>${entry.entryType === "payment" ? "Payment" : entry.entryType === "due" ? "Due added" : "Credit sale"}</strong>
+                    <span class="ledger-entry-note">${escapeHtml(entry.note || "")}</span>
+                </div>
+                <div class="ledger-entry-meta">
+                    <span class="${entry.entryType === "payment" ? "ledger-amount-negative" : "ledger-amount-positive"}">${entry.entryType === "payment" ? "-" : "+"}${escapeHtml(formatCurrency(entry.amount))}</span>
+                    <span class="ledger-entry-date">${escapeHtml(formatDateTime(entry.createdAt))}</span>
+                </div>
+            </div>
+        `).join("")
+        : `<p class="empty-state">No ledger entries yet.</p>`;
+}
+
+function closeLedgerModal() {
+    $("ledger-modal").classList.add("hidden");
+    ledgerState.type = null;
+    ledgerState.id = null;
+}
+
+async function handleLedgerSubmit(event) {
+    event.preventDefault();
+    const { type, id } = ledgerState;
+    if (!type || !id) return;
+
+    const endpoint = type === "supplier" ? `/api/suppliers/${id}/ledger` : `/api/customers/${id}/ledger`;
+    try {
+        await api(endpoint, {
+            method: "POST",
+            body: {
+                entryType: $("ledger-entry-type").value,
+                amount: Number($("ledger-amount").value) || 0,
+                note: $("ledger-note").value.trim()
+            }
+        });
+        $("ledger-form").reset();
+        await refreshLedgerModal();
+        if (type === "supplier") {
+            const response = await api("/api/suppliers");
+            state.suppliers = response.suppliers;
+            renderSuppliers();
+        } else {
+            const response = await api("/api/customers");
+            state.customers = response.customers;
+            renderCustomers();
+        }
+        showNotification("Ledger entry saved.");
+    } catch (error) {
+        showNotification(error.message, "error");
+    }
+}
+
+// ---- Dashboard: weekly sales chart + best-sellers ----
+function renderSalesChart() {
+    const container = $("sales-chart");
+    if (!container) return;
+    const days = state.chart.weeklySales || [];
+    if (!days.length) {
+        container.innerHTML = `<p class="empty-state">No sales data yet.</p>`;
+        return;
+    }
+    const max = Math.max(1, ...days.map((d) => d.total));
+    const bars = days.map((d) => {
+        const heightPct = Math.max(4, Math.round((d.total / max) * 100));
+        const label = new Date(d.date + "T00:00:00").toLocaleDateString(undefined, { weekday: "short" });
+        return `
+            <div class="chart-bar-col">
+                <div class="chart-bar-track">
+                    <div class="chart-bar" style="height:${heightPct}%" title="${escapeHtml(formatCurrency(d.total))}"></div>
+                </div>
+                <span class="chart-bar-label">${escapeHtml(label)}</span>
+            </div>
+        `;
+    }).join("");
+    container.innerHTML = `<div class="chart-bars">${bars}</div>`;
+}
+
+function renderBestSellers() {
+    const container = $("best-sellers-list");
+    if (!container) return;
+    const items = state.chart.bestSellers || [];
+    container.innerHTML = items.length
+        ? items.map((item, index) => `
+            <div class="best-seller-row">
+                <span class="best-seller-rank">${index + 1}</span>
+                <div class="best-seller-info">
+                    <strong>${escapeHtml(item.productName)}</strong>
+                    <span>${escapeHtml(item.quantity)} sold</span>
+                </div>
+                <span class="best-seller-revenue">${escapeHtml(formatCurrency(item.revenue))}</span>
+            </div>
+        `).join("")
+        : `<p class="empty-state">No sales yet.</p>`;
 }
 
 async function handleCreateUser(event) {

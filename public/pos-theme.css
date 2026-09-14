@@ -300,17 +300,17 @@ button:disabled, input:disabled, select:disabled, .disabled {
 .pos-search-bar svg { flex: 0 0 auto; color: #db0202; }
 .pos-search-input { width: 100%; min-width: 0; min-height: 44px; padding: 0; border: 0; outline: 0; background: #ffffff; color: #171717; font: inherit; }
 .pos-search-input::placeholder { color: #8a8a8a; }
-.pos-category-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.pos-category-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .pos-category-card {
   min-width: 0;
-  min-height: 84px;
+  min-height: 0;
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  flex-direction: row;
+  align-items: center;
   gap: 8px;
-  padding: 10px;
+  padding: 8px 10px;
   border: 1px solid #dddddd;
-  border-radius: 8px;
+  border-radius: 4px;
   background: #ffffff;
   color: #171717;
   text-align: left;
@@ -318,11 +318,12 @@ button:disabled, input:disabled, select:disabled, .disabled {
 }
 .pos-category-card:hover { border-color: #8d8d8d; background: #fafafa; }
 .pos-category-card.active { border-color: #db0202; background: #fff3f3; color: #b40000; }
-.pos-category-icon { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 7px; background: #f1f1f1; color: #333333; }
+.pos-category-icon { width: 24px; height: 24px; flex: 0 0 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; background: #f1f1f1; color: #333333; }
+.pos-category-icon svg { width: 14px; height: 14px; }
 .pos-category-card.active .pos-category-icon { background: #db0202; color: #ffffff; }
-.pos-category-copy { min-width: 0; display: grid; gap: 2px; }
-.pos-category-name { overflow: hidden; font-size: 12px; font-weight: 800; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
-.pos-category-count { color: #6b6b6b; font-size: 10px; font-weight: 650; }
+.pos-category-copy { min-width: 0; display: grid; gap: 0; }
+.pos-category-name { overflow: hidden; font-size: 11.5px; font-weight: 800; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.pos-category-count { color: #6b6b6b; font-size: 9.5px; font-weight: 650; }
 .pos-category-card.active .pos-category-count { color: #b40000; }
 .pos-product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(188px, 1fr)); gap: 8px; }
 .pos-results-popover { min-width: 0; display: grid; gap: 8px; }
@@ -566,9 +567,10 @@ button:disabled, input:disabled, select:disabled, .disabled {
   .pos-browser { position: relative; z-index: 5; gap: 10px; }
   .pos-category-grid { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 116px; gap: 7px; overflow-x: auto; padding: 0 2px 10px; scroll-padding-inline: 2px; scroll-snap-type: inline mandatory; overscroll-behavior-inline: contain; scrollbar-width: none; }
   .pos-category-grid::-webkit-scrollbar { display: none; }
-  .pos-category-card { min-height: 70px; padding: 8px; }
+  .pos-category-card { min-height: 0; padding: 7px 8px; }
   .pos-category-card { scroll-snap-align: start; }
-  .pos-category-icon { width: 26px; height: 26px; }
+  .pos-category-icon { width: 20px; height: 20px; flex: 0 0 20px; }
+  .pos-category-icon svg { width: 12px; height: 12px; }
   .pos-category-name { font-size: 11px; }
   .pos-results-popover { position: absolute; top: calc(100% + 8px); left: 0; right: 0; z-index: 30; gap: 7px; padding: 8px; border: 1px solid #d7d7d7; border-radius: 10px; background: #ffffff; box-shadow: 0 14px 34px rgba(0, 0, 0, .18); }
   .pos-results-popover .pos-product-grid { grid-template-columns: 1fr; gap: 6px; max-height: min(48vh, 380px); overflow-y: auto; overscroll-behavior: contain; }
@@ -845,6 +847,37 @@ button:disabled, input:disabled, select:disabled, .disabled {
 .camera-scanner-viewport video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .camera-scanner-reticle { position: absolute; inset: 18% 12%; border: 2px solid rgba(255,255,255,.85); border-radius: 10px; box-shadow: 0 0 0 2000px rgba(0,0,0,.28); pointer-events: none; }
 #camera-scanner-message { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: #fff1f1; color: #b91c1c; border: 1px solid #fecaca; }
+
+/* Dashboard: weekly sales chart + best-sellers */
+.dashboard-widgets-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .dashboard-widgets-grid { grid-template-columns: 1fr; } }
+.sales-chart { min-height: 160px; }
+.chart-bars { display: flex; align-items: flex-end; gap: 10px; height: 160px; padding-top: 10px; }
+.chart-bar-col { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; }
+.chart-bar-track { flex: 1; width: 100%; display: flex; align-items: flex-end; }
+.chart-bar { width: 100%; min-height: 3px; background: #db0202; border-radius: 3px 3px 0 0; transition: background-color 150ms ease; }
+.chart-bar-col:hover .chart-bar { background: #171717; }
+.chart-bar-label { font-size: 10px; font-weight: 700; color: #6b6b6b; text-transform: uppercase; }
+
+.best-sellers-list { display: grid; gap: 8px; }
+.best-seller-row { display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid #ececec; border-radius: 4px; }
+.best-seller-rank { flex: 0 0 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; background: #171717; color: #ffffff; font-size: 11px; font-weight: 800; }
+.best-seller-info { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.best-seller-info strong { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.best-seller-info span { font-size: 10px; color: #777777; }
+.best-seller-revenue { font-size: 12px; font-weight: 800; color: #db0202; white-space: nowrap; }
+
+/* Ledger modal (suppliers / customers) */
+.ledger-balance-line { margin: 2px 0 0; font-size: 12px; font-weight: 700; color: #db0202; }
+.ledger-form { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid #ececec; }
+.ledger-history h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #6b6b6b; }
+.ledger-entries-list { display: grid; gap: 6px; max-height: 240px; overflow-y: auto; }
+.ledger-entry-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid #ececec; border-radius: 4px; font-size: 12px; }
+.ledger-entry-note { display: block; color: #777777; font-size: 10px; margin-top: 2px; }
+.ledger-entry-meta { text-align: right; display: grid; gap: 1px; }
+.ledger-amount-positive { color: #b91c1c; font-weight: 800; }
+.ledger-amount-negative { color: #15803d; font-weight: 800; }
+.ledger-entry-date { font-size: 9px; color: #999999; }
 
 /* =====================================================
    VISUAL POLISH PASS — subtle depth + refined interactions

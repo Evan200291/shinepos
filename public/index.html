@@ -112,6 +112,18 @@
                     <i data-lucide="history" class="h-5 w-5"></i>
                     <span data-i18n="history">Stock History</span>
                 </button>
+                <button type="button" data-tab="suppliers" class="nav-button admin-only">
+                    <i data-lucide="truck" class="h-5 w-5"></i>
+                    <span data-i18n="suppliers">Suppliers</span>
+                </button>
+                <button type="button" data-tab="customers" class="nav-button">
+                    <i data-lucide="contact" class="h-5 w-5"></i>
+                    <span data-i18n="customers">Customers</span>
+                </button>
+                <button type="button" data-tab="expenses" class="nav-button admin-only">
+                    <i data-lucide="receipt" class="h-5 w-5"></i>
+                    <span data-i18n="expenses">Expenses</span>
+                </button>
                 <button type="button" data-tab="users" class="nav-button admin-only">
                     <i data-lucide="users" class="h-5 w-5"></i>
                     <span data-i18n="users">Users</span>
@@ -157,6 +169,21 @@
             <main class="content-scroll">
                 <section data-view="dashboard" class="view-section section-stack">
                     <div id="summary-cards" class="metric-grid"></div>
+
+                    <div class="dashboard-widgets-grid">
+                        <div class="surface-panel">
+                            <div class="section-heading">
+                                <h3 data-i18n="weekly_sales_chart">Weekly Sales</h3>
+                            </div>
+                            <div id="sales-chart" class="sales-chart"></div>
+                        </div>
+                        <div class="surface-panel">
+                            <div class="section-heading">
+                                <h3 data-i18n="best_sellers">Best-Sellers</h3>
+                            </div>
+                            <div id="best-sellers-list" class="best-sellers-list"></div>
+                        </div>
+                    </div>
 
                     <div class="surface-panel">
                         <div class="section-heading row">
@@ -316,6 +343,12 @@
                                     <option value="Personal Care">Personal Care</option>
                                 </select>
                             </div>
+                            <div class="span-2">
+                                <label class="field-label" for="inbound-supplier">Supplier <span class="field-hint">optional — adds to their balance owed</span></label>
+                                <select id="inbound-supplier" class="field-input">
+                                    <option value="">No supplier</option>
+                                </select>
+                            </div>
                             <div>
                                 <label class="field-label" for="inbound-expiry" data-i18n="expiry_date">Expiry Date</label>
                                 <input id="inbound-expiry" type="date" class="field-input" required>
@@ -458,6 +491,147 @@
                             </table>
                         </div>
                         <div id="history-pager" class="pager"></div>
+                    </div>
+                </section>
+
+                <section data-view="suppliers" class="view-section section-stack hidden">
+                    <div class="user-grid">
+                        <div class="surface-panel">
+                            <div class="section-heading">
+                                <h3 data-i18n="add_supplier">Add Supplier</h3>
+                            </div>
+                            <form id="supplier-form" class="stack-form">
+                                <div>
+                                    <label class="field-label" for="supplier-name" data-i18n="supplier_name">Supplier Name</label>
+                                    <input id="supplier-name" type="text" class="field-input" required>
+                                </div>
+                                <div>
+                                    <label class="field-label" for="supplier-phone" data-i18n="phone">Phone</label>
+                                    <input id="supplier-phone" type="text" class="field-input">
+                                </div>
+                                <button type="submit" class="primary-btn full-width" data-i18n="add_supplier">Add Supplier</button>
+                            </form>
+                        </div>
+
+                        <div class="surface-panel">
+                            <div class="section-heading">
+                                <h3 data-i18n="suppliers">Suppliers</h3>
+                            </div>
+                            <div class="table-wrap">
+                                <table class="data-table responsive-table">
+                                    <thead>
+                                        <tr>
+                                            <th data-i18n="supplier_name">Name</th>
+                                            <th data-i18n="phone">Phone</th>
+                                            <th class="text-right" data-i18n="balance_owed">Balance Owed</th>
+                                            <th class="text-center" data-i18n="actions">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="suppliers-table-body"></tbody>
+                                </table>
+                            </div>
+                            <div id="suppliers-pager" class="pager"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section data-view="customers" class="view-section section-stack hidden">
+                    <div class="user-grid">
+                        <div class="surface-panel">
+                            <div class="section-heading">
+                                <h3 data-i18n="add_customer">Add Customer</h3>
+                            </div>
+                            <form id="customer-form" class="stack-form">
+                                <div>
+                                    <label class="field-label" for="customer-name" data-i18n="customer_name">Customer Name</label>
+                                    <input id="customer-name" type="text" class="field-input" required>
+                                </div>
+                                <div>
+                                    <label class="field-label" for="customer-phone" data-i18n="phone">Phone</label>
+                                    <input id="customer-phone" type="text" class="field-input">
+                                </div>
+                                <button type="submit" class="primary-btn full-width" data-i18n="add_customer">Add Customer</button>
+                            </form>
+                        </div>
+
+                        <div class="surface-panel">
+                            <div class="section-heading">
+                                <h3 data-i18n="customers">Customers</h3>
+                            </div>
+                            <div class="table-wrap">
+                                <table class="data-table responsive-table">
+                                    <thead>
+                                        <tr>
+                                            <th data-i18n="customer_name">Name</th>
+                                            <th data-i18n="phone">Phone</th>
+                                            <th class="text-right" data-i18n="credit_balance">Credit Balance</th>
+                                            <th class="text-center" data-i18n="actions">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="customers-table-body"></tbody>
+                                </table>
+                            </div>
+                            <div id="customers-pager" class="pager"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section data-view="expenses" class="view-section section-stack hidden">
+                    <div class="user-grid">
+                        <div class="surface-panel">
+                            <div class="section-heading">
+                                <h3 data-i18n="add_expense">Add Expense</h3>
+                            </div>
+                            <form id="expense-form" class="stack-form">
+                                <div>
+                                    <label class="field-label" for="expense-category" data-i18n="category">Category</label>
+                                    <input id="expense-category" type="text" class="field-input" list="expense-category-options" required>
+                                    <datalist id="expense-category-options">
+                                        <option value="Rent"></option>
+                                        <option value="Utilities"></option>
+                                        <option value="Salaries"></option>
+                                        <option value="Transport"></option>
+                                        <option value="Maintenance"></option>
+                                        <option value="Other"></option>
+                                    </datalist>
+                                </div>
+                                <div>
+                                    <label class="field-label" for="expense-description" data-i18n="description">Description</label>
+                                    <input id="expense-description" type="text" class="field-input">
+                                </div>
+                                <div>
+                                    <label class="field-label" for="expense-amount" data-i18n="amount">Amount</label>
+                                    <input id="expense-amount" type="number" min="0" class="field-input" required>
+                                </div>
+                                <div>
+                                    <label class="field-label" for="expense-date" data-i18n="date">Date</label>
+                                    <input id="expense-date" type="date" class="field-input" required>
+                                </div>
+                                <button type="submit" class="primary-btn full-width" data-i18n="add_expense">Add Expense</button>
+                            </form>
+                        </div>
+
+                        <div class="surface-panel">
+                            <div class="section-heading">
+                                <h3 data-i18n="expenses">Expenses</h3>
+                            </div>
+                            <div class="table-wrap">
+                                <table class="data-table responsive-table">
+                                    <thead>
+                                        <tr>
+                                            <th data-i18n="date">Date</th>
+                                            <th data-i18n="category">Category</th>
+                                            <th data-i18n="description">Description</th>
+                                            <th class="text-right" data-i18n="amount">Amount</th>
+                                            <th data-i18n="actor">Actor</th>
+                                            <th class="text-center" data-i18n="actions">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="expenses-table-body"></tbody>
+                                </table>
+                            </div>
+                            <div id="expenses-pager" class="pager"></div>
+                        </div>
                     </div>
                 </section>
 
@@ -835,6 +1009,44 @@
             <div id="receipt-content" class="receipt-preview"></div>
             <div class="button-pair">
                 <button id="receipt-print-button" type="button" class="primary-btn" data-i18n="print_receipt">Print Receipt</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="ledger-modal" class="modal-shell hidden" role="dialog" aria-modal="true" aria-labelledby="ledger-modal-title">
+        <div class="modal-card receipt-modal-card">
+            <div class="section-heading row">
+                <div>
+                    <h3 id="ledger-modal-title">Ledger</h3>
+                    <p id="ledger-modal-balance" class="ledger-balance-line"></p>
+                </div>
+                <button id="ledger-close-button" class="icon-btn" type="button" aria-label="Close ledger">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+            <form id="ledger-form" class="form-grid ledger-form">
+                <div>
+                    <label class="field-label" for="ledger-entry-type">Entry Type</label>
+                    <select id="ledger-entry-type" class="field-input">
+                        <option value="due">Add Due (purchase)</option>
+                        <option value="payment">Record Payment</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="field-label" for="ledger-amount">Amount</label>
+                    <input id="ledger-amount" type="number" min="0" class="field-input" required>
+                </div>
+                <div class="span-2">
+                    <label class="field-label" for="ledger-note">Note (optional)</label>
+                    <input id="ledger-note" type="text" class="field-input">
+                </div>
+                <div class="span-2">
+                    <button type="submit" class="primary-btn full-width">Save Entry</button>
+                </div>
+            </form>
+            <div class="ledger-history">
+                <h4>History</h4>
+                <div id="ledger-entries-list" class="ledger-entries-list"></div>
             </div>
         </div>
     </div>

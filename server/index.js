@@ -549,6 +549,7 @@ app.post("/api/inbound", authenticate, requireRole("admin", "super_admin"), (req
     const sellPrice = toNumber(req.body.sellPrice);
     const quantity = Math.max(0, Math.floor(toNumber(req.body.quantity)));
     const lowStockThreshold = Math.max(1, Math.floor(toNumber(req.body.lowStockThreshold, 10)));
+    const supplierId = req.body.supplierId ? Number(req.body.supplierId) : null;
 
     if (!code || !name || !expiryDate || quantity <= 0) {
         return res.status(400).json({ message: "Code, name, expiry date, and quantity are required." });
@@ -614,6 +615,21 @@ app.post("/api/inbound", authenticate, requireRole("admin", "super_admin"), (req
             VALUES (?, ?, 'inbound', ?, ?, ?, ?)
             `
         ).run(productId, shopId, quantity, newBalance, "Inbound stock entry", req.user.id);
+
+        if (supplierId) {
+            const supplier = db.prepare("SELECT id FROM suppliers WHERE id = ? AND shop_id = ?").get(supplierId, shopId);
+            if (supplier) {
+                const dueAmount = costPrice * quantity;
+                db.prepare(
+                    `
+                    INSERT INTO supplier_ledger (supplier_id, shop_id, entry_type, amount, note, actor_id)
+                    VALUES (?, ?, 'due', ?, ?, ?)
+                    `
+                ).run(supplierId, shopId, dueAmount, `Stock purchase: ${name} x${quantity}`, req.user.id);
+                db.prepare("UPDATE suppliers SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+                    .run(dueAmount, supplierId);
+            }
+        }
 
         writeAuditLog({
             actorId: req.user.id,
@@ -1052,6 +1068,419 @@ app.post("/api/users", authenticate, requireRole("admin", "super_admin"), (req, 
     });
 
     res.status(201).json({ message: "User created successfully." });
+});
+
+// ============================================
+// Suppliers endpoints (accounts payable)
+// ============================================
+function sanitizeSupplier(row) {
+    return {
+        id: row.id,
+        name: row.name,
+        phone: row.phone,
+        balance: row.balance,
+        isActive: Boolean(row.is_active),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+    };
+}
+
+app.get("/api/suppliers", authenticate, requireRole("admin", "super_admin"), (req, res) => {
+    const shopId = getShopId(req);
+    const rows = db
+        .prepare("SELECT * FROM suppliers WHERE shop_id = ? AND is_active = 1 ORDER BY name ASC")
+        .all(shopId);
+    res.json({ suppliers: rows.map(sanitizeSupplier) });
+});
+
+app.post("/api/suppliers", authenticate, requireRole("admin", "super_admin"), (req, res) => {
+    const shopId = getShopId(req);
+    const name = String(req.body.name || "").trim();
+    const phone = String(req.body.phone || "").trim();
+
+    if (!name) {
+        return res.status(400).json({ message: "Supplier name is required." });
+    }
+
+    const result = db
+        .prepare("INSERT INTO suppliers (shop_id, name, phone) VALUES (?, ?, ?)")
+        .run(shopId, name, phone || null);
+
+    res.status(201).json({ message: "Supplier added.", supplierId: result.lastInsertRowid });
+});
+
+app.put("/api/suppliers/:id", authenticate, requireRole("admin", "super_admin"), (req, res) => {
+    const shopId = getShopId(req);
+    const supplierId = Number(req.params.id);
+    const name = String(req.body.name || "").trim();
+    const phone = String(req.body.phone || "").trim();
+
+    const existing = db.prepare("SELECT id FROM suppliers WHERE id = ? AND shop_id = ?").get(supplierId, shopId);
+    if (!existing) {
+        return res.status(404).json({ message: "Supplier not found." });
+    }
+    if (!name) {
+        return res.status(400).json({ message: "Supplier name is required." });
+    }
+
+    db.prepare("UPDATE suppliers SET name = ?, phone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+        .run(name, phone || null, supplierId);
+
+    res.json({ message: "Supplier updated." });
+});
+
+app.delete("/api/suppliers/:id", authenticate, requireRole("admin", "super_admin"), (req, res) => {
+    const shopId = getShopId(req);
+    const supplierId = Number(req.params.id);
+
+    const existing = db.prepare("SELECT id FROM suppliers WHERE id = ? AND shop_id = ?").get(supplierId, shopId);
+    if (!existing) {
+        return res.status(404).json({ message: "Supplier not found." });
+    }
+
+    db.prepare("UPDATE suppliers SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(supplierId);
+    res.json({ message: "Supplier removed." });
+});
+
+app.get("/api/suppliers/:id/ledger", authenticate, requireRole("admin", "super_admin"), (req, res) => {
+    const shopId = getShopId(req);
+    const supplierId = Number(req.params.id);
+
+    const supplier = db.prepare("SELECT * FROM suppliers WHERE id = ? AND shop_id = ?").get(supplierId, shopId);
+    if (!supplier) {
+        return res.status(404).json({ message: "Supplier not found." });
+    }
+
+    const entries = db
+        .prepare(
+            `
+            SELECT l.*, u.full_name AS actor_name
+            FROM supplier_ledger l
+            LEFT JOIN users u ON u.id = l.actor_id
+            WHERE l.supplier_id = ? AND l.shop_id = ?
+            ORDER BY l.id DESC
+            `
+        )
+        .all(supplierId, shopId);
+
+    res.json({
+        supplier: sanitizeSupplier(supplier),
+        entries: entries.map((e) => ({
+            id: e.id,
+            entryType: e.entry_type,
+            amount: e.amount,
+            note: e.note,
+            actorName: e.actor_name || "System",
+            createdAt: e.created_at
+        }))
+    });
+});
+
+app.post("/api/suppliers/:id/ledger", authenticate, requireRole("admin", "super_admin"), (req, res) => {
+    const shopId = getShopId(req);
+    const supplierId = Number(req.params.id);
+    const entryType = req.body.entryType === "payment" ? "payment" : "due";
+    const amount = toNumber(req.body.amount);
+    const note = String(req.body.note || "").trim();
+
+    if (amount <= 0) {
+        return res.status(400).json({ message: "Amount must be greater than zero." });
+    }
+
+    const supplier = db.prepare("SELECT * FROM suppliers WHERE id = ? AND shop_id = ?").get(supplierId, shopId);
+    if (!supplier) {
+        return res.status(404).json({ message: "Supplier not found." });
+    }
+
+    const delta = entryType === "due" ? amount : -amount;
+
+    const tx = db.transaction(() => {
+        db.prepare(
+            `
+            INSERT INTO supplier_ledger (supplier_id, shop_id, entry_type, amount, note, actor_id)
+            VALUES (?, ?, ?, ?, ?, ?)
+            `
+        ).run(supplierId, shopId, entryType, amount, note || null, req.user.id);
+
+        db.prepare("UPDATE suppliers SET balance = balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+            .run(delta, supplierId);
+    });
+    tx();
+
+    writeAuditLog({
+        actorId: req.user.id,
+        shopId,
+        action: entryType === "due" ? "SUPPLIER_DUE_ADDED" : "SUPPLIER_PAYMENT_RECORDED",
+        entityType: "supplier",
+        entityId: supplierId,
+        description: `${entryType === "due" ? "Due added" : "Payment recorded"} for supplier ${supplier.name}: ${amount}`,
+        ipAddress: getClientIp(req)
+    });
+
+    res.status(201).json({ message: "Ledger entry saved." });
+});
+
+// ============================================
+// Customers endpoints (credit accounts)
+// ============================================
+function sanitizeCustomer(row) {
+    return {
+        id: row.id,
+        name: row.name,
+        phone: row.phone,
+        creditBalance: row.credit_balance,
+        isActive: Boolean(row.is_active),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at
+    };
+}
+
+app.get("/api/customers", authenticate, (req, res) => {
+    const shopId = getShopId(req);
+    const rows = db
+        .prepare("SELECT * FROM customers WHERE shop_id = ? AND is_active = 1 ORDER BY name ASC")
+        .all(shopId);
+    res.json({ customers: rows.map(sanitizeCustomer) });
+});
+
+app.post("/api/customers", authenticate, (req, res) => {
+    const shopId = getShopId(req);
+    const name = String(req.body.name || "").trim();
+    const phone = String(req.body.phone || "").trim();
+
+    if (!name) {
+        return res.status(400).json({ message: "Customer name is required." });
+    }
+
+    const result = db
+        .prepare("INSERT INTO customers (shop_id, name, phone) VALUES (?, ?, ?)")
+        .run(shopId, name, phone || null);
+
+    res.status(201).json({ message: "Customer added.", customerId: result.lastInsertRowid });
+});
+
+app.put("/api/customers/:id", authenticate, (req, res) => {
+    const shopId = getShopId(req);
+    const customerId = Number(req.params.id);
+    const name = String(req.body.name || "").trim();
+    const phone = String(req.body.phone || "").trim();
+
+    const existing = db.prepare("SELECT id FROM customers WHERE id = ? AND shop_id = ?").get(customerId, shopId);
+    if (!existing) {
+        return res.status(404).json({ message: "Customer not found." });
+    }
+    if (!name) {
+        return res.status(400).json({ message: "Customer name is required." });
+    }
+
+    db.prepare("UPDATE customers SET name = ?, phone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+        .run(name, phone || null, customerId);
+
+    res.json({ message: "Customer updated." });
+});
+
+app.delete("/api/customers/:id", authenticate, requireRole("admin", "super_admin"), (req, res) => {
+    const shopId = getShopId(req);
+    const customerId = Number(req.params.id);
+
+    const existing = db.prepare("SELECT id FROM customers WHERE id = ? AND shop_id = ?").get(customerId, shopId);
+    if (!existing) {
+        return res.status(404).json({ message: "Customer not found." });
+    }
+
+    db.prepare("UPDATE customers SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(customerId);
+    res.json({ message: "Customer removed." });
+});
+
+app.get("/api/customers/:id/ledger", authenticate, (req, res) => {
+    const shopId = getShopId(req);
+    const customerId = Number(req.params.id);
+
+    const customer = db.prepare("SELECT * FROM customers WHERE id = ? AND shop_id = ?").get(customerId, shopId);
+    if (!customer) {
+        return res.status(404).json({ message: "Customer not found." });
+    }
+
+    const entries = db
+        .prepare(
+            `
+            SELECT l.*, u.full_name AS actor_name
+            FROM customer_ledger l
+            LEFT JOIN users u ON u.id = l.actor_id
+            WHERE l.customer_id = ? AND l.shop_id = ?
+            ORDER BY l.id DESC
+            `
+        )
+        .all(customerId, shopId);
+
+    res.json({
+        customer: sanitizeCustomer(customer),
+        entries: entries.map((e) => ({
+            id: e.id,
+            entryType: e.entry_type,
+            amount: e.amount,
+            note: e.note,
+            actorName: e.actor_name || "System",
+            createdAt: e.created_at
+        }))
+    });
+});
+
+app.post("/api/customers/:id/ledger", authenticate, (req, res) => {
+    const shopId = getShopId(req);
+    const customerId = Number(req.params.id);
+    const entryType = req.body.entryType === "payment" ? "payment" : "credit_sale";
+    const amount = toNumber(req.body.amount);
+    const note = String(req.body.note || "").trim();
+
+    if (amount <= 0) {
+        return res.status(400).json({ message: "Amount must be greater than zero." });
+    }
+
+    const customer = db.prepare("SELECT * FROM customers WHERE id = ? AND shop_id = ?").get(customerId, shopId);
+    if (!customer) {
+        return res.status(404).json({ message: "Customer not found." });
+    }
+
+    const delta = entryType === "credit_sale" ? amount : -amount;
+
+    const tx = db.transaction(() => {
+        db.prepare(
+            `
+            INSERT INTO customer_ledger (customer_id, shop_id, entry_type, amount, note, actor_id)
+            VALUES (?, ?, ?, ?, ?, ?)
+            `
+        ).run(customerId, shopId, entryType, amount, note || null, req.user.id);
+
+        db.prepare("UPDATE customers SET credit_balance = credit_balance + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+            .run(delta, customerId);
+    });
+    tx();
+
+    writeAuditLog({
+        actorId: req.user.id,
+        shopId,
+        action: entryType === "credit_sale" ? "CUSTOMER_CREDIT_ADDED" : "CUSTOMER_PAYMENT_RECORDED",
+        entityType: "customer",
+        entityId: customerId,
+        description: `${entryType === "credit_sale" ? "Credit sale added" : "Payment recorded"} for customer ${customer.name}: ${amount}`,
+        ipAddress: getClientIp(req)
+    });
+
+    res.status(201).json({ message: "Ledger entry saved." });
+});
+
+// ============================================
+// Expenses endpoints
+// ============================================
+app.get("/api/expenses", authenticate, requireRole("admin", "super_admin"), (req, res) => {
+    const shopId = getShopId(req);
+    const rows = db
+        .prepare("SELECT e.*, u.full_name AS actor_name FROM expenses e LEFT JOIN users u ON u.id = e.actor_id WHERE e.shop_id = ? ORDER BY e.expense_date DESC, e.id DESC")
+        .all(shopId);
+    res.json({
+        expenses: rows.map((e) => ({
+            id: e.id,
+            category: e.category,
+            description: e.description,
+            amount: e.amount,
+            expenseDate: e.expense_date,
+            actorName: e.actor_name || "System",
+            createdAt: e.created_at
+        }))
+    });
+});
+
+app.post("/api/expenses", authenticate, requireRole("admin", "super_admin"), (req, res) => {
+    const shopId = getShopId(req);
+    const category = String(req.body.category || "").trim();
+    const description = String(req.body.description || "").trim();
+    const amount = toNumber(req.body.amount);
+    const expenseDate = String(req.body.expenseDate || todayString()).trim();
+
+    if (!category || amount <= 0) {
+        return res.status(400).json({ message: "Category and a positive amount are required." });
+    }
+
+    const result = db
+        .prepare(
+            "INSERT INTO expenses (shop_id, category, description, amount, expense_date, actor_id) VALUES (?, ?, ?, ?, ?, ?)"
+        )
+        .run(shopId, category, description || null, amount, expenseDate, req.user.id);
+
+    writeAuditLog({
+        actorId: req.user.id,
+        shopId,
+        action: "EXPENSE_ADDED",
+        entityType: "expense",
+        entityId: result.lastInsertRowid,
+        description: `Expense recorded: ${category} - ${amount}`,
+        ipAddress: getClientIp(req)
+    });
+
+    res.status(201).json({ message: "Expense recorded." });
+});
+
+app.delete("/api/expenses/:id", authenticate, requireRole("admin", "super_admin"), (req, res) => {
+    const shopId = getShopId(req);
+    const expenseId = Number(req.params.id);
+
+    const existing = db.prepare("SELECT id FROM expenses WHERE id = ? AND shop_id = ?").get(expenseId, shopId);
+    if (!existing) {
+        return res.status(404).json({ message: "Expense not found." });
+    }
+
+    db.prepare("DELETE FROM expenses WHERE id = ?").run(expenseId);
+    res.json({ message: "Expense deleted." });
+});
+
+// ============================================
+// Dashboard analytics: weekly chart + best-sellers
+// ============================================
+app.get("/api/dashboard/chart", authenticate, (req, res) => {
+    const shopId = getShopId(req);
+    const days = [];
+    const now = new Date();
+    for (let i = 6; i >= 0; i -= 1) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        const month = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        days.push(`${d.getFullYear()}-${month}-${day}`);
+    }
+
+    const rows = db
+        .prepare(
+            `
+            SELECT sale_date, COALESCE(SUM(total), 0) AS total
+            FROM sales
+            WHERE shop_id = ? AND sale_date >= ? AND sale_date <= ?
+            GROUP BY sale_date
+            `
+        )
+        .all(shopId, days[0], days[days.length - 1]);
+
+    const totalsByDate = new Map(rows.map((r) => [r.sale_date, r.total]));
+    const weeklySales = days.map((date) => ({ date, total: totalsByDate.get(date) || 0 }));
+
+    const bestSellers = db
+        .prepare(
+            `
+            SELECT si.product_name, SUM(si.quantity) AS qty, SUM(si.line_total) AS revenue
+            FROM sale_items si
+            JOIN sales s ON s.id = si.sale_id
+            WHERE s.shop_id = ?
+            GROUP BY si.product_name
+            ORDER BY qty DESC
+            LIMIT 5
+            `
+        )
+        .all(shopId);
+
+    res.json({
+        weeklySales,
+        bestSellers: bestSellers.map((b) => ({ productName: b.product_name, quantity: b.qty, revenue: b.revenue }))
+    });
 });
 
 // ============================================
