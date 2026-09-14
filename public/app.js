@@ -349,6 +349,7 @@ const translations = {
 document.addEventListener("DOMContentLoaded", () => {
     setDefaultDates();
     bindEvents();
+    initDeviceSettings();
     applyTranslations();
     bootstrapAuth();
     lucide.createIcons();
@@ -362,8 +363,17 @@ function t(key) {
     return translations[state.language]?.[key] || translations.en[key] || key;
 }
 
+// Local calendar date. toISOString() is UTC and would report the wrong day for
+// any browser whose offset has already rolled past (or not yet reached) midnight.
+function todayIso() {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${now.getFullYear()}-${month}-${day}`;
+}
+
 function setDefaultDates() {
-    const today = new Date().toISOString().split("T")[0];
+    const today = todayIso();
     const month = today.slice(0, 7);
     $("sales-date-filter").value = today;
     $("sales-month-filter").value = month;
@@ -426,6 +436,13 @@ function bindEvents() {
     $("receipt-print-button").addEventListener("click", handlePrintReceipt);
     $("password-form").addEventListener("submit", handlePasswordChange);
     document.addEventListener("click", handlePagerClick);
+    document.addEventListener("keydown", (event) => {
+        // A hardware scanner ends its burst with Enter; inside a scan field that
+        // would submit the form before the operator finished the rest of it.
+        if (event.key === "Enter" && event.target.matches?.("[data-scan-field]")) {
+            event.preventDefault();
+        }
+    });
     document.addEventListener("pointerdown", (event) => {
         if (state.posSearchOpen && !event.target.closest(".pos-browser")) {
             state.posSearchOpen = false;
@@ -629,6 +646,7 @@ async function api(url, options = {}) {
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
             if (response.status === 401 && !options.ignoreUnauthorized) clearSession();
+            if (payload.code === "SHOP_ACCESS_REVOKED") clearSession();
             throw new Error(payload.message || "Request failed.");
         }
         return payload;
@@ -1028,9 +1046,11 @@ function renderSummary() {
         { key: "metric_inventory_value", value: formatCurrency(state.summary.inventoryValue || 0), icon: "wallet", target: "inventory" },
         { key: "metric_low_stock", value: state.summary.lowStockCount || 0, icon: "triangle-alert", target: "low" },
         { key: "metric_expired", value: state.summary.expiredCount || 0, icon: "shield-alert", target: "expired" },
-        { key: "metric_today_sales", value: formatCurrency(state.summary.todaySales || 0), icon: "banknote", target: "sales" },
-        { key: "metric_today_profit", value: formatCurrency(state.summary.todayProfit || 0), icon: "trending-up", target: "sales" }
+        { key: "metric_today_sales", value: formatCurrency(state.summary.todaySales || 0), icon: "banknote", target: "sales" }
     ];
+    if (canSeeProfit()) {
+        cards.push({ key: "metric_today_profit", value: formatCurrency(state.summary.todayProfit || 0), icon: "trending-up", target: "sales" });
+    }
 
     $("summary-cards").innerHTML = cards.map((card) => `
         <button type="button" class="metric-card metric-card-button" data-summary-target="${card.target}" aria-label="View ${escapeHtml(t(card.key))} details">
@@ -1048,6 +1068,7 @@ function renderSummary() {
 
 function renderRecentSales() {
     const rows = state.recentSales;
+    const showProfit = canSeeProfit();
     $("dashboard-sales-body").innerHTML = rows.length
         ? rows.map((sale) => `
             <tr>
@@ -1057,7 +1078,7 @@ function renderRecentSales() {
                 <td data-label="${escapeHtml(t("date"))}">${escapeHtml(sale.saleDate)}</td>
                 <td data-label="${escapeHtml(t("cashier"))}">${escapeHtml(sale.cashierName)}</td>
                 <td data-label="${escapeHtml(t("total"))}" class="text-right">${escapeHtml(formatCurrency(sale.total))}</td>
-                <td data-label="${escapeHtml(t("profit"))}" class="text-right">${escapeHtml(formatCurrency(sale.profit))}</td>
+                ${showProfit ? `<td data-label="${escapeHtml(t("profit"))}" class="text-right">${escapeHtml(formatCurrency(sale.profit))}</td>` : ""}
                 <td data-label="${escapeHtml(t("actions"))}" class="text-center">
                     <button type="button" class="mini-btn" data-print-sale="${sale.id}">
                         ${escapeHtml(t("print"))}
@@ -1065,7 +1086,7 @@ function renderRecentSales() {
                 </td>
             </tr>
         `).join("")
-        : `<tr><td colspan="6" class="empty-state">${escapeHtml(t("no_recent_sales"))}</td></tr>`;
+        : `<tr><td colspan="${showProfit ? 6 : 5}" class="empty-state">${escapeHtml(t("no_recent_sales"))}</td></tr>`;
     lucide.createIcons();
 }
 
@@ -1079,9 +1100,9 @@ function filteredProducts() {
         if (!search) {
             return true;
         }
-        const fields = [product.name, product.code, product.brand, product.category]
+        const fields = [product.name, product.code, product.barcode, product.brand, product.category]
             .filter(Boolean)
-            .map((value) => value.toLowerCase().trim());
+            .map((value) => String(value).toLowerCase().trim());
 
         return fields.some((value) =>
             value.startsWith(search) || value.split(/\s+/).some((part) => part.startsWith(search))
@@ -1399,7 +1420,7 @@ async function handleCheckout() {
         const response = await api("/api/sales", {
             method: "POST",
             body: {
-                saleDate: new Date().toISOString().split("T")[0],
+                saleDate: todayIso(),
                 discount: Number($("pos-discount").value) || 0,
                 items: state.cart.map((item) => ({
                     productId: item.productId,
@@ -1414,6 +1435,7 @@ async function handleCheckout() {
         state.cart = [];
         $("pos-discount").value = 0;
         await loadInitialData();
+        voucherPrinter.onSaleComplete(state.receiptSale);
         openReceiptModal(state.receiptSale);
         switchTab("sales");
         showNotification(`${t("msg_sale_complete")} ${response.invoiceNo}`);
@@ -1428,7 +1450,7 @@ function inventoryResults() {
         return state.products;
     }
     return state.products.filter((product) =>
-        [product.code, product.brand, product.name, product.category, product.expiryDate].join(" ").toLowerCase().includes(search)
+        [product.code, product.barcode, product.brand, product.name, product.category, product.expiryDate].join(" ").toLowerCase().includes(search)
     );
 }
 
@@ -1441,7 +1463,10 @@ function renderInventory() {
     $("inventory-table-body").innerHTML = rows.length
         ? page.rows.map((product) => `
             <tr>
-                <td data-label="${escapeHtml(t("product_code"))}"><strong>${escapeHtml(product.code)}</strong></td>
+                <td data-label="${escapeHtml(t("product_code"))}">
+                    <strong>${escapeHtml(product.code)}</strong>
+                    ${product.barcode ? `<div class="table-sub table-sub-barcode">${escapeHtml(product.barcode)}</div>` : ""}
+                </td>
                 <td data-label="${escapeHtml(t("brand"))}">${escapeHtml(product.brand || "-")}</td>
                 <td data-label="${escapeHtml(t("product_name"))}">${escapeHtml(product.name)}</td>
                 <td data-label="${escapeHtml(t("category"))}">${escapeHtml(product.category || "-")}</td>
@@ -1471,6 +1496,7 @@ function openProductModal(productId) {
 
     $("product-id").value = product.id;
     $("product-code").value = product.code;
+    $("product-barcode").value = product.barcode || "";
     $("product-brand").value = product.brand || "";
     $("product-name").value = product.name;
     $("product-category").value = product.category || "";
@@ -1494,6 +1520,7 @@ async function handleSaveProduct(event) {
             method: "PUT",
             body: {
                 code: $("product-code").value.trim(),
+                barcode: $("product-barcode").value.trim(),
                 brand: $("product-brand").value.trim(),
                 name: $("product-name").value.trim(),
                 category: $("product-category").value.trim(),
@@ -1542,6 +1569,7 @@ async function handleInboundSubmit(event) {
             method: "POST",
             body: {
                 code: $("inbound-code").value.trim(),
+                barcode: $("inbound-barcode").value.trim(),
                 brand: $("inbound-brand").value.trim(),
                 name: $("inbound-name").value.trim(),
                 category: $("inbound-category").value.trim(),
@@ -1574,6 +1602,7 @@ function renderSales() {
     const totalSales = state.sales.reduce((sum, sale) => sum + sale.total, 0);
     const totalProfit = state.sales.reduce((sum, sale) => sum + sale.profit, 0);
     const page = getPageSlice(state.sales, "sales");
+    const showProfit = canSeeProfit();
 
     $("sales-summary-strip").innerHTML = `
         <div class="sales-report-metric">
@@ -1584,10 +1613,10 @@ function renderSales() {
             <div class="metric-label">${escapeHtml(t("report_total_sales"))}</div>
             <strong>${escapeHtml(formatCurrency(totalSales))}</strong>
         </div>
-        <div class="sales-report-metric">
+        ${showProfit ? `<div class="sales-report-metric">
             <div class="metric-label">${escapeHtml(t("report_total_profit"))}</div>
             <strong>${escapeHtml(formatCurrency(totalProfit))}</strong>
-        </div>
+        </div>` : ""}
     `;
 
     $("sales-table-body").innerHTML = state.sales.length
@@ -1600,7 +1629,7 @@ function renderSales() {
                     <td data-label="${escapeHtml(t("cashier"))}">${escapeHtml(sale.cashierName)}</td>
                     <td data-label="${escapeHtml(t("items"))}">${escapeHtml(itemSummary)}</td>
                     <td data-label="${escapeHtml(t("total"))}" class="text-right">${escapeHtml(formatCurrency(sale.total))}</td>
-                    <td data-label="${escapeHtml(t("profit"))}" class="text-right">${escapeHtml(formatCurrency(sale.profit))}</td>
+                    ${showProfit ? `<td data-label="${escapeHtml(t("profit"))}" class="text-right">${escapeHtml(formatCurrency(sale.profit))}</td>` : ""}
                     <td data-label="${escapeHtml(t("actions"))}" class="text-center">
                         <button type="button" class="mini-btn" data-print-sale="${sale.id}">
                             ${escapeHtml(t("print"))}
@@ -1609,7 +1638,7 @@ function renderSales() {
                 </tr>
             `;
         }).join("")
-        : `<tr><td colspan="7" class="empty-state">${escapeHtml(t("no_sales"))}</td></tr>`;
+        : `<tr><td colspan="${showProfit ? 7 : 6}" class="empty-state">${escapeHtml(t("no_sales"))}</td></tr>`;
     renderPager("sales-pager", "sales", page.totalPages);
     lucide.createIcons();
 }
@@ -1757,7 +1786,7 @@ async function openReceiptById(saleId) {
 
 function openReceiptModal(sale) {
     state.receiptSale = sale;
-    $("receipt-content").innerHTML = buildReceiptMarkup(sale);
+    $("receipt-content").innerHTML = buildReceiptMarkup(sale, { showProfit: canSeeProfit() });
     $("receipt-modal").classList.remove("hidden");
     lucide.createIcons();
 }
@@ -1766,51 +1795,60 @@ function closeReceiptModal() {
     $("receipt-modal").classList.add("hidden");
 }
 
-function buildReceiptMarkup(sale) {
+function canSeeProfit() {
+    return state.user?.role === "admin" || state.user?.role === "super_admin";
+}
+
+function buildReceiptMarkup(sale, options = {}) {
+    const itemCount = sale.items.reduce((sum, item) => sum + Number(item.quantity), 0);
+    const profitRow = options.showProfit
+        ? `<div class="receipt-total-row receipt-profit-row"><span>${escapeHtml(t("profit"))}</span><strong>${escapeHtml(formatCurrency(sale.profit))}</strong></div>`
+        : "";
+
     return `
         <div class="receipt-sheet">
-            <div class="summary-row">
-                <div>
+            <div class="receipt-head">
+                <div class="receipt-head-brand">
                     <h3>${escapeHtml(VENDOR_NAME)}</h3>
                     <p class="receipt-meta">${escapeHtml(t("app_name"))}</p>
                 </div>
-                <div class="text-right">
+                <div class="receipt-head-invoice">
                     <strong>${escapeHtml(sale.invoiceNo)}</strong>
                     <p class="receipt-meta">${escapeHtml(formatDate(sale.saleDate))}</p>
                 </div>
             </div>
 
-            <div style="margin-top: 1rem; display: grid; gap: 0.4rem;">
+            <div class="receipt-facts">
                 <p><strong>${escapeHtml(t("cashier"))}:</strong> ${escapeHtml(sale.cashierName)}</p>
                 <p><strong>${escapeHtml(t("date"))}:</strong> ${escapeHtml(formatDate(sale.saleDate))}</p>
             </div>
 
-            <table>
+            <table class="receipt-table">
                 <thead>
                     <tr>
                         <th>${escapeHtml(t("product_name"))}</th>
-                        <th>${escapeHtml(t("quantity"))}</th>
-                        <th>${escapeHtml(t("sell_price"))}</th>
-                        <th>${escapeHtml(t("total"))}</th>
+                        <th class="receipt-col-num">${escapeHtml(t("total"))}</th>
                     </tr>
                 </thead>
                 <tbody>
                     ${sale.items.map((item) => `
                         <tr>
-                            <td>${escapeHtml(item.productName)}</td>
-                            <td>${escapeHtml(item.quantity)}</td>
-                            <td>${escapeHtml(formatCurrency(item.sellPrice))}</td>
-                            <td>${escapeHtml(formatCurrency(item.lineTotal))}</td>
+                            <td class="receipt-col-name">
+                                ${escapeHtml(item.productName)}
+                                <span class="receipt-line-calc">${escapeHtml(item.quantity)} &times; ${escapeHtml(formatCurrency(item.sellPrice))}</span>
+                            </td>
+                            <td class="receipt-col-num">${escapeHtml(formatCurrency(item.lineTotal))}</td>
                         </tr>
                     `).join("")}
                 </tbody>
             </table>
 
-            <div style="margin-top: 1rem; display: grid; gap: 0.5rem;">
-                <div class="summary-row"><span>${escapeHtml(t("subtotal"))}</span><strong>${escapeHtml(formatCurrency(sale.subtotal))}</strong></div>
-                <div class="summary-row"><span>${escapeHtml(t("discount"))}</span><strong>${escapeHtml(formatCurrency(sale.discount))}</strong></div>
-                <div class="summary-row"><span>${escapeHtml(t("total"))}</span><strong>${escapeHtml(formatCurrency(sale.total))}</strong></div>
-                <div class="summary-row"><span>${escapeHtml(t("profit"))}</span><strong>${escapeHtml(formatCurrency(sale.profit))}</strong></div>
+            <div class="receipt-totals">
+                <div class="receipt-total-row"><span>${escapeHtml(t("items"))}</span><strong>${escapeHtml(itemCount)}</strong></div>
+                <div class="receipt-total-row"><span>${escapeHtml(t("subtotal"))}</span><strong>${escapeHtml(formatCurrency(sale.subtotal))}</strong></div>
+                <div class="receipt-total-row"><span>${escapeHtml(t("discount"))}</span><strong>${escapeHtml(formatCurrency(sale.discount))}</strong></div>
+                <div class="receipt-total-row receipt-grand-total"><span>${escapeHtml(t("total"))}</span><strong>${escapeHtml(formatCurrency(sale.total))}</strong></div>
+                ${profitRow}
             </div>
         </div>
     `;
@@ -1826,11 +1864,17 @@ function buildReceiptDocument(sale) {
             <style>
                 body { font-family: Arial, sans-serif; padding: 24px; color: #000000; background: #ffffff; }
                 h1, h2, h3, p { margin: 0; }
-                .head { display: flex; justify-content: space-between; align-items: start; margin-bottom: 16px; }
+                .receipt-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; }
+                .receipt-head-invoice { text-align: right; }
+                .receipt-facts { margin-top: 16px; display: grid; gap: 4px; }
                 table { width: 100%; border-collapse: collapse; margin-top: 16px; }
                 th, td { text-align: left; border-bottom: 1px dashed #b2aeae; padding: 8px 0; color: #000000; }
-                .total-row { display: flex; justify-content: space-between; margin-top: 8px; }
-                .muted { color: #000000; }
+                .receipt-col-qty, .receipt-col-num { text-align: right; white-space: nowrap; vertical-align: top; width: 110px; }
+                .receipt-line-calc { display: block; margin-top: 2px; font-size: 11px; color: #444444; }
+                .receipt-totals { margin-top: 16px; display: grid; gap: 6px; max-width: 320px; margin-left: auto; }
+                .receipt-total-row { display: flex; justify-content: space-between; gap: 16px; }
+                .receipt-grand-total { border-top: 1px solid #000000; padding-top: 6px; font-size: 15px; }
+                .receipt-meta { color: #000000; font-size: 12px; }
             </style>
         </head>
         <body>
@@ -1846,8 +1890,13 @@ function handlePrintReceipt() {
         showNotification(t("msg_receipt_unavailable"), "error");
         return;
     }
+    if (voucherPrinter.enabled) {
+        voucherPrinter.printVoucher(state.receiptSale);
+        return;
+    }
     const printWindow = window.open("", "_blank", "width=900,height=700");
     if (!printWindow) {
+        showNotification("Popup blocked. Allow popups to print receipts.", "error");
         return;
     }
     printWindow.document.write(buildReceiptDocument(state.receiptSale));
@@ -1862,6 +1911,7 @@ function printSalesReport() {
 
     const totalSales = state.sales.reduce((sum, sale) => sum + sale.total, 0);
     const totalProfit = state.sales.reduce((sum, sale) => sum + sale.profit, 0);
+    const showProfit = canSeeProfit();
     const reportWindow = window.open("", "_blank", "width=1100,height=800");
     if (!reportWindow) {
         return;
@@ -1874,7 +1924,7 @@ function printSalesReport() {
             <td>${escapeHtml(sale.cashierName)}</td>
             <td>${escapeHtml(sale.items.map((item) => `${item.productName} x${item.quantity}`).join(", "))}</td>
             <td>${escapeHtml(formatCurrency(sale.total))}</td>
-            <td>${escapeHtml(formatCurrency(sale.profit))}</td>
+            ${showProfit ? `<td>${escapeHtml(formatCurrency(sale.profit))}</td>` : ""}
         </tr>
     `).join("");
 
@@ -1911,7 +1961,7 @@ function printSalesReport() {
             <div class="strip">
                 <div class="chip"><strong>${escapeHtml(t("sales_count"))}</strong><p>${escapeHtml(state.sales.length)}</p></div>
                 <div class="chip"><strong>${escapeHtml(t("report_total_sales"))}</strong><p>${escapeHtml(formatCurrency(totalSales))}</p></div>
-                <div class="chip"><strong>${escapeHtml(t("report_total_profit"))}</strong><p>${escapeHtml(formatCurrency(totalProfit))}</p></div>
+                ${showProfit ? `<div class="chip"><strong>${escapeHtml(t("report_total_profit"))}</strong><p>${escapeHtml(formatCurrency(totalProfit))}</p></div>` : ""}
             </div>
 
             <table>
@@ -1922,7 +1972,7 @@ function printSalesReport() {
                         <th>${escapeHtml(t("cashier"))}</th>
                         <th>${escapeHtml(t("items"))}</th>
                         <th>${escapeHtml(t("total"))}</th>
-                        <th>${escapeHtml(t("profit"))}</th>
+                        ${showProfit ? `<th>${escapeHtml(t("profit"))}</th>` : ""}
                     </tr>
                 </thead>
                 <tbody>${rows}</tbody>
@@ -1960,4 +2010,700 @@ async function downloadAuthenticatedFile(url) {
     } catch (error) {
         showNotification(error.message, "error");
     }
+}
+
+// =====================================================
+// BARCODE SCANNER INTEGRATION
+// =====================================================
+// Hardware scanners emulate a keyboard: they burst characters far faster than a
+// human types, then send a terminator. We detect the burst by inter-key timing.
+const barcodeScanner = {
+    enabled: JSON.parse(localStorage.getItem("pharmacy_barcode_enabled") || "false"),
+    prefix: localStorage.getItem("pharmacy_barcode_prefix") || "",
+    terminator: localStorage.getItem("pharmacy_barcode_terminator") || "Enter",
+    minLength: Number(localStorage.getItem("pharmacy_barcode_minlength")) || 4,
+    buffer: "",
+    lastKeyTime: 0,
+    timeout: null,
+    testMode: false,
+    SCAN_THRESHOLD: 60,
+    IDLE_FLUSH: 120,
+
+    init() {
+        document.addEventListener("keydown", (event) => this.handleKey(event), true);
+        this.updateUI();
+    },
+
+    handleKey(event) {
+        if (!this.enabled) return;
+
+        const target = event.target;
+        const isField = target instanceof HTMLElement
+            && (target.tagName === "TEXTAREA" || target.tagName === "SELECT"
+                || (target.tagName === "INPUT" && target.id !== "pos-search"));
+        if (isField && !this.testMode) return;
+
+        const now = Date.now();
+        const gap = now - this.lastKeyTime;
+        this.lastKeyTime = now;
+
+        if (gap > this.SCAN_THRESHOLD && event.key.length === 1) {
+            this.buffer = event.key;
+            this.armIdleFlush();
+            return;
+        }
+
+        const isTerminator = event.key === "Enter"
+            || (this.terminator === "Tab" && event.key === "Tab");
+
+        if (isTerminator) {
+            if (this.buffer.length >= this.minLength) {
+                event.preventDefault();
+                event.stopPropagation();
+                this.commit();
+            }
+            this.buffer = "";
+            clearTimeout(this.timeout);
+            return;
+        }
+
+        if (event.key.length === 1 && !event.ctrlKey && !event.altKey && !event.metaKey) {
+            this.buffer += event.key;
+            this.armIdleFlush();
+        }
+    },
+
+    armIdleFlush() {
+        clearTimeout(this.timeout);
+        if (this.terminator !== "none") return;
+        this.timeout = setTimeout(() => {
+            if (this.buffer.length >= this.minLength) this.commit();
+            this.buffer = "";
+        }, this.IDLE_FLUSH);
+    },
+
+    commit() {
+        let code = this.buffer.trim();
+        this.buffer = "";
+        if (this.prefix && code.startsWith(this.prefix)) {
+            code = code.slice(this.prefix.length);
+        }
+        if (!code) return;
+
+        if (this.testMode) {
+            this.reportTest(code);
+            return;
+        }
+        this.processBarcode(code);
+    },
+
+    processBarcode(code) {
+        const needle = code.toLowerCase();
+        const product = state.products.find((item) => String(item.code).toLowerCase() === needle)
+            || state.products.find((item) => String(item.barcode || "").toLowerCase() === needle);
+
+        if (!product) {
+            this.flashIndicator(false, `No product matches ${code}`);
+            showNotification(`Product not found: ${code}`, "error");
+            return;
+        }
+
+        if (state.activeTab !== "pos") {
+            switchTab("pos");
+        }
+        const searchField = document.getElementById("pos-search");
+        if (searchField) searchField.value = "";
+        addToCart(product.id);
+        this.flashIndicator(true, `${product.name} added`);
+    },
+
+    reportTest(code) {
+        this.testMode = false;
+        const readout = document.getElementById("barcode-test-readout");
+        if (readout) {
+            readout.textContent = `Captured "${code}" (${code.length} characters). Scanner is working.`;
+            readout.classList.add("is-success");
+        }
+        const button = document.getElementById("barcode-test-btn");
+        if (button) button.classList.remove("is-listening");
+        this.updateUI();
+    },
+
+    startTest() {
+        if (!this.enabled) {
+            showNotification("Enable the barcode scanner first.", "error");
+            return;
+        }
+        this.testMode = true;
+        this.buffer = "";
+        const readout = document.getElementById("barcode-test-readout");
+        if (readout) {
+            readout.textContent = "Listening… scan a barcode now.";
+            readout.classList.remove("is-success");
+        }
+        const button = document.getElementById("barcode-test-btn");
+        if (button) button.classList.add("is-listening");
+        this.updateUI();
+
+        clearTimeout(this.testTimeout);
+        this.testTimeout = setTimeout(() => {
+            if (!this.testMode) return;
+            this.testMode = false;
+            if (readout) readout.textContent = "No scan detected. Check that the scanner is powered on and set to keyboard (HID) mode.";
+            if (button) button.classList.remove("is-listening");
+            this.updateUI();
+        }, 15000);
+    },
+
+    flashIndicator(success, message) {
+        const indicator = document.getElementById("barcode-indicator");
+        if (!indicator) return;
+        indicator.hidden = false;
+        indicator.classList.remove("scan-success", "scan-error");
+        indicator.classList.add(success ? "scan-success" : "scan-error");
+        indicator.textContent = (success ? "✓ " : "✕ ") + message;
+        clearTimeout(this.indicatorTimeout);
+        this.indicatorTimeout = setTimeout(() => {
+            indicator.hidden = true;
+        }, 2200);
+    },
+
+    toggle(enabled) {
+        this.enabled = enabled;
+        localStorage.setItem("pharmacy_barcode_enabled", JSON.stringify(enabled));
+        this.buffer = "";
+        this.updateUI();
+    },
+
+    setConfig({ prefix, terminator, minLength }) {
+        if (prefix !== undefined) {
+            this.prefix = prefix;
+            localStorage.setItem("pharmacy_barcode_prefix", prefix);
+        }
+        if (terminator !== undefined) {
+            this.terminator = terminator;
+            localStorage.setItem("pharmacy_barcode_terminator", terminator);
+        }
+        if (minLength !== undefined) {
+            this.minLength = Math.min(50, Math.max(3, Number(minLength) || 4));
+            localStorage.setItem("pharmacy_barcode_minlength", String(this.minLength));
+        }
+        this.updateUI();
+    },
+
+    updateUI() {
+        const toggle = document.getElementById("barcode-scanner-toggle");
+        if (toggle) toggle.checked = this.enabled;
+
+        const body = document.getElementById("barcode-scanner-settings");
+        if (body) body.classList.toggle("hidden", !this.enabled);
+
+        const prefixInput = document.getElementById("barcode-prefix");
+        if (prefixInput) prefixInput.value = this.prefix;
+        const suffixSelect = document.getElementById("barcode-suffix");
+        if (suffixSelect) suffixSelect.value = this.terminator;
+        const minInput = document.getElementById("barcode-min-length");
+        if (minInput) minInput.value = this.minLength;
+
+        const dot = document.getElementById("barcode-status-dot");
+        const text = document.getElementById("barcode-status-text");
+        if (dot) {
+            dot.className = "status-indicator"
+                + (this.testMode ? " listening" : this.enabled ? " connected" : "");
+        }
+        if (text) {
+            text.textContent = this.testMode
+                ? "Listening for a test scan…"
+                : this.enabled ? "Active — ready to scan" : "Disabled";
+        }
+
+        const chip = document.getElementById("pos-scan-chip");
+        const chipText = document.getElementById("pos-scan-chip-text");
+        if (chip) chip.classList.toggle("is-active", this.enabled);
+        if (chipText) chipText.textContent = this.enabled ? "Scanner ready" : "Scanner off";
+    }
+};
+
+// =====================================================
+// VOUCHER / RECEIPT PRINTER INTEGRATION
+// =====================================================
+const voucherPrinter = {
+    enabled: JSON.parse(localStorage.getItem("pharmacy_printer_enabled") || "false"),
+    printerType: localStorage.getItem("pharmacy_printer_type") || "thermal-80",
+    autoPrint: localStorage.getItem("pharmacy_printer_autoprint") || "ask",
+    copies: Number(localStorage.getItem("pharmacy_printer_copies")) || 1,
+    headerText: localStorage.getItem("pharmacy_printer_header") ?? VENDOR_NAME,
+    footerText: localStorage.getItem("pharmacy_printer_footer") ?? "Thank you for shopping!",
+    // "dialog" uses the browser print dialog (any OS-driven printer).
+    // "serial" / "usb" send raw ESC/POS bytes directly to a connected thermal printer.
+    connectionMode: localStorage.getItem("pharmacy_printer_connmode") || "dialog",
+    serialPort: null,
+    usbDevice: null,
+    usbInterfaceNumber: null,
+    usbEndpointNumber: null,
+
+    init() {
+        this.updateUI();
+    },
+
+    // ---- Direct ESC/POS connection (Web Serial / WebUSB) ----
+    async connectSerial() {
+        if (!("serial" in navigator)) {
+            showNotification("Web Serial isn't supported in this browser. Use Chrome or Edge on desktop, or use the print dialog instead.", "error");
+            return;
+        }
+        try {
+            const port = await navigator.serial.requestPort();
+            await port.open({ baudRate: 9600 });
+            await this.disconnect(false);
+            this.serialPort = port;
+            this.connectionMode = "serial";
+            localStorage.setItem("pharmacy_printer_connmode", "serial");
+            showNotification("Thermal printer connected (Serial).");
+        } catch (error) {
+            if (error.name !== "NotFoundError") showNotification(error.message, "error");
+        }
+        this.updateUI();
+    },
+
+    async connectUsb() {
+        if (!("usb" in navigator)) {
+            showNotification("WebUSB isn't supported in this browser. Use Chrome or Edge on desktop, or use the print dialog instead.", "error");
+            return;
+        }
+        try {
+            const device = await navigator.usb.requestDevice({ filters: [] });
+            await device.open();
+            if (device.configuration === null) await device.selectConfiguration(1);
+            const iface = device.configuration.interfaces.find((candidate) =>
+                candidate.alternates.some((alt) => alt.interfaceClass === 7))
+                || device.configuration.interfaces[0];
+            await device.claimInterface(iface.interfaceNumber);
+            const alternate = iface.alternates[0];
+            const outEndpoint = alternate.endpoints.find((endpoint) => endpoint.direction === "out");
+            if (!outEndpoint) throw new Error("No writable endpoint found on this USB device.");
+
+            await this.disconnect(false);
+            this.usbDevice = device;
+            this.usbInterfaceNumber = iface.interfaceNumber;
+            this.usbEndpointNumber = outEndpoint.endpointNumber;
+            this.connectionMode = "usb";
+            localStorage.setItem("pharmacy_printer_connmode", "usb");
+            showNotification("Thermal printer connected (USB).");
+        } catch (error) {
+            if (error.name !== "NotFoundError") showNotification(error.message, "error");
+        }
+        this.updateUI();
+    },
+
+    async disconnect(resetMode = true) {
+        try {
+            if (this.serialPort) {
+                await this.serialPort.close();
+            }
+        } catch (error) { /* ignore close errors */ }
+        try {
+            if (this.usbDevice) {
+                if (this.usbInterfaceNumber !== null) await this.usbDevice.releaseInterface(this.usbInterfaceNumber);
+                await this.usbDevice.close();
+            }
+        } catch (error) { /* ignore close errors */ }
+        this.serialPort = null;
+        this.usbDevice = null;
+        this.usbInterfaceNumber = null;
+        this.usbEndpointNumber = null;
+        if (resetMode) {
+            this.connectionMode = "dialog";
+            localStorage.setItem("pharmacy_printer_connmode", "dialog");
+        }
+        this.updateUI();
+    },
+
+    isDirectConnected() {
+        return (this.connectionMode === "serial" && !!this.serialPort)
+            || (this.connectionMode === "usb" && !!this.usbDevice);
+    },
+
+    async sendBytes(bytes) {
+        if (this.connectionMode === "serial" && this.serialPort?.writable) {
+            const writer = this.serialPort.writable.getWriter();
+            try {
+                await writer.write(bytes);
+            } finally {
+                writer.releaseLock();
+            }
+            return true;
+        }
+        if (this.connectionMode === "usb" && this.usbDevice) {
+            await this.usbDevice.transferOut(this.usbEndpointNumber, bytes);
+            return true;
+        }
+        return false;
+    },
+
+    // ---- ESC/POS command + receipt builder ----
+    buildEscPosBytes(sale) {
+        const ESC = 0x1b;
+        const GS = 0x1d;
+        const width = this.printerType === "thermal-58" ? 32 : 48;
+        const bytes = [];
+        const push = (arr) => bytes.push(...arr);
+        const textLine = (str = "") => push(Array.from(new TextEncoder().encode(str + "\n")));
+        const hr = () => textLine("-".repeat(width));
+        const twoCol = (left, right) => {
+            left = String(left);
+            right = String(right);
+            const gap = Math.max(1, width - left.length - right.length);
+            return left + " ".repeat(gap) + right;
+        };
+        const align = (n) => push([ESC, 0x61, n]);
+        const bold = (on) => push([ESC, 0x45, on ? 1 : 0]);
+        const size = (w, h) => push([GS, 0x21, ((w & 0xf) << 4) | (h & 0xf)]);
+
+        push([ESC, 0x40]);
+        align(1);
+        bold(true);
+        size(1, 1);
+        textLine(this.headerText || VENDOR_NAME);
+        size(0, 0);
+        bold(false);
+        textLine(t("app_name"));
+        align(0);
+        hr();
+        textLine(`${t("invoice")}: ${sale.invoiceNo}`);
+        textLine(`${t("date")}: ${formatDate(sale.saleDate)}`);
+        textLine(`${t("cashier")}: ${sale.cashierName}`);
+        hr();
+        sale.items.forEach((item) => {
+            textLine(item.productName);
+            textLine(twoCol(`${item.quantity} x ${formatCurrency(item.sellPrice)}`, formatCurrency(item.lineTotal)));
+        });
+        hr();
+        textLine(twoCol(t("subtotal"), formatCurrency(sale.subtotal)));
+        textLine(twoCol(t("discount"), formatCurrency(sale.discount)));
+        bold(true);
+        size(0, 1);
+        textLine(twoCol(t("total"), formatCurrency(sale.total)));
+        size(0, 0);
+        bold(false);
+        hr();
+        align(1);
+        textLine(this.footerText);
+        textLine("Powered by Shine Digital");
+        push([0x0a, 0x0a, 0x0a, 0x0a]);
+        push([GS, 0x56, 0x42, 0x00]);
+        return new Uint8Array(bytes);
+    },
+
+    toggle(enabled) {
+        this.enabled = enabled;
+        localStorage.setItem("pharmacy_printer_enabled", JSON.stringify(enabled));
+        this.updateUI();
+    },
+
+    setConfig(config) {
+        const map = {
+            printerType: "pharmacy_printer_type",
+            autoPrint: "pharmacy_printer_autoprint",
+            headerText: "pharmacy_printer_header",
+            footerText: "pharmacy_printer_footer"
+        };
+        Object.keys(map).forEach((key) => {
+            if (config[key] !== undefined) {
+                this[key] = config[key];
+                localStorage.setItem(map[key], config[key]);
+            }
+        });
+        if (config.copies !== undefined) {
+            this.copies = Math.min(5, Math.max(1, Number(config.copies) || 1));
+            localStorage.setItem("pharmacy_printer_copies", String(this.copies));
+        }
+        this.updateUI();
+    },
+
+    paperWidth() {
+        if (this.printerType === "thermal-58") return "58mm";
+        if (this.printerType === "a4") return "210mm";
+        return "80mm";
+    },
+
+    updateUI() {
+        const toggle = document.getElementById("printer-toggle");
+        if (toggle) toggle.checked = this.enabled;
+
+        const body = document.getElementById("printer-settings");
+        if (body) body.classList.toggle("hidden", !this.enabled);
+
+        const typeSelect = document.getElementById("printer-type");
+        if (typeSelect) typeSelect.value = this.printerType;
+        const autoSelect = document.getElementById("printer-auto-print");
+        if (autoSelect) autoSelect.value = this.autoPrint;
+        const copiesInput = document.getElementById("printer-copies");
+        if (copiesInput) copiesInput.value = this.copies;
+        const headerInput = document.getElementById("printer-header");
+        if (headerInput) headerInput.value = this.headerText;
+        const footerInput = document.getElementById("printer-footer");
+        if (footerInput) footerInput.value = this.footerText;
+
+        const connSelect = document.getElementById("printer-connection-mode");
+        if (connSelect) connSelect.value = this.connectionMode;
+        const directPanel = document.getElementById("printer-direct-connect");
+        if (directPanel) directPanel.classList.toggle("hidden", this.connectionMode === "dialog");
+        const disconnectBtn = document.getElementById("printer-disconnect-btn");
+        if (disconnectBtn) disconnectBtn.classList.toggle("hidden", !this.isDirectConnected());
+        const connectRow = document.getElementById("printer-connect-row");
+        if (connectRow) connectRow.classList.toggle("hidden", this.isDirectConnected());
+
+        const dot = document.getElementById("printer-status-dot");
+        const text = document.getElementById("printer-status-text");
+        const label = { "thermal-80": "Thermal 80mm", "thermal-58": "Thermal 58mm", a4: "A4" }[this.printerType];
+        if (!this.enabled) {
+            if (dot) dot.className = "status-indicator";
+            if (text) text.textContent = "Disabled";
+        } else if (this.connectionMode === "dialog") {
+            if (dot) dot.className = "status-indicator connected";
+            if (text) text.textContent = `Ready — ${label} via print dialog, ${this.copies} ${this.copies === 1 ? "copy" : "copies"}`;
+        } else if (this.isDirectConnected()) {
+            if (dot) dot.className = "status-indicator connected";
+            if (text) text.textContent = `Connected directly (${this.connectionMode.toUpperCase()}) — ${label}, ${this.copies} ${this.copies === 1 ? "copy" : "copies"}`;
+        } else {
+            if (dot) dot.className = "status-indicator listening";
+            if (text) text.textContent = "Not connected — click Connect below";
+        }
+    },
+
+    buildVoucher(sale) {
+        const width = this.paperWidth();
+        const isThermal = this.printerType !== "a4";
+        const rows = sale.items.map((item) => `<tr>
+                <td>${escapeHtml(item.productName)}<br><span class="dim">${item.quantity} x ${escapeHtml(formatCurrency(item.sellPrice))}</span></td>
+                <td class="right">${escapeHtml(formatCurrency(item.lineTotal))}</td>
+            </tr>`).join("");
+
+        const body = `
+            <div class="center bold big">${escapeHtml(this.headerText || VENDOR_NAME)}</div>
+            <div class="center dim">${escapeHtml(t("app_name"))}</div>
+            <div class="line"></div>
+            <div class="meta"><span>${escapeHtml(t("invoice"))}</span><span>${escapeHtml(sale.invoiceNo)}</span></div>
+            <div class="meta"><span>${escapeHtml(t("date"))}</span><span>${escapeHtml(formatDate(sale.saleDate))}</span></div>
+            <div class="meta"><span>${escapeHtml(t("cashier"))}</span><span>${escapeHtml(sale.cashierName)}</span></div>
+            <div class="line"></div>
+            <table>${rows}</table>
+            <div class="line"></div>
+            <table>
+                <tr><td>${escapeHtml(t("subtotal"))}</td><td class="right">${escapeHtml(formatCurrency(sale.subtotal))}</td></tr>
+                <tr><td>${escapeHtml(t("discount"))}</td><td class="right">${escapeHtml(formatCurrency(sale.discount))}</td></tr>
+                <tr class="total-row"><td>${escapeHtml(t("total"))}</td><td class="right">${escapeHtml(formatCurrency(sale.total))}</td></tr>
+            </table>
+            <div class="line"></div>
+            <div class="center">${escapeHtml(this.footerText)}</div>
+            <div class="center dim tiny">Powered by Shine Digital</div>`;
+
+        const copies = Array.from({ length: this.copies }, () => `<section class="voucher">${body}</section>`).join("");
+
+        return `<!DOCTYPE html><html lang="${document.documentElement.lang}"><head><meta charset="UTF-8">
+            <title>${escapeHtml(sale.invoiceNo)}</title>
+            <style>
+                @page { size: ${width} auto; margin: ${isThermal ? "0" : "12mm"}; }
+                body { margin: 0; padding: 0; background: #fff; color: #000;
+                    font-family: ${isThermal ? '"Courier New", monospace' : 'system-ui, "Segoe UI", sans-serif'};
+                    font-size: ${isThermal ? "11px" : "13px"}; }
+                .voucher { width: ${isThermal ? width : "auto"}; box-sizing: border-box; padding: 8px; page-break-after: always; }
+                .voucher:last-child { page-break-after: auto; }
+                .center { text-align: center; } .right { text-align: right; }
+                .bold { font-weight: 700; } .big { font-size: ${isThermal ? "14px" : "18px"}; }
+                .dim { color: #444; } .tiny { font-size: 9px; margin-top: 6px; }
+                .line { border-top: 1px dashed #000; margin: 6px 0; }
+                .meta { display: flex; justify-content: space-between; gap: 8px; }
+                table { width: 100%; border-collapse: collapse; }
+                td { padding: 2px 0; vertical-align: top; }
+                .total-row td { font-weight: 700; border-top: 1px solid #000; padding-top: 4px; }
+            </style></head><body>${copies}
+            <script>window.onload=function(){window.print();setTimeout(function(){window.close();},400);};<\/script>
+            </body></html>`;
+    },
+
+    async printVoucher(sale) {
+        if (this.isDirectConnected()) {
+            try {
+                const bytes = this.buildEscPosBytes(sale);
+                for (let copy = 0; copy < this.copies; copy += 1) {
+                    const sent = await this.sendBytes(bytes);
+                    if (!sent) throw new Error("Printer is not connected.");
+                }
+                return;
+            } catch (error) {
+                showNotification(`Direct print failed (${error.message}). Falling back to the print dialog.`, "error");
+            }
+        }
+
+        const printWindow = window.open("", "_blank", "width=420,height=640");
+        if (!printWindow) {
+            showNotification("Popup blocked. Allow popups to print vouchers.", "error");
+            return;
+        }
+        printWindow.document.write(this.buildVoucher(sale));
+        printWindow.document.close();
+    },
+
+    onSaleComplete(sale) {
+        if (!this.enabled || this.autoPrint === "never") return;
+        if (this.autoPrint === "always") {
+            this.printVoucher(sale);
+        }
+    }
+};
+
+// =====================================================
+// CAMERA BARCODE SCANNER (phone / webcam, no hardware needed)
+// =====================================================
+const cameraScanner = {
+    enabled: JSON.parse(localStorage.getItem("pharmacy_camera_scanner_enabled") || "false"),
+    stream: null,
+    detector: null,
+    detecting: false,
+    supported: "BarcodeDetector" in window,
+
+    init() {
+        this.updateUI();
+    },
+
+    toggle(enabled) {
+        this.enabled = enabled;
+        localStorage.setItem("pharmacy_camera_scanner_enabled", JSON.stringify(enabled));
+        this.updateUI();
+    },
+
+    updateUI() {
+        const toggle = document.getElementById("camera-scanner-toggle");
+        if (toggle) toggle.checked = this.enabled;
+        const body = document.getElementById("camera-scanner-settings");
+        if (body) body.classList.toggle("hidden", !this.enabled);
+        const chip = document.getElementById("pos-camera-scan-button");
+        if (chip) chip.classList.toggle("hidden", !this.enabled);
+        const dot = document.getElementById("camera-scanner-status-dot");
+        const text = document.getElementById("camera-scanner-status-text");
+        if (dot) dot.className = "status-indicator" + (this.enabled ? " connected" : "");
+        if (text) {
+            text.textContent = !this.enabled
+                ? "Disabled"
+                : this.supported ? "Ready — tap Open Camera Scanner" : "Not supported in this browser";
+        }
+    },
+
+    async open({ testMode = false } = {}) {
+        const modal = document.getElementById("camera-scanner-modal");
+        const video = document.getElementById("camera-scanner-video");
+        const message = document.getElementById("camera-scanner-message");
+        if (!modal || !video) return;
+
+        this.testMode = testMode;
+        modal.classList.remove("hidden");
+        message.hidden = true;
+
+        if (!this.supported) {
+            message.textContent = "This browser doesn't support live barcode detection (Chrome or Edge is required). Use a USB/Bluetooth scanner, or type the code manually.";
+            message.hidden = false;
+            return;
+        }
+
+        try {
+            this.detector = this.detector || new BarcodeDetector({
+                formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "qr_code"]
+            });
+            this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            video.srcObject = this.stream;
+            await video.play();
+            this.detecting = true;
+            this.loop(video);
+        } catch (error) {
+            message.textContent = `Could not access the camera: ${error.message}`;
+            message.hidden = false;
+        }
+    },
+
+    async loop(video) {
+        if (!this.detecting) return;
+        try {
+            const codes = await this.detector.detect(video);
+            if (codes.length) {
+                const value = codes[0].rawValue;
+                this.close();
+                if (this.testMode) {
+                    barcodeScanner.reportTest(value);
+                } else {
+                    barcodeScanner.processBarcode(value);
+                }
+                return;
+            }
+        } catch (error) { /* transient decode errors are expected between frames */ }
+        this.rafId = requestAnimationFrame(() => this.loop(video));
+    },
+
+    close() {
+        this.detecting = false;
+        if (this.rafId) cancelAnimationFrame(this.rafId);
+        if (this.stream) {
+            this.stream.getTracks().forEach((track) => track.stop());
+            this.stream = null;
+        }
+        const modal = document.getElementById("camera-scanner-modal");
+        if (modal) modal.classList.add("hidden");
+        const video = document.getElementById("camera-scanner-video");
+        if (video) video.srcObject = null;
+    }
+};
+
+function initDeviceSettings() {
+    barcodeScanner.init();
+    voucherPrinter.init();
+    cameraScanner.init();
+
+    const bind = (id, event, handler) => {
+        const element = document.getElementById(id);
+        if (element) element.addEventListener(event, handler);
+    };
+
+    bind("barcode-scanner-toggle", "change", (event) => barcodeScanner.toggle(event.target.checked));
+    bind("barcode-prefix", "change", (event) => barcodeScanner.setConfig({ prefix: event.target.value.trim() }));
+    bind("barcode-suffix", "change", (event) => barcodeScanner.setConfig({ terminator: event.target.value }));
+    bind("barcode-min-length", "change", (event) => barcodeScanner.setConfig({ minLength: event.target.value }));
+    bind("barcode-test-btn", "click", () => barcodeScanner.startTest());
+
+    bind("camera-scanner-toggle", "change", (event) => cameraScanner.toggle(event.target.checked));
+    bind("camera-scanner-test-btn", "click", () => cameraScanner.open({ testMode: true }));
+    bind("camera-scanner-close", "click", () => cameraScanner.close());
+    bind("pos-camera-scan-button", "click", () => cameraScanner.open({ testMode: false }));
+
+    bind("printer-toggle", "change", (event) => voucherPrinter.toggle(event.target.checked));
+    bind("printer-type", "change", (event) => voucherPrinter.setConfig({ printerType: event.target.value }));
+    bind("printer-auto-print", "change", (event) => voucherPrinter.setConfig({ autoPrint: event.target.value }));
+    bind("printer-copies", "change", (event) => voucherPrinter.setConfig({ copies: event.target.value }));
+    bind("printer-header", "change", (event) => voucherPrinter.setConfig({ headerText: event.target.value }));
+    bind("printer-footer", "change", (event) => voucherPrinter.setConfig({ footerText: event.target.value }));
+    bind("printer-connection-mode", "change", (event) => {
+        if (event.target.value === "dialog") {
+            voucherPrinter.disconnect();
+        } else {
+            voucherPrinter.connectionMode = event.target.value;
+            localStorage.setItem("pharmacy_printer_connmode", event.target.value);
+            voucherPrinter.updateUI();
+        }
+    });
+    bind("printer-connect-serial-btn", "click", () => voucherPrinter.connectSerial());
+    bind("printer-connect-usb-btn", "click", () => voucherPrinter.connectUsb());
+    bind("printer-disconnect-btn", "click", () => voucherPrinter.disconnect(false).then(() => voucherPrinter.updateUI()));
+    bind("printer-test-btn", "click", () => {
+        voucherPrinter.printVoucher({
+            invoiceNo: "TEST-0001",
+            saleDate: todayIso(),
+            cashierName: state.user?.fullName || "Test cashier",
+            subtotal: 5000,
+            discount: 0,
+            total: 5000,
+            items: [{ productName: "Test product", quantity: 2, sellPrice: 2500, lineTotal: 5000 }]
+        });
+    });
+
+    bind("pos-scan-chip", "click", () => switchTab("account"));
 }

@@ -174,7 +174,7 @@
                                         <th data-i18n="date">Date</th>
                                         <th data-i18n="cashier">Cashier</th>
                                         <th class="text-right" data-i18n="total">Total</th>
-                                        <th class="text-right" data-i18n="profit">Profit</th>
+                                        <th class="text-right admin-only" data-i18n="profit">Profit</th>
                                         <th class="text-center" data-i18n="actions">Actions</th>
                                     </tr>
                                 </thead>
@@ -190,7 +190,16 @@
                             <div class="pos-search-bar">
                                 <i data-lucide="search" class="h-5 w-5" aria-hidden="true"></i>
                                 <input id="pos-search" type="text" class="pos-search-input" data-i18n-placeholder="search_products" placeholder="Search products" autocomplete="off">
+                                <button id="pos-scan-chip" type="button" class="pos-scan-chip" aria-live="polite" title="Barcode scanner status — click to open device settings">
+                                    <i data-lucide="scan-barcode" class="h-4 w-4" aria-hidden="true"></i>
+                                    <span id="pos-scan-chip-text">Scanner off</span>
+                                </button>
+                                <button id="pos-camera-scan-button" type="button" class="pos-scan-chip hidden" title="Scan a barcode with the camera">
+                                    <i data-lucide="camera" class="h-4 w-4" aria-hidden="true"></i>
+                                    <span>Camera scan</span>
+                                </button>
                             </div>
+                            <div id="barcode-indicator" class="pos-scan-toast" role="status" aria-live="polite" hidden></div>
                             <div id="pos-categories" class="pos-category-grid" aria-label="Product types"></div>
                             <div id="pos-results-popover" class="pos-results-popover hidden">
                                 <div id="pos-products-grid" class="pos-product-grid product-results" aria-live="polite"></div>
@@ -283,6 +292,10 @@
                                 <input id="inbound-code" type="text" class="field-input" required>
                             </div>
                             <div>
+                                <label class="field-label" for="inbound-barcode">Barcode <span class="field-hint">scan or type</span></label>
+                                <input id="inbound-barcode" type="text" class="field-input" data-scan-field autocomplete="off" placeholder="EAN / UPC on the box">
+                            </div>
+                            <div>
                                 <label class="field-label" for="inbound-brand" data-i18n="brand">Brand</label>
                                 <input id="inbound-brand" type="text" class="field-input">
                             </div>
@@ -356,7 +369,7 @@
                                         <th data-i18n="cashier">Cashier</th>
                                         <th data-i18n="items">Items</th>
                                         <th class="text-right" data-i18n="total">Total</th>
-                                        <th class="text-right" data-i18n="profit">Profit</th>
+                                        <th class="text-right admin-only" data-i18n="profit">Profit</th>
                                         <th class="text-center" data-i18n="actions">Actions</th>
                                     </tr>
                                 </thead>
@@ -539,6 +552,163 @@
                             </form>
                         </div>
 
+                        <div class="surface-panel">
+                            <div class="section-heading">
+                                <h3>Device Settings</h3>
+                            </div>
+
+                            <div class="device-settings-group">
+                                <div class="device-setting-card">
+                                    <div class="device-setting-header">
+                                        <div class="device-setting-icon">
+                                            <i data-lucide="scan-barcode" class="h-5 w-5"></i>
+                                        </div>
+                                        <div class="device-setting-info">
+                                            <h4>Barcode Scanner</h4>
+                                            <p>USB/Bluetooth barcode scanner for quick product lookup</p>
+                                        </div>
+                                        <label class="device-toggle" for="barcode-scanner-toggle">
+                                            <input id="barcode-scanner-toggle" type="checkbox" class="device-toggle-input">
+                                            <span class="device-toggle-track"></span>
+                                        </label>
+                                    </div>
+                                    <div id="barcode-scanner-settings" class="device-setting-body hidden">
+                                        <div class="form-group">
+                                            <label class="field-label" for="barcode-prefix">Scan Prefix (optional)</label>
+                                            <input id="barcode-prefix" type="text" class="field-input" placeholder="e.g. ]E0 or none">
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="field-label" for="barcode-suffix">Scan Suffix / Terminator</label>
+                                            <select id="barcode-suffix" class="field-input">
+                                                <option value="Enter">Enter (default)</option>
+                                                <option value="Tab">Tab</option>
+                                                <option value="none">None (use timeout)</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="field-label" for="barcode-min-length">Minimum Barcode Length</label>
+                                            <input id="barcode-min-length" type="number" min="3" max="50" value="4" class="field-input">
+                                        </div>
+                                        <div class="device-setting-status">
+                                            <span class="status-indicator" id="barcode-status-dot"></span>
+                                            <span id="barcode-status-text">Disconnected</span>
+                                        </div>
+                                        <button id="barcode-test-btn" type="button" class="secondary-btn full-width">
+                                            <i data-lucide="zap" class="h-4 w-4"></i>
+                                            <span>Test Scanner</span>
+                                        </button>
+                                        <p id="barcode-test-readout" class="device-setting-note">Enable the scanner, then click Test and scan any barcode. The captured value is shown here instead of being added to the cart.</p>
+                                    </div>
+                                </div>
+
+                                <div class="device-setting-card">
+                                    <div class="device-setting-header">
+                                        <div class="device-setting-icon">
+                                            <i data-lucide="camera" class="h-5 w-5"></i>
+                                        </div>
+                                        <div class="device-setting-info">
+                                            <h4>Camera Barcode Scanner</h4>
+                                            <p>Use a phone or webcam camera to scan barcodes — no hardware needed</p>
+                                        </div>
+                                        <label class="device-toggle" for="camera-scanner-toggle">
+                                            <input id="camera-scanner-toggle" type="checkbox" class="device-toggle-input">
+                                            <span class="device-toggle-track"></span>
+                                        </label>
+                                    </div>
+                                    <div id="camera-scanner-settings" class="device-setting-body hidden">
+                                        <div class="device-setting-status">
+                                            <span class="status-indicator" id="camera-scanner-status-dot"></span>
+                                            <span id="camera-scanner-status-text">Disabled</span>
+                                        </div>
+                                        <button id="camera-scanner-test-btn" type="button" class="secondary-btn full-width">
+                                            <i data-lucide="camera" class="h-4 w-4"></i>
+                                            <span>Open Camera Scanner</span>
+                                        </button>
+                                        <p class="device-setting-note">Needs Chrome or Edge with camera access. A "Camera scan" button also appears next to product search on the POS screen.</p>
+                                    </div>
+                                </div>
+
+                                <div class="device-setting-card">
+                                    <div class="device-setting-header">
+                                        <div class="device-setting-icon">
+                                            <i data-lucide="printer" class="h-5 w-5"></i>
+                                        </div>
+                                        <div class="device-setting-info">
+                                            <h4>Voucher / Receipt Printer</h4>
+                                            <p>Thermal or standard printer for sales receipts</p>
+                                        </div>
+                                        <label class="device-toggle" for="printer-toggle">
+                                            <input id="printer-toggle" type="checkbox" class="device-toggle-input">
+                                            <span class="device-toggle-track"></span>
+                                        </label>
+                                    </div>
+                                    <div id="printer-settings" class="device-setting-body hidden">
+                                        <div class="form-group">
+                                            <label class="field-label" for="printer-type">Printer Type</label>
+                                            <select id="printer-type" class="field-input">
+                                                <option value="thermal-80">Thermal 80mm (standard POS)</option>
+                                                <option value="thermal-58">Thermal 58mm (compact)</option>
+                                                <option value="a4">A4 Standard Printer</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="field-label" for="printer-auto-print">Auto-print after checkout</label>
+                                            <select id="printer-auto-print" class="field-input">
+                                                <option value="ask">Ask every time</option>
+                                                <option value="always">Always print</option>
+                                                <option value="never">Never (manual only)</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="field-label" for="printer-copies">Number of Copies</label>
+                                            <input id="printer-copies" type="number" min="1" max="5" value="1" class="field-input">
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="field-label" for="printer-header">Receipt Header Text</label>
+                                            <input id="printer-header" type="text" class="field-input" placeholder="Shine Digital Store" value="Shine Digital Store">
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="field-label" for="printer-footer">Receipt Footer Text</label>
+                                            <input id="printer-footer" type="text" class="field-input" placeholder="Thank you for shopping!" value="Thank you for shopping!">
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="field-label" for="printer-connection-mode">Connection</label>
+                                            <select id="printer-connection-mode" class="field-input">
+                                                <option value="dialog">Browser print dialog (any printer)</option>
+                                                <option value="serial">Direct — USB/Serial cable (ESC/POS)</option>
+                                                <option value="usb">Direct — WebUSB (ESC/POS)</option>
+                                            </select>
+                                        </div>
+                                        <div id="printer-direct-connect" class="device-setting-note hidden">
+                                            Direct printing sends raw ESC/POS commands straight to the printer — no popup, no print dialog, and it auto-cuts the paper. Works with most Epson-compatible thermal printers on Chrome or Edge desktop. The browser will ask you to pick the device once per session.
+                                            <div id="printer-connect-row" class="button-pair mt-6">
+                                                <button id="printer-connect-serial-btn" type="button" class="secondary-btn full-width">
+                                                    <i data-lucide="cable" class="h-4 w-4"></i>
+                                                    <span>Connect via Serial</span>
+                                                </button>
+                                                <button id="printer-connect-usb-btn" type="button" class="secondary-btn full-width">
+                                                    <i data-lucide="usb" class="h-4 w-4"></i>
+                                                    <span>Connect via USB</span>
+                                                </button>
+                                            </div>
+                                            <button id="printer-disconnect-btn" type="button" class="secondary-btn full-width mt-6 hidden">
+                                                <i data-lucide="plug-zap" class="h-4 w-4"></i>
+                                                <span>Disconnect Printer</span>
+                                            </button>
+                                        </div>
+                                        <div class="device-setting-status">
+                                            <span class="status-indicator" id="printer-status-dot"></span>
+                                            <span id="printer-status-text">Disconnected</span>
+                                        </div>
+                                        <button id="printer-test-btn" type="button" class="secondary-btn full-width">
+                                            <i data-lucide="printer" class="h-4 w-4"></i>
+                                            <span>Print Test Page</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="surface-panel admin-only">
                             <div class="section-heading">
                                 <h3 data-i18n="system_tools">System Tools</h3>
@@ -602,6 +772,10 @@
                     <input id="product-code" type="text" class="field-input" required>
                 </div>
                 <div>
+                    <label class="field-label" for="product-barcode">Barcode <span class="field-hint">scan or type</span></label>
+                    <input id="product-barcode" type="text" class="field-input" data-scan-field autocomplete="off" placeholder="EAN / UPC on the box">
+                </div>
+                <div>
                     <label class="field-label" for="product-brand" data-i18n="brand">Brand</label>
                     <input id="product-brand" type="text" class="field-input">
                 </div>
@@ -662,6 +836,23 @@
             <div class="button-pair">
                 <button id="receipt-print-button" type="button" class="primary-btn" data-i18n="print_receipt">Print Receipt</button>
             </div>
+        </div>
+    </div>
+
+    <div id="camera-scanner-modal" class="modal-shell hidden" role="dialog" aria-modal="true" aria-labelledby="camera-scanner-title">
+        <div class="modal-card camera-scanner-card">
+            <div class="section-heading row">
+                <h3 id="camera-scanner-title">Camera Barcode Scanner</h3>
+                <button id="camera-scanner-close" class="icon-btn" type="button" aria-label="Close camera scanner">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+            <div class="camera-scanner-viewport">
+                <video id="camera-scanner-video" playsinline muted></video>
+                <div class="camera-scanner-reticle" aria-hidden="true"></div>
+            </div>
+            <p id="camera-scanner-message" class="device-setting-note" hidden></p>
+            <p class="device-setting-note">Point the camera at a barcode. It's added to the cart automatically as soon as it's recognized.</p>
         </div>
     </div>
 

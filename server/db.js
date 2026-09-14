@@ -32,6 +32,9 @@ function runMigrations() {
     ensureColumn("sales", "shop_id", "INTEGER");
     ensureColumn("stock_movements", "shop_id", "INTEGER");
     ensureColumn("audit_logs", "shop_id", "INTEGER");
+    ensureColumn("sale_items", "shop_id", "INTEGER");
+    ensureColumn("products", "barcode", "TEXT");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_products_shop_barcode ON products(shop_id, barcode)");
 }
 
 function ensureDefaultShop() {

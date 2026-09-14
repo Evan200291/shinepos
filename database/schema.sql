@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS sales (
 CREATE TABLE IF NOT EXISTS sale_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sale_id INTEGER NOT NULL,
+    shop_id INTEGER,
     product_id INTEGER,
     product_code TEXT NOT NULL,
     product_name TEXT NOT NULL,

@@ -8,63 +8,222 @@
     <link rel="stylesheet" href="/application.css?v=20260718">
     <link rel="stylesheet" href="/pos-theme.css?v=20260718-operations">
     <style>
-        .hidden {
-            display: none !important;
-        }
-
+        .hidden { display: none !important; }
         .h-3, .w-3 { width: 0.75rem; height: 0.75rem; }
         .h-4, .w-4 { width: 1rem; height: 1rem; }
         .h-5, .w-5 { width: 1.25rem; height: 1.25rem; }
         .h-6, .w-6 { width: 1.5rem; height: 1.5rem; }
 
-        /* Shop detail tabs */
-        .detail-tabs {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1.25rem;
-            flex-wrap: wrap;
+        /* Super Admin Design Tokens */
+        :root {
+            --sa-white: #ffffff;
+            --sa-red: #db0202;
+            --sa-gray: #b2aeae;
+            --sa-black: #000000;
+            --sa-green: #22c55e;
+            --sa-green-soft: #d4f4dd;
+            --sa-amber: #f59e0b;
+            --sa-amber-soft: #fff4de;
+            --sa-red-soft: #ffecec;
+            --sa-border: #e0e0e0;
+            --sa-muted: #666666;
         }
 
+        /* Detail tabs */
+        .detail-tabs { display: flex; gap: 8px; margin-bottom: 1.25rem; flex-wrap: wrap; }
         .detail-tab {
-            padding: 0.55rem 1.1rem;
-            border-radius: 0.25rem;
-            border: 1px solid var(--border);
-            background: var(--white);
-            color: var(--muted);
-            font-weight: 600;
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: 1px solid var(--sa-border);
+            background: var(--sa-white);
+            color: var(--sa-black);
+            font-weight: 700;
+            font-size: 13px;
             cursor: pointer;
-            font-size: 0.88rem;
-            transition: 0.2s;
+            transition: all .15s ease;
         }
+        .detail-tab:hover { border-color: var(--sa-red); color: var(--sa-red); }
+        .detail-tab.active { border-color: var(--sa-red); background: var(--sa-red); color: var(--sa-white); }
+        .detail-panel { display: none; }
+        .detail-panel.active { display: block; }
 
-        .detail-tab.active {
-            background: var(--ocean-soft);
-            color: var(--navy);
-            border-color: var(--ocean);
+        /* Action buttons row */
+        .table-actions-inline { display: flex; align-items: center; gap: 6px; }
+        .table-actions-inline .mini-btn { white-space: nowrap; }
+
+        /* Status badges */
+        .status-active, .status-inactive, .status-suspended {
+            display: inline-flex; align-items: center; gap: 6px;
+            min-height: 24px; padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 11px; font-weight: 800; line-height: 1; text-transform: uppercase;
         }
+        .status-active { border: 1px solid var(--sa-green); background: var(--sa-green-soft); color: #145a2a; }
+        .status-inactive { border: 1px solid var(--sa-red); background: var(--sa-red-soft); color: #8a1616; }
+        .status-suspended { border: 1px solid var(--sa-amber); background: var(--sa-amber-soft); color: #7a4a05; }
+        .status-active .status-dot, .status-inactive .status-dot, .status-suspended .status-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; }
+        .status-active .status-dot { background: var(--sa-green); }
+        .status-inactive .status-dot { background: var(--sa-red); }
+        .status-suspended .status-dot { background: var(--sa-amber); }
 
-        .detail-panel {
-            display: none;
-        }
-
-        .detail-panel.active {
-            display: block;
-        }
-
-        /* Keep Super Admin operations visually consistent with the POS workspace. */
-        :root { --white: #ffffff; --gray: #b2aeae; --blue: #db0202; --red: #db0202; --black: #000000; --border: #b2aeae; --navy: #000000; --muted: #555555; --ocean: #db0202; --ocean-soft: #fff1f1; }
-        .detail-tab { border-color: var(--gray); background: var(--white); color: var(--black); font-weight: 800; }
-        .detail-tab:hover, .detail-tab:focus-visible, .detail-tab.active { border-color: var(--blue); background: var(--blue); color: var(--white); }
-        .table-actions-inline { display: flex; flex-wrap: wrap; gap: 7px; }
-        .status-active, .status-inactive, .status-suspended { display: inline-flex; align-items: center; gap: 7px; min-height: 26px; padding: 5px 9px; border: 1px solid var(--gray); border-radius: 999px; background: var(--white); color: var(--black); font-size: 10px; font-weight: 900; line-height: 1; text-transform: uppercase; }
-        .status-active .status-dot, .status-inactive .status-dot, .status-suspended .status-dot { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; }
-        .status-active .status-dot { background: var(--blue); }
-        .status-inactive .status-dot { background: var(--red); }
-        .status-suspended .status-dot { background: var(--black); }
-        .muted { color: var(--black); font-weight: 600; }
+        .muted { color: var(--sa-muted); font-weight: 600; }
         .expand-form-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
         .super-admin-page .expand-form.collapsed { display: none; }
-        @media (max-width: 720px) { .detail-tabs { gap: 6px; } .detail-tab { flex: 1 1 140px; } .expand-form-actions > button { flex: 1; } }
+
+        /* --- SHOPS TABLE: Desktop uses a proper single-row layout --- */
+        .super-admin-page .shops-table { table-layout: auto; }
+        .super-admin-page .shops-table thead tr { display: table-row; }
+        .super-admin-page .shops-table tbody tr { display: table-row; }
+        .super-admin-page .shops-table td,
+        .super-admin-page .shops-table th { display: table-cell; vertical-align: middle; padding: 12px 10px; }
+        .super-admin-page .shops-table td:last-child { white-space: nowrap; }
+
+        /* --- MOBILE: Super Admin --- */
+        @media (max-width: 720px) {
+            .detail-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+            .detail-tab { min-width: 0; padding: 9px 8px; font-size: 12px; text-align: center; }
+            .expand-form-actions > button { flex: 1; }
+
+            /* The topbar already shows the shop name — drop the duplicate hero heading. */
+            .super-admin-page #shop-details-view .back-row #shop-name { display: none; }
+            .super-admin-page #shop-details-view .section-heading.row {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+            .super-admin-page #shop-details-view .section-heading.row .button-pair {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+            .super-admin-page #shop-details-view .section-heading.row .button-pair > button {
+                width: 100%;
+                justify-content: center;
+                padding: 10px 8px;
+                font-size: 12px;
+            }
+            .super-admin-page #shop-details-view .section-heading.row .button-pair > button:last-child {
+                grid-column: 1 / -1;
+            }
+
+            /* Override generic responsive-table for shops */
+            .super-admin-page .shops-table thead { display: none !important; }
+            .super-admin-page .shops-table tbody { display: block; }
+            .super-admin-page .shops-table tbody tr {
+                display: grid !important;
+                grid-template-columns: 1fr auto;
+                grid-template-rows: auto auto;
+                gap: 6px 8px;
+                padding: 14px 12px;
+                border-bottom: 1px solid #e8e8e8;
+            }
+            .super-admin-page .shops-table td {
+                display: block !important;
+                padding: 0 !important;
+                border: 0 !important;
+                overflow: visible !important;
+                white-space: normal !important;
+                text-overflow: unset !important;
+                text-align: left !important;
+            }
+            /* Row 1: shop name + status */
+            .super-admin-page .shops-table td:nth-child(1) {
+                grid-column: 1; grid-row: 1;
+                font-size: 15px; font-weight: 800; color: #000;
+            }
+            .super-admin-page .shops-table td:nth-child(2) {
+                grid-column: 2; grid-row: 1;
+                justify-self: end; align-self: center;
+            }
+            /* Row 2: subscription + actions */
+            .super-admin-page .shops-table td:nth-child(3) {
+                grid-column: 1; grid-row: 2;
+                font-size: 12px; color: #555; align-self: center;
+            }
+            .super-admin-page .shops-table td:nth-child(4) {
+                grid-column: 2; grid-row: 2;
+                justify-self: end; align-self: center;
+            }
+
+            /* Detail tables become label/value cards driven by data-label. */
+            .super-admin-page .sa-detail-table tbody tr {
+                display: grid !important;
+                grid-template-columns: minmax(0, 1fr);
+                gap: 4px;
+                min-height: 0;
+                padding: 12px 12px;
+                border-bottom: 1px solid #e8e8e8;
+            }
+            .super-admin-page .sa-detail-table td {
+                display: flex !important;
+                align-items: baseline;
+                justify-content: space-between;
+                gap: 12px;
+                padding: 0 !important;
+                border: 0 !important;
+                overflow: visible !important;
+                white-space: normal !important;
+                text-overflow: unset !important;
+                text-align: right !important;
+                font-size: 12px;
+            }
+            .super-admin-page .sa-detail-table td::before {
+                content: attr(data-label);
+                flex: 0 0 auto;
+                color: #777777;
+                font-size: 10px;
+                font-weight: 800;
+                letter-spacing: .06em;
+                text-transform: uppercase;
+            }
+            .super-admin-page .sa-detail-table td .cell-value {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                flex-wrap: wrap;
+                justify-content: flex-end;
+            }
+            .super-admin-page .sa-detail-table td:first-child {
+                font-size: 14px;
+                font-weight: 800;
+                color: #000000;
+            }
+            .super-admin-page .sa-detail-table td[data-label="Actions"] {
+                margin-top: 6px;
+                justify-content: flex-end;
+            }
+            .super-admin-page .sa-detail-table td[data-label="Actions"]::before { display: none; }
+            .super-admin-page .sa-detail-table .table-actions-inline { justify-content: flex-end !important; }
+            .super-admin-page .sa-detail-table .empty-state {
+                display: block !important;
+                padding: 18px 4px !important;
+                text-align: center !important;
+            }
+            .super-admin-page .sa-detail-table .empty-state::before { display: none; }
+
+            /* Icon-only buttons on mobile */
+            .super-admin-page .table-actions-inline {
+                flex-wrap: nowrap; gap: 5px;
+            }
+            .super-admin-page .table-actions-inline .mini-btn {
+                width: 36px; min-width: 36px; height: 36px; min-height: 36px;
+                padding: 0; gap: 0; font-size: 0;
+                border-radius: 8px;
+                display: inline-flex; align-items: center; justify-content: center;
+            }
+            .super-admin-page .table-actions-inline .mini-btn span { display: none; }
+            /* pos-theme.css injects a "..." glyph into every responsive-table mini-btn. */
+            .super-admin-page .responsive-table .mini-btn::before { content: none; }
+            .super-admin-page .table-actions-inline .mini-btn svg,
+            .super-admin-page .table-actions-inline .mini-btn i { width: 15px; height: 15px; }
+            .super-admin-page .table-actions-inline .edit-action { border-color: var(--sa-red); color: var(--sa-red); }
+            .super-admin-page .table-actions-inline .disable-action { border-color: var(--sa-amber); color: #b47808; }
+            .super-admin-page .table-actions-inline .enable-action { border-color: var(--sa-green); color: #167a3a; }
+            .super-admin-page .table-actions-inline .delete-action { border-color: var(--sa-red); color: var(--sa-red); }
+            .super-admin-page .table-actions-inline .enable-action:hover { background: var(--green); color: var(--white); }
+            .super-admin-page .table-actions-inline .delete-action { border-color: var(--red); color: var(--red); }
+            .super-admin-page .table-actions-inline .delete-action:hover { background: var(--red); color: var(--white); }
+        }
     </style>
 </head>
 <body class="theme-body super-admin-page">
@@ -277,7 +436,7 @@
                                 </button>
                             </div>
                             <div class="table-wrap">
-                                <table class="data-table responsive-table">
+                                <table class="data-table responsive-table sa-detail-table">
                                     <thead>
                                         <tr>
                                             <th>Name</th>
@@ -295,7 +454,7 @@
                         <!-- Products Panel -->
                         <div id="detail-products" class="detail-panel">
                             <div class="table-wrap">
-                                <table class="data-table responsive-table">
+                                <table class="data-table responsive-table sa-detail-table">
                                     <thead>
                                         <tr>
                                             <th>Code</th>
@@ -312,7 +471,7 @@
                         <!-- Stock Movements Panel -->
                         <div id="detail-movements" class="detail-panel">
                             <div class="table-wrap">
-                                <table class="data-table responsive-table">
+                                <table class="data-table responsive-table sa-detail-table">
                                     <thead>
                                         <tr>
                                             <th>Date</th>
@@ -331,7 +490,7 @@
                         <!-- Subscriptions Panel -->
                         <div id="detail-subscriptions" class="detail-panel">
                             <div class="table-wrap">
-                                <table class="data-table responsive-table">
+                                <table class="data-table responsive-table sa-detail-table">
                                     <thead>
                                         <tr>
                                             <th>Start Date</th>
@@ -395,6 +554,24 @@
             if (!dateStr) return '-';
             const d = new Date(dateStr);
             return d.toLocaleDateString('en-GB');
+        }
+
+        // Local-date ISO string. toISOString() is UTC and would shift the day
+        // for any browser east of Greenwich.
+        function isoDate(d) {
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${d.getFullYear()}-${month}-${day}`;
+        }
+
+        function todayIso() {
+            return isoDate(new Date());
+        }
+
+        function addDays(dateStr, days) {
+            const d = new Date(dateStr + 'T00:00:00');
+            d.setDate(d.getDate() + days);
+            return isoDate(d);
         }
 
         function formatDaysLeft(dateStr) {
@@ -475,9 +652,13 @@
             const tbody = document.getElementById('shops-table');
             tbody.innerHTML = state.shops.map(shop => {
                 const subscriptionText = shop.subscription ? formatDaysLeft(shop.subscription.end_date) : 'No subscription';
-                const isSuspended = shop.is_active && (!shop.subscription || subscriptionText === 'Expired');
-                const statusClass = !shop.is_active ? 'status-inactive' : isSuspended ? 'status-suspended' : 'status-active';
-                const statusText = !shop.is_active ? 'Disabled' : isSuspended ? 'Suspended' : 'Active';
+                // Three distinct states: the server only blocks access for
+                // disabled shops and expired plans, so an unmetered shop is
+                // labelled separately instead of being called suspended.
+                const isExpired = shop.is_active && shop.subscription && subscriptionText === 'Expired';
+                const noPlan = shop.is_active && !shop.subscription;
+                const statusClass = !shop.is_active ? 'status-inactive' : (isExpired || noPlan) ? 'status-suspended' : 'status-active';
+                const statusText = !shop.is_active ? 'Disabled' : isExpired ? 'Suspended' : noPlan ? 'No Plan' : 'Active';
                 return `
                     <tr>
                         <td data-label="Shop"><strong class="shop-name">${escapeHtml(shop.name)}</strong></td>
@@ -487,7 +668,7 @@
                         <td data-label="Subscription">${shop.subscription ? '<strong>' + escapeHtml(subscriptionText) + '</strong>' : '<span class="muted">No subscription</span>'}</td>
                         <td data-label="Actions" class="text-center">
                             <div class="table-actions-inline shop-actions">
-                                <button class="mini-btn edit-action" data-view-shop="${shop.id}"><i data-lucide="pencil" class="h-3 w-3"></i><span>Edit</span></button>
+                                <button class="mini-btn edit-action" data-view-shop="${shop.id}" aria-label="Manage ${escapeHtml(shop.name)}"><i data-lucide="settings-2" class="h-3 w-3"></i><span>Manage</span></button>
                                 <button class="mini-btn ${shop.is_active ? 'disable-action' : 'enable-action'}" data-toggle-shop="${shop.id}"><i data-lucide="${shop.is_active ? 'ban' : 'power'}" class="h-3 w-3"></i><span>${shop.is_active ? 'Disable' : 'Enable'}</span></button>
                                 <button class="mini-btn delete-action" data-delete-shop="${shop.id}"><i data-lucide="trash-2" class="h-3 w-3"></i><span>Delete</span></button>
                             </div>
@@ -498,33 +679,50 @@
         }
 
         // ---- RENDER: Shop details ----
-        function renderShopDetails() {
+        async function renderShopDetails() {
             const shop = state.selectedShop;
             if (!shop) return;
             document.getElementById('shop-name').textContent = shop.name;
             document.getElementById('shop-detail-title').textContent = shop.name;
 
-            // Refresh shop data for latest subscription info
-            api('/api/super/shops').then(data => {
-                const updated = data.shops.find(s => s.id === shop.id);
-                if (updated) state.selectedShop = updated;
-            });
+            document.getElementById('shops-view').classList.add('hidden');
+            document.getElementById('shop-details-view').classList.remove('hidden');
+            const pt = document.getElementById('page-title');
+            if (pt) pt.textContent = shop.name;
+            setActiveNav(null);
 
-            Promise.all([
-                api('/api/super/shops/' + shop.id + '/users'),
-                api('/api/super/shops/' + shop.id + '/products'),
-                api('/api/super/shops/' + shop.id + '/stock-movements'),
-                api('/api/super/shops/' + shop.id + '/subscriptions')
-            ]).then(([usersData, productsData, movementsData, subsData]) => {
-                // Update subscription button text based on existing subscriptions
-                const hasSub = subsData.subscriptions && subsData.subscriptions.length > 0;
-                const subBtn = document.getElementById('add-sub-btn');
-                subBtn.innerHTML = hasSub
-                    ? '<i data-lucide="pencil" class="h-4 w-4"></i> Edit Subscription'
-                    : '<i data-lucide="calendar-plus" class="h-4 w-4"></i> Add Subscription';
-                lucide.createIcons();
-                // Users
-                document.getElementById('users-table').innerHTML = usersData.users.map(user => `
+            let shopsData, usersData, productsData, movementsData, subsData;
+            try {
+                [shopsData, usersData, productsData, movementsData, subsData] = await Promise.all([
+                    api('/api/super/shops'),
+                    api('/api/super/shops/' + shop.id + '/users'),
+                    api('/api/super/shops/' + shop.id + '/products'),
+                    api('/api/super/shops/' + shop.id + '/stock-movements'),
+                    api('/api/super/shops/' + shop.id + '/subscriptions')
+                ]);
+            } catch (err) {
+                notify(err.message, true);
+                return;
+            }
+
+            // A newer selection landed while these requests were in flight.
+            if (state.selectedShop?.id !== shop.id) return;
+
+            state.shops = shopsData.shops;
+            const updated = shopsData.shops.find(s => s.id === shop.id);
+            if (updated) {
+                state.selectedShop = updated;
+                document.getElementById('shop-name').textContent = updated.name;
+                document.getElementById('shop-detail-title').textContent = updated.name;
+                if (pt) pt.textContent = updated.name;
+            }
+
+            const hasSub = subsData.subscriptions.length > 0;
+            document.getElementById('add-sub-btn').innerHTML = hasSub
+                ? '<i data-lucide="pencil" class="h-4 w-4"></i> Edit Subscription'
+                : '<i data-lucide="calendar-plus" class="h-4 w-4"></i> Add Subscription';
+
+            document.getElementById('users-table').innerHTML = usersData.users.map(user => `
                     <tr>
                         <td data-label="Name">${escapeHtml(user.fullName)}</td>
                         <td data-label="Username">${escapeHtml(user.username)}</td>
@@ -532,15 +730,16 @@
                         <td data-label="Status"><span class="${user.isActive ? 'status-active' : 'status-inactive'}"><span class="status-dot" aria-hidden="true"></span>${user.isActive ? 'Active' : 'Disabled'}</span></td>
                         <td data-label="Actions" class="text-center">
                             <div class="table-actions-inline" style="justify-content: center;">
-                                <button class="mini-btn" data-edit-user="${user.id}">Edit</button>
-                                <button class="mini-btn danger-btn" data-delete-user="${user.id}">Disable</button>
+                                <button class="mini-btn edit-action" data-edit-user="${user.id}"><i data-lucide="pencil" class="h-3 w-3"></i><span>Edit</span></button>
+                                ${user.isActive
+                                    ? `<button class="mini-btn disable-action" data-toggle-user="${user.id}" data-next-active="0"><i data-lucide="ban" class="h-3 w-3"></i><span>Disable</span></button>`
+                                    : `<button class="mini-btn enable-action" data-toggle-user="${user.id}" data-next-active="1"><i data-lucide="power" class="h-3 w-3"></i><span>Enable</span></button>`}
                             </div>
                         </td>
                     </tr>
                 `).join('') || '<tr><td colspan="5" class="empty-state">No users in this shop.</td></tr>';
 
-                // Products
-                document.getElementById('products-table').innerHTML = productsData.products.map(p => `
+            document.getElementById('products-table').innerHTML = productsData.products.map(p => `
                     <tr>
                         <td data-label="Code">${escapeHtml(p.code)}</td>
                         <td data-label="Product">${escapeHtml(p.name)}</td>
@@ -553,8 +752,7 @@
                     </tr>
                 `).join('') || '<tr><td colspan="4" class="empty-state">No products in this shop.</td></tr>';
 
-                // Movements
-                document.getElementById('movements-table').innerHTML = movementsData.movements.map(m => `
+            document.getElementById('movements-table').innerHTML = movementsData.movements.map(m => `
                     <tr>
                         <td data-label="Date">${formatDate(m.createdAt)}</td>
                         <td data-label="Product">${escapeHtml(m.productName)}</td>
@@ -565,24 +763,24 @@
                     </tr>
                 `).join('') || '<tr><td colspan="6" class="empty-state">No stock movements recorded.</td></tr>';
 
-                // Subscriptions
-                document.getElementById('subscriptions-table').innerHTML = subsData.subscriptions.map(s => `
+            document.getElementById('subscriptions-table').innerHTML = subsData.subscriptions.map((s, index) => {
+                const today = todayIso();
+                const pill = index !== 0
+                    ? ''
+                    : s.end_date >= today
+                        ? ' <span class="status-pill status-good">current</span>'
+                        : ' <span class="status-pill status-expired">expired</span>';
+                return `
                     <tr>
-                        <td data-label="Start">${formatDate(s.start_date)}</td>
-                        <td data-label="End">${formatDate(s.end_date)}</td>
-                        <td data-label="Remarks">${escapeHtml(s.remarks || '')}</td>
-                        <td data-label="Created">${formatDate(s.created_at)}</td>
+                        <td data-label="Start"><span class="cell-value">${formatDate(s.start_date)}</span></td>
+                        <td data-label="End"><span class="cell-value">${formatDate(s.end_date)}${pill}</span></td>
+                        <td data-label="Remarks"><span class="cell-value">${escapeHtml(s.remarks || '—')}</span></td>
+                        <td data-label="Created"><span class="cell-value">${formatDate(s.created_at)}</span></td>
                     </tr>
-                `).join('') || '<tr><td colspan="4" class="empty-state">No subscriptions found.</td></tr>';
+                `;
+            }).join('') || '<tr><td colspan="4" class="empty-state">No subscriptions found.</td></tr>';
 
-                lucide.createIcons();
-            });
-
-            document.getElementById('shops-view').classList.add('hidden');
-            document.getElementById('shop-details-view').classList.remove('hidden');
-            const pt = document.getElementById('page-title');
-            if (pt) pt.textContent = shop.name;
-            setActiveNav(null);
+            lucide.createIcons();
         }
 
         // ---- Navigation ----
@@ -712,7 +910,7 @@
             addShopBtn.addEventListener('click', () => {
                 if (addShopExpand.classList.contains('collapsed')) {
                     // Pre-fill today's date
-                    const today = new Date().toISOString().split('T')[0];
+                    const today = todayIso();
                     document.getElementById('new-shop-sub-start').value = today;
                     document.getElementById('new-shop-sub-end').value = '';
                     document.getElementById('new-shop-sub-remarks').value = '';
@@ -855,7 +1053,7 @@
             document.getElementById('add-sub-btn').addEventListener('click', () => {
                 const shop = state.selectedShop;
                 if (!shop) return;
-                const today = new Date().toISOString().split('T')[0];
+                const today = todayIso();
                 const hasSub = shop.subscription && shop.subscription.end_date;
                 const title = hasSub ? 'Edit Subscription' : 'Add Subscription';
                 const endVal = hasSub ? shop.subscription.end_date : '';
@@ -910,13 +1108,11 @@
                 const shop = state.selectedShop;
                 if (!shop) return;
                 try {
-                    const today = new Date().toISOString().split('T')[0];
-                    const thirtyDaysLater = new Date();
-                    thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
-                    const endDate = thirtyDaysLater.toISOString().split('T')[0];
-                    const startDate = shop.subscription && shop.subscription.end_date && shop.subscription.end_date >= today
-                        ? shop.subscription.end_date
-                        : today;
+                    const today = todayIso();
+                    const currentEnd = shop.subscription?.end_date;
+                    // Extend from the existing expiry so an active plan is never shortened.
+                    const startDate = currentEnd && currentEnd >= today ? currentEnd : today;
+                    const endDate = addDays(startDate, 30);
                     await api('/api/super/shops/' + shop.id + '/subscriptions', {
                         method: 'POST',
                         body: {
@@ -925,7 +1121,7 @@
                             remarks: 'Quick 30-day extension'
                         }
                     });
-                    notify('Subscription extended by 30 days.');
+                    notify('Subscription extended to ' + formatDate(endDate) + '.');
                     renderShopDetails();
                 } catch (err) {
                     notify(err.message, true);
@@ -1086,15 +1282,33 @@
                     }
                 }
 
-                // Delete/disable user
-                const deleteUserBtn = e.target.closest('[data-delete-user]');
-                if (deleteUserBtn) {
-                    if (!confirm('Are you sure you want to disable this user?')) return;
-                    const userId = Number(deleteUserBtn.dataset.deleteUser);
+                // Enable/disable user
+                const toggleUserBtn = e.target.closest('[data-toggle-user]');
+                if (toggleUserBtn) {
+                    const nextActive = toggleUserBtn.dataset.nextActive === '1';
+                    if (!nextActive && !confirm('Disable this user? They will no longer be able to sign in.')) return;
+                    const userId = Number(toggleUserBtn.dataset.toggleUser);
                     try {
-                        await api('/api/super/users/' + userId, { method: 'DELETE' });
-                        notify('User disabled.');
+                        await api('/api/super/users/' + userId, { method: 'PUT', body: { isActive: nextActive } });
+                        notify(nextActive ? 'User enabled.' : 'User disabled.');
                         renderShopDetails();
+                    } catch (err) {
+                        notify(err.message, true);
+                    }
+                }
+
+                // Delete shop
+                const deleteShopBtn = e.target.closest('[data-delete-shop]');
+                if (deleteShopBtn) {
+                    const shopId = Number(deleteShopBtn.dataset.deleteShop);
+                    const shop = state.shops.find(s => s.id === shopId);
+                    const shopName = shop ? shop.name : 'this shop';
+                    if (!confirm(`Are you sure you want to delete "${shopName}"? This will deactivate the shop and all its data.`)) return;
+                    try {
+                        await api('/api/super/shops/' + shopId, { method: 'DELETE' });
+                        notify('Shop deleted successfully.');
+                        state.selectedShop = null;
+                        await loadShops();
                     } catch (err) {
                         notify(err.message, true);
                     }

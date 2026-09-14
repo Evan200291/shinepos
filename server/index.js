@@ -38,7 +38,12 @@ function toNumber(value, fallback = 0) {
 }
 
 function todayString() {
-    return new Date().toISOString().split("T")[0];
+    // Business dates are local, not UTC — toISOString() would roll the day over
+    // for any host east of Greenwich before its UTC-midnight offset.
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${now.getFullYear()}-${month}-${day}`;
 }
 
 function sanitizeUser(user) {
@@ -70,6 +75,29 @@ function writeAuditLog({ actorId = null, shopId = null, action, entityType, enti
     ).run(actorId, shopId, action, entityType, entityId ? String(entityId) : null, description, ipAddress);
 }
 
+function shopAccessError(user) {
+    if (user.role === "super_admin" || !user.shop_id) {
+        return null;
+    }
+
+    const shop = db.prepare("SELECT id, name, is_active FROM shops WHERE id = ?").get(user.shop_id);
+    if (!shop) {
+        return "This account is not linked to an active shop.";
+    }
+    if (!shop.is_active) {
+        return `${shop.name} is currently deactivated. Contact your provider to restore access.`;
+    }
+
+    const subscription = db
+        .prepare("SELECT end_date FROM subscriptions WHERE shop_id = ? ORDER BY id DESC LIMIT 1")
+        .get(shop.id);
+    if (subscription && subscription.end_date < todayString()) {
+        return `The subscription for ${shop.name} expired on ${subscription.end_date}. Contact your provider to renew.`;
+    }
+
+    return null;
+}
+
 function authenticate(req, res, next) {
     const authHeader = req.headers.authorization || "";
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
@@ -86,6 +114,11 @@ function authenticate(req, res, next) {
 
         if (!user) {
             return res.status(401).json({ message: "Session is no longer valid." });
+        }
+
+        const accessError = shopAccessError(user);
+        if (accessError) {
+            return res.status(403).json({ message: accessError, code: "SHOP_ACCESS_REVOKED" });
         }
 
         req.user = sanitizeUser(user);
@@ -121,6 +154,7 @@ function mapProduct(row) {
         id: row.id,
         shopId: row.shop_id,
         code: row.code,
+        barcode: row.barcode || "",
         brand: row.brand || "",
         name: row.name,
         category: row.category || "",
@@ -151,11 +185,11 @@ function getProducts(shopId, search = "") {
             `
             SELECT * FROM products
             WHERE shop_id = ? AND is_active = 1
-              AND (code LIKE ? OR name LIKE ? OR brand LIKE ? OR category LIKE ?)
+              AND (code LIKE ? OR barcode LIKE ? OR name LIKE ? OR brand LIKE ? OR category LIKE ?)
             ORDER BY name ASC
             `
         )
-        .all(shopId, like, like, like, like);
+        .all(shopId, like, like, like, like, like);
 
     return rows.map(mapProduct);
 }
@@ -399,6 +433,20 @@ app.post("/api/auth/login", (req, res) => {
         return res.status(401).json({ message: "Invalid username or password." });
     }
 
+    const accessError = shopAccessError(user);
+    if (accessError) {
+        writeAuditLog({
+            actorId: user.id,
+            shopId: user.shop_id,
+            action: "LOGIN_BLOCKED",
+            entityType: "auth",
+            entityId: user.id,
+            description: `${user.full_name} was blocked at login: ${accessError}`,
+            ipAddress: getClientIp(req)
+        });
+        return res.status(403).json({ message: accessError });
+    }
+
     const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: "12h" });
 
     writeAuditLog({
@@ -492,6 +540,7 @@ app.get("/api/products", authenticate, (req, res) => {
 app.post("/api/inbound", authenticate, requireRole("admin", "super_admin"), (req, res) => {
     const shopId = getShopId(req);
     const code = String(req.body.code || "").trim().toUpperCase();
+    const barcode = String(req.body.barcode || "").trim();
     const brand = String(req.body.brand || "").trim();
     const name = String(req.body.name || "").trim();
     const category = String(req.body.category || "").trim();
@@ -503,6 +552,15 @@ app.post("/api/inbound", authenticate, requireRole("admin", "super_admin"), (req
 
     if (!code || !name || !expiryDate || quantity <= 0) {
         return res.status(400).json({ message: "Code, name, expiry date, and quantity are required." });
+    }
+
+    if (barcode) {
+        const barcodeOwner = db
+            .prepare("SELECT code FROM products WHERE shop_id = ? AND barcode = ? AND code != ?")
+            .get(shopId, barcode, code);
+        if (barcodeOwner) {
+            return res.status(400).json({ message: `Barcode already assigned to product ${barcodeOwner.code}.` });
+        }
     }
 
     const tx = db.transaction(() => {
@@ -517,11 +575,12 @@ app.post("/api/inbound", authenticate, requireRole("admin", "super_admin"), (req
             db.prepare(
                 `
                 UPDATE products
-                SET brand = ?, name = ?, category = ?, expiry_date = ?, cost_price = ?, sell_price = ?,
+                SET barcode = ?, brand = ?, name = ?, category = ?, expiry_date = ?, cost_price = ?, sell_price = ?,
                     quantity = ?, low_stock_threshold = ?, is_active = 1, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 `
             ).run(
+                barcode || existing.barcode || null,
                 brand,
                 name,
                 category || existing.category || "",
@@ -539,10 +598,10 @@ app.post("/api/inbound", authenticate, requireRole("admin", "super_admin"), (req
             const result = db.prepare(
                 `
                 INSERT INTO products (
-                    shop_id, code, brand, name, category, expiry_date, cost_price, sell_price, quantity, low_stock_threshold
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    shop_id, code, barcode, brand, name, category, expiry_date, cost_price, sell_price, quantity, low_stock_threshold
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `
-            ).run(shopId, code, brand, name, category, expiryDate, costPrice, sellPrice, quantity, lowStockThreshold);
+            ).run(shopId, code, barcode || null, brand, name, category, expiryDate, costPrice, sellPrice, quantity, lowStockThreshold);
             productId = result.lastInsertRowid;
             newBalance = quantity;
             action = "PRODUCT_CREATED";
@@ -582,6 +641,7 @@ app.put("/api/products/:id", authenticate, requireRole("admin", "super_admin"), 
     }
 
     const code = String(req.body.code || "").trim().toUpperCase();
+    const barcode = String(req.body.barcode || "").trim();
     const brand = String(req.body.brand || "").trim();
     const name = String(req.body.name || "").trim();
     const category = String(req.body.category || "").trim();
@@ -600,17 +660,26 @@ app.put("/api/products/:id", authenticate, requireRole("admin", "super_admin"), 
         return res.status(400).json({ message: "Another product already uses this code." });
     }
 
+    if (barcode) {
+        const barcodeOwner = db
+            .prepare("SELECT code FROM products WHERE shop_id = ? AND barcode = ? AND id != ?")
+            .get(shopId, barcode, productId);
+        if (barcodeOwner) {
+            return res.status(400).json({ message: `Barcode already assigned to product ${barcodeOwner.code}.` });
+        }
+    }
+
     const quantityDifference = quantity - existing.quantity;
 
     const tx = db.transaction(() => {
         db.prepare(
             `
             UPDATE products
-            SET code = ?, brand = ?, name = ?, category = ?, expiry_date = ?, cost_price = ?,
+            SET code = ?, barcode = ?, brand = ?, name = ?, category = ?, expiry_date = ?, cost_price = ?,
                 sell_price = ?, quantity = ?, low_stock_threshold = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
             `
-        ).run(code, brand, name, category, expiryDate, costPrice, sellPrice, quantity, lowStockThreshold, productId);
+        ).run(code, barcode || null, brand, name, category, expiryDate, costPrice, sellPrice, quantity, lowStockThreshold, productId);
 
         if (quantityDifference !== 0) {
             db.prepare(
@@ -704,8 +773,8 @@ app.post("/api/sales", authenticate, (req, res) => {
             const insertSaleItem = db.prepare(
                 `
                 INSERT INTO sale_items (
-                    sale_id, product_id, product_code, product_name, quantity, cost_price, sell_price, line_total, line_profit
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    sale_id, shop_id, product_id, product_code, product_name, quantity, cost_price, sell_price, line_total, line_profit
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `
             );
             const insertMovement = db.prepare(
@@ -757,6 +826,7 @@ app.post("/api/sales", authenticate, (req, res) => {
                 const newBalance = item.product.quantity - item.requestedQty;
                 insertSaleItem.run(
                     saleId,
+                    shopId,
                     item.product.id,
                     item.product.code,
                     item.product.name,
@@ -996,7 +1066,7 @@ app.get("/api/export/excel", authenticate, requireRole("admin", "super_admin"), 
 app.get("/api/super/shops", authenticate, requireSuperAdmin, (req, res) => {
     const shops = db.prepare("SELECT * FROM shops ORDER BY created_at DESC, id DESC").all();
     const shopsWithSub = shops.map(shop => {
-        const sub = db.prepare("SELECT * FROM subscriptions WHERE shop_id = ? ORDER BY end_date DESC LIMIT 1").get(shop.id);
+        const sub = db.prepare("SELECT * FROM subscriptions WHERE shop_id = ? ORDER BY id DESC LIMIT 1").get(shop.id);
         return {
             ...shop,
             subscription: sub
@@ -1101,9 +1171,30 @@ app.put("/api/super/shops/:id", authenticate, requireSuperAdmin, (req, res) => {
     res.json({ message: "Shop updated successfully." });
 });
 
+app.delete("/api/super/shops/:id", authenticate, requireSuperAdmin, (req, res) => {
+    const shopId = Number(req.params.id);
+    const shop = db.prepare("SELECT * FROM shops WHERE id = ?").get(shopId);
+    if (!shop) {
+        return res.status(404).json({ message: "Shop not found." });
+    }
+
+    // Soft delete by deactivating the shop
+    db.prepare("UPDATE shops SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(shopId);
+
+    writeAuditLog({
+        actorId: req.user.id,
+        action: "SHOP_DELETED",
+        entityType: "shop",
+        entityId: shopId,
+        description: `Shop ${shop.name} deleted (deactivated)`,
+        ipAddress: getClientIp(req)
+    });
+    res.json({ message: "Shop deleted successfully." });
+});
+
 app.get("/api/super/shops/:id/subscriptions", authenticate, requireSuperAdmin, (req, res) => {
     const shopId = Number(req.params.id);
-    const subscriptions = db.prepare("SELECT * FROM subscriptions WHERE shop_id = ? ORDER BY created_at DESC").all(shopId);
+    const subscriptions = db.prepare("SELECT * FROM subscriptions WHERE shop_id = ? ORDER BY id DESC").all(shopId);
     res.json({ subscriptions });
 });
 
@@ -1115,6 +1206,12 @@ app.post("/api/super/shops/:id/subscriptions", authenticate, requireSuperAdmin, 
 
     if (!endDate) {
         return res.status(400).json({ message: "End date is required." });
+    }
+    if (endDate < startDate) {
+        return res.status(400).json({ message: "End date must be on or after the start date." });
+    }
+    if (!db.prepare("SELECT id FROM shops WHERE id = ?").get(shopId)) {
+        return res.status(404).json({ message: "Shop not found." });
     }
 
     const result = db.prepare(
