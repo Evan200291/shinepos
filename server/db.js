@@ -34,6 +34,7 @@ function runMigrations() {
     ensureColumn("audit_logs", "shop_id", "INTEGER");
     ensureColumn("sale_items", "shop_id", "INTEGER");
     ensureColumn("products", "barcode", "TEXT");
+    ensureColumn("users", "password_enc", "TEXT");
     db.exec("CREATE INDEX IF NOT EXISTS idx_products_shop_barcode ON products(shop_id, barcode)");
 }
 

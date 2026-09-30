@@ -1,4 +1,4 @@
-const VENDOR_NAME = "Shine Digital Store";
+const VENDOR_NAME = "KKS ortho clinic";
 
 function getInitialActiveTab() {
     const fromHash = window.location.hash.replace(/^#/, "").trim();
@@ -65,8 +65,8 @@ const PAGE_SIZES = {
 
 const translations = {
     en: {
-        vendor_label: "Pharmacy POS",
-        app_name: "Pharmacy POS System",
+        vendor_label: "Clinic POS",
+        app_name: "Clinic POS System",
         login_title: "Secure pharmacy operations",
         login_subtitle: "Inventory, sales, admin control, receipt printing, and audit history.",
         sign_in: "Sign In",
@@ -227,8 +227,8 @@ const translations = {
         print_save_pdf: "Print / Save PDF"
     },
     mm: {
-        vendor_label: "ဆေးဆိုင် POS",
-        app_name: "ဆေးဆိုင် POS စနစ်",
+        vendor_label: "ဆေးခန်း POS",
+        app_name: "ဆေးခန်း POS စနစ်",
         login_title: "ဆေးဆိုင်လုပ်ငန်းအတွက် ယုံကြည်စိတ်ချရသော စနစ်",
         login_subtitle: "ကုန်ပစ္စည်းစာရင်း၊ အရောင်း၊ အသုံးပြုသူခွင့်ပြုချက်၊ ဘောင်ချာထုတ်ခြင်းနှင့် မှတ်တမ်းစီမံမှုကို တစ်နေရာတည်းမှာ အသုံးပြုနိုင်ပါသည်။",
         sign_in: "ဝင်မည်",
@@ -551,6 +551,11 @@ function bindEvents() {
         if (deleteButton) handleDeleteExpense(Number(deleteButton.dataset.deleteExpense));
     });
     $("supplier-form").addEventListener("submit", handleCreateSupplier);
+    $("inbound-new-supplier-toggle").addEventListener("click", () => {
+        $("inbound-new-supplier").classList.toggle("hidden");
+        $("inbound-new-supplier-name").focus();
+    });
+    $("inbound-new-supplier-save").addEventListener("click", handleInboundQuickSupplier);
     $("customer-form").addEventListener("submit", handleCreateCustomer);
     $("expense-form").addEventListener("submit", handleCreateExpense);
     $("ledger-close-button").addEventListener("click", closeLedgerModal);
@@ -1820,6 +1825,30 @@ function populateSupplierDropdown() {
     select.value = current;
 }
 
+async function handleInboundQuickSupplier() {
+    const name = $("inbound-new-supplier-name").value.trim();
+    if (!name) {
+        showNotification("Enter a supplier name.", "error");
+        return;
+    }
+    try {
+        const created = await api("/api/suppliers", {
+            method: "POST",
+            body: { name, phone: $("inbound-new-supplier-phone").value.trim() }
+        });
+        const response = await api("/api/suppliers");
+        state.suppliers = response.suppliers;
+        renderSuppliers();
+        $("inbound-supplier").value = String(created.supplierId);
+        $("inbound-new-supplier-name").value = "";
+        $("inbound-new-supplier-phone").value = "";
+        $("inbound-new-supplier").classList.add("hidden");
+        showNotification("Supplier added and selected.");
+    } catch (error) {
+        showNotification(error.message, "error");
+    }
+}
+
 async function handleCreateSupplier(event) {
     event.preventDefault();
     try {
@@ -2587,7 +2616,10 @@ const voucherPrinter = {
     printerType: localStorage.getItem("pharmacy_printer_type") || "thermal-80",
     autoPrint: localStorage.getItem("pharmacy_printer_autoprint") || "ask",
     copies: Number(localStorage.getItem("pharmacy_printer_copies")) || 1,
-    headerText: localStorage.getItem("pharmacy_printer_header") ?? VENDOR_NAME,
+    headerText: (() => {
+        const saved = localStorage.getItem("pharmacy_printer_header");
+        return saved === null || saved === "Shine Digital Store" ? VENDOR_NAME : saved;
+    })(),
     footerText: localStorage.getItem("pharmacy_printer_footer") ?? "Thank you for shopping!",
     // "dialog" uses the browser print dialog (any OS-driven printer).
     // "serial" / "usb" send raw ESC/POS bytes directly to a connected thermal printer.
@@ -2596,9 +2628,72 @@ const voucherPrinter = {
     usbDevice: null,
     usbInterfaceNumber: null,
     usbEndpointNumber: null,
+    bleDevice: null,
+    bleCharacteristic: null,
+    // Common service UUIDs used by BLE receipt printers (needed so Chrome lets us read their services).
+    bleServices: [
+        "000018f0-0000-1000-8000-00805f9b34fb",
+        "0000ff00-0000-1000-8000-00805f9b34fb",
+        "0000ffe0-0000-1000-8000-00805f9b34fb",
+        "0000fff0-0000-1000-8000-00805f9b34fb",
+        "0000ae30-0000-1000-8000-00805f9b34fb",
+        "49535343-fe7d-4ae5-8fa9-9fafd205e455",
+        "e7810a71-73ae-499d-8c15-faa9aef0c3f2"
+    ],
 
     init() {
         this.updateUI();
+        this.restoreConnection();
+        if ("usb" in navigator) {
+            navigator.usb.addEventListener("disconnect", (event) => {
+                if (event.device === this.usbDevice) {
+                    this.usbDevice = null;
+                    this.usbInterfaceNumber = null;
+                    this.usbEndpointNumber = null;
+                    showNotification("USB printer was unplugged. Plug it back in and click Connect.", "error");
+                    this.updateUI();
+                }
+            });
+        }
+    },
+
+    // Browsers forget the live connection on refresh, so re-open devices the user already approved.
+    async restoreConnection() {
+        try {
+            if (this.connectionMode === "usb" && "usb" in navigator) {
+                const savedId = localStorage.getItem("pharmacy_printer_usb_id");
+                const devices = await navigator.usb.getDevices();
+                const device = devices.find((d) => `${d.vendorId}:${d.productId}` === savedId);
+                if (device) await this.openUsbDevice(device);
+            } else if (this.connectionMode === "serial" && "serial" in navigator) {
+                const [port] = await navigator.serial.getPorts();
+                if (port) {
+                    await port.open({ baudRate: 9600 });
+                    this.serialPort = port;
+                }
+            }
+        } catch (error) { /* needs a manual reconnect */ }
+        this.updateUI();
+    },
+
+    async openUsbDevice(device) {
+        await this.disconnect(false);
+        await device.open();
+        if (device.configuration === null) await device.selectConfiguration(1);
+        const candidates = device.configuration.interfaces
+            .map((iface) => ({ iface, alt: iface.alternates.find((alt) => alt.endpoints.some((ep) => ep.direction === "out")) }))
+            .filter((candidate) => candidate.alt);
+        const pick = candidates.find((candidate) => candidate.alt.interfaceClass === 7) || candidates[0];
+        if (!pick) throw new Error("No writable endpoint found on this USB device.");
+        await device.claimInterface(pick.iface.interfaceNumber);
+        const outEndpoint = pick.alt.endpoints.find((ep) => ep.direction === "out");
+
+        this.usbDevice = device;
+        this.usbInterfaceNumber = pick.iface.interfaceNumber;
+        this.usbEndpointNumber = outEndpoint.endpointNumber;
+        this.connectionMode = "usb";
+        localStorage.setItem("pharmacy_printer_connmode", "usb");
+        localStorage.setItem("pharmacy_printer_usb_id", `${device.vendorId}:${device.productId}`);
     },
 
     // ---- Direct ESC/POS connection (Web Serial / WebUSB) ----
@@ -2628,23 +2723,59 @@ const voucherPrinter = {
         }
         try {
             const device = await navigator.usb.requestDevice({ filters: [] });
-            await device.open();
-            if (device.configuration === null) await device.selectConfiguration(1);
-            const iface = device.configuration.interfaces.find((candidate) =>
-                candidate.alternates.some((alt) => alt.interfaceClass === 7))
-                || device.configuration.interfaces[0];
-            await device.claimInterface(iface.interfaceNumber);
-            const alternate = iface.alternates[0];
-            const outEndpoint = alternate.endpoints.find((endpoint) => endpoint.direction === "out");
-            if (!outEndpoint) throw new Error("No writable endpoint found on this USB device.");
-
-            await this.disconnect(false);
-            this.usbDevice = device;
-            this.usbInterfaceNumber = iface.interfaceNumber;
-            this.usbEndpointNumber = outEndpoint.endpointNumber;
-            this.connectionMode = "usb";
-            localStorage.setItem("pharmacy_printer_connmode", "usb");
+            await this.openUsbDevice(device);
             showNotification("Thermal printer connected (USB).");
+        } catch (error) {
+            if (error.name === "NotFoundError") {
+                // user closed the picker
+            } else if (/access denied|claim|busy|protected/i.test(error.message)) {
+                showNotification("Windows already owns this USB printer with its own driver, so the browser can't take it. Set Connection to \"Browser print dialog\" (recommended), or replace the driver with WinUSB using Zadig.", "error");
+            } else {
+                showNotification(error.message, "error");
+            }
+        }
+        this.updateUI();
+    },
+
+    async connectBluetooth() {
+        if (!("bluetooth" in navigator)) {
+            showNotification("Web Bluetooth isn't supported in this browser. Use Chrome or Edge, or pair the printer in Windows and use Serial.", "error");
+            return;
+        }
+        try {
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: this.bleServices
+            });
+            const server = await device.gatt.connect();
+            let characteristic = null;
+            for (const service of await server.getPrimaryServices()) {
+                for (const candidate of await service.getCharacteristics()) {
+                    if (candidate.properties.write || candidate.properties.writeWithoutResponse) {
+                        characteristic = candidate;
+                        break;
+                    }
+                }
+                if (characteristic) break;
+            }
+            if (!characteristic) {
+                device.gatt.disconnect();
+                throw new Error("No writable Bluetooth channel found. If this printer uses classic Bluetooth, pair it in Windows Bluetooth settings and use \"Connect via Serial\" instead.");
+            }
+            await this.disconnect(false);
+            this.bleDevice = device;
+            this.bleCharacteristic = characteristic;
+            device.addEventListener("gattserverdisconnected", () => {
+                if (this.bleDevice === device) {
+                    this.bleDevice = null;
+                    this.bleCharacteristic = null;
+                    showNotification("Bluetooth printer disconnected.", "error");
+                    this.updateUI();
+                }
+            });
+            this.connectionMode = "bluetooth";
+            localStorage.setItem("pharmacy_printer_connmode", "bluetooth");
+            showNotification("Portable printer connected (Bluetooth).");
         } catch (error) {
             if (error.name !== "NotFoundError") showNotification(error.message, "error");
         }
@@ -2663,10 +2794,15 @@ const voucherPrinter = {
                 await this.usbDevice.close();
             }
         } catch (error) { /* ignore close errors */ }
+        try {
+            if (this.bleDevice?.gatt?.connected) this.bleDevice.gatt.disconnect();
+        } catch (error) { /* ignore close errors */ }
         this.serialPort = null;
         this.usbDevice = null;
         this.usbInterfaceNumber = null;
         this.usbEndpointNumber = null;
+        this.bleDevice = null;
+        this.bleCharacteristic = null;
         if (resetMode) {
             this.connectionMode = "dialog";
             localStorage.setItem("pharmacy_printer_connmode", "dialog");
@@ -2676,7 +2812,8 @@ const voucherPrinter = {
 
     isDirectConnected() {
         return (this.connectionMode === "serial" && !!this.serialPort)
-            || (this.connectionMode === "usb" && !!this.usbDevice);
+            || (this.connectionMode === "usb" && !!this.usbDevice)
+            || (this.connectionMode === "bluetooth" && !!this.bleCharacteristic && !!this.bleDevice?.gatt?.connected);
     },
 
     async sendBytes(bytes) {
@@ -2690,7 +2827,22 @@ const voucherPrinter = {
             return true;
         }
         if (this.connectionMode === "usb" && this.usbDevice) {
-            await this.usbDevice.transferOut(this.usbEndpointNumber, bytes);
+            const chunkSize = 4096;
+            for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+                const result = await this.usbDevice.transferOut(this.usbEndpointNumber, bytes.slice(offset, offset + chunkSize));
+                if (result.status !== "ok") throw new Error(`USB transfer ${result.status}. Check the cable, paper and printer cover.`);
+            }
+            return true;
+        }
+        if (this.connectionMode === "bluetooth" && this.bleCharacteristic) {
+            const chunkSize = 20;
+            const withoutResponse = this.bleCharacteristic.properties.writeWithoutResponse;
+            for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+                const chunk = bytes.slice(offset, offset + chunkSize);
+                if (withoutResponse) await this.bleCharacteristic.writeValueWithoutResponse(chunk);
+                else await this.bleCharacteristic.writeValue(chunk);
+                await new Promise((resolve) => setTimeout(resolve, 20));
+            }
             return true;
         }
         return false;
@@ -2700,7 +2852,7 @@ const voucherPrinter = {
     buildEscPosBytes(sale) {
         const ESC = 0x1b;
         const GS = 0x1d;
-        const width = this.printerType === "thermal-58" ? 32 : 48;
+        const width = this.paperMm() === 58 ? 32 : 48;
         const bytes = [];
         const push = (arr) => bytes.push(...arr);
         const textLine = (str = "") => push(Array.from(new TextEncoder().encode(str + "\n")));
@@ -2776,10 +2928,14 @@ const voucherPrinter = {
         this.updateUI();
     },
 
+    paperMm() {
+        if (this.printerType === "thermal-58" || this.printerType === "portable-58") return 58;
+        if (this.printerType === "a4") return 210;
+        return 80;
+    },
+
     paperWidth() {
-        if (this.printerType === "thermal-58") return "58mm";
-        if (this.printerType === "a4") return "210mm";
-        return "80mm";
+        return `${this.paperMm()}mm`;
     },
 
     updateUI() {
@@ -2811,7 +2967,7 @@ const voucherPrinter = {
 
         const dot = document.getElementById("printer-status-dot");
         const text = document.getElementById("printer-status-text");
-        const label = { "thermal-80": "Thermal 80mm", "thermal-58": "Thermal 58mm", a4: "A4" }[this.printerType];
+        const label = { "thermal-80": "Thermal 80mm", "thermal-58": "Thermal 58mm", "portable-80": "Portable 80mm", "portable-58": "Portable 58mm", a4: "A4" }[this.printerType] || this.printerType;
         if (!this.enabled) {
             if (dot) dot.className = "status-indicator";
             if (text) text.textContent = "Disabled";
@@ -3047,6 +3203,7 @@ function initDeviceSettings() {
     });
     bind("printer-connect-serial-btn", "click", () => voucherPrinter.connectSerial());
     bind("printer-connect-usb-btn", "click", () => voucherPrinter.connectUsb());
+    bind("printer-connect-bluetooth-btn", "click", () => voucherPrinter.connectBluetooth());
     bind("printer-disconnect-btn", "click", () => voucherPrinter.disconnect(false).then(() => voucherPrinter.updateUI()));
     bind("printer-test-btn", "click", () => {
         voucherPrinter.printVoucher({

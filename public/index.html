@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shine Digital Store POS</title>
+    <title>KKS ortho clinic POS</title>
+    <link rel="icon" type="image/svg+xml" href="/logo.svg">
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="/application.css?v=20260718"><link rel="stylesheet" href="/pos-theme.css?v=20260718-operations">
 </head>
@@ -21,10 +22,10 @@
         <div class="login-shell">
             <div class="login-head">
                 <div class="brand-lockup">
-                    <div class="brand-mark">SDS</div>
+                    <img class="brand-mark" src="/logo.svg" alt="KKS ortho clinic logo">
                     <div>
-                        <p class="brand-label" data-i18n="vendor_label">Pharmacy POS</p>
-                        <h1 class="brand-name">Shine Digital Store</h1>
+                        <p class="brand-label" data-i18n="vendor_label">Clinic POS</p>
+                        <h1 class="brand-name">KKS ortho clinic</h1>
                     </div>
                 </div>
                 <div class="lang-switch">
@@ -73,10 +74,10 @@
             <input type="checkbox" id="sidebar-toggle" class="sidebar-toggle-input">
             <div class="sidebar-head">
                 <div class="brand-lockup store-lockup">
-                    <span class="store-mark" aria-hidden="true"><i data-lucide="cross" class="h-5 w-5"></i></span>
+                    <span class="store-mark" aria-hidden="true"><img src="/logo.svg" alt=""></span>
                     <div class="store-copy">
-                        <span>Pharmacy workspace</span>
-                        <h2 class="brand-name small store-title">Shine Digital Store</h2>
+                        <span>Clinic workspace</span>
+                        <h2 class="brand-name small store-title">KKS ortho clinic</h2>
                     </div>
                 </div>
                 <label for="sidebar-toggle" class="sidebar-toggle-btn desktop-only-inline" title="Collapse or expand sidebar" aria-label="Collapse or expand sidebar" role="button" tabindex="0">
@@ -147,7 +148,7 @@
                         <span class="menu-glyph" aria-hidden="true"><span></span><span></span><span></span></span>
                     </button>
                     <div class="app-title-block">
-                        <p class="app-title-kicker" data-i18n="vendor_label">Pharmacy POS</p>
+                        <p class="app-title-kicker" data-i18n="vendor_label">Clinic POS</p>
                         <h1 id="page-title" class="app-header-title">Dashboard</h1>
                     </div>
                 </div>
@@ -348,6 +349,12 @@
                                 <select id="inbound-supplier" class="field-input">
                                     <option value="">No supplier</option>
                                 </select>
+                                <button id="inbound-new-supplier-toggle" type="button" class="mini-btn mt-6">+ Add new supplier</button>
+                                <div id="inbound-new-supplier" class="hidden mt-6">
+                                    <input id="inbound-new-supplier-name" type="text" class="field-input" placeholder="Supplier name">
+                                    <input id="inbound-new-supplier-phone" type="text" class="field-input mt-6" placeholder="Phone (optional)">
+                                    <button id="inbound-new-supplier-save" type="button" class="secondary-btn full-width mt-6">Save supplier &amp; select</button>
+                                </div>
                             </div>
                             <div>
                                 <label class="field-label" for="inbound-expiry" data-i18n="expiry_date">Expiry Date</label>
@@ -822,6 +829,8 @@
                                             <select id="printer-type" class="field-input">
                                                 <option value="thermal-80">Thermal 80mm (standard POS)</option>
                                                 <option value="thermal-58">Thermal 58mm (compact)</option>
+                                                <option value="portable-80">Portable / Mobile 80mm (Bluetooth or USB)</option>
+                                                <option value="portable-58">Portable / Mobile 58mm (Bluetooth or USB)</option>
                                                 <option value="a4">A4 Standard Printer</option>
                                             </select>
                                         </div>
@@ -839,7 +848,7 @@
                                         </div>
                                         <div class="form-group">
                                             <label class="field-label" for="printer-header">Receipt Header Text</label>
-                                            <input id="printer-header" type="text" class="field-input" placeholder="Shine Digital Store" value="Shine Digital Store">
+                                            <input id="printer-header" type="text" class="field-input" placeholder="KKS ortho clinic" value="KKS ortho clinic">
                                         </div>
                                         <div class="form-group">
                                             <label class="field-label" for="printer-footer">Receipt Footer Text</label>
@@ -851,10 +860,11 @@
                                                 <option value="dialog">Browser print dialog (any printer)</option>
                                                 <option value="serial">Direct — USB/Serial cable (ESC/POS)</option>
                                                 <option value="usb">Direct — WebUSB (ESC/POS)</option>
+                                                <option value="bluetooth">Direct — Bluetooth (portable printer)</option>
                                             </select>
                                         </div>
                                         <div id="printer-direct-connect" class="device-setting-note hidden">
-                                            Direct printing sends raw ESC/POS commands straight to the printer — no popup, no print dialog, and it auto-cuts the paper. Works with most Epson-compatible thermal printers on Chrome or Edge desktop. The browser will ask you to pick the device once per session.
+                                            Direct printing sends raw ESC/POS commands straight to the printer — no popup, no print dialog, and it auto-cuts the paper. Works with most Epson-compatible thermal printers on Chrome or Edge desktop. The browser will ask you to pick the device once per session. If USB says "Access denied", Windows is using its own printer driver: switch Connection back to "Browser print dialog", or use Bluetooth/Serial for portable printers.
                                             <div id="printer-connect-row" class="button-pair mt-6">
                                                 <button id="printer-connect-serial-btn" type="button" class="secondary-btn full-width">
                                                     <i data-lucide="cable" class="h-4 w-4"></i>
@@ -863,6 +873,10 @@
                                                 <button id="printer-connect-usb-btn" type="button" class="secondary-btn full-width">
                                                     <i data-lucide="usb" class="h-4 w-4"></i>
                                                     <span>Connect via USB</span>
+                                                </button>
+                                                <button id="printer-connect-bluetooth-btn" type="button" class="secondary-btn full-width">
+                                                    <i data-lucide="bluetooth" class="h-4 w-4"></i>
+                                                    <span>Connect via Bluetooth</span>
                                                 </button>
                                             </div>
                                             <button id="printer-disconnect-btn" type="button" class="secondary-btn full-width mt-6 hidden">

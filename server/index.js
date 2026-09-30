@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const path = require("path");
 const express = require("express");
 const bcrypt = require("bcryptjs");
@@ -11,6 +12,29 @@ const PORT = process.env.PORT || 45451;
 const JWT_SECRET = process.env.JWT_SECRET || "pharmacy-pos-local-secret";
 
 app.use(express.json());
+
+// Reversible (AES-256-GCM) copy of each account password so the super admin can look it up.
+// Set PASSWORD_VAULT_KEY in the environment; without it the key is derived from JWT_SECRET.
+const VAULT_KEY = crypto.scryptSync(process.env.PASSWORD_VAULT_KEY || JWT_SECRET, "shine-password-vault", 32);
+
+function encryptPassword(plain) {
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv("aes-256-gcm", VAULT_KEY, iv);
+    const data = Buffer.concat([cipher.update(String(plain), "utf8"), cipher.final()]);
+    return [iv, cipher.getAuthTag(), data].map((part) => part.toString("base64")).join(".");
+}
+
+function decryptPassword(stored) {
+    if (!stored) return null;
+    try {
+        const [iv, tag, data] = stored.split(".").map((part) => Buffer.from(part, "base64"));
+        const decipher = crypto.createDecipheriv("aes-256-gcm", VAULT_KEY, iv);
+        decipher.setAuthTag(tag);
+        return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
+    } catch (error) {
+        return null;
+    }
+}
 
 // Keep the active UI fresh during local POS updates. The desktop theme is served
 // from static CSS, so HTML/CSS/JS should not be held by the browser cache.
@@ -447,6 +471,10 @@ app.post("/api/auth/login", (req, res) => {
         return res.status(403).json({ message: accessError });
     }
 
+    if (!user.password_enc && user.role !== "super_admin") {
+        db.prepare("UPDATE users SET password_enc = ? WHERE id = ?").run(encryptPassword(password), user.id);
+    }
+
     const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: "12h" });
 
     writeAuditLog({
@@ -495,8 +523,8 @@ app.post("/api/auth/change-password", authenticate, (req, res) => {
 
     const passwordHash = bcrypt.hashSync(newPassword, 10);
     db.prepare(
-        "UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
-    ).run(passwordHash, req.user.id);
+        "UPDATE users SET password_hash = ?, password_enc = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"
+    ).run(passwordHash, encryptPassword(newPassword), req.user.id);
 
     writeAuditLog({
         actorId: req.user.id,
@@ -1052,10 +1080,10 @@ app.post("/api/users", authenticate, requireRole("admin", "super_admin"), (req, 
     const passwordHash = bcrypt.hashSync(password, 10);
     const result = db.prepare(
         `
-        INSERT INTO users (full_name, username, password_hash, role, shop_id)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO users (full_name, username, password_hash, password_enc, role, shop_id)
+        VALUES (?, ?, ?, ?, ?, ?)
         `
-    ).run(fullName, username, passwordHash, role, shopId);
+    ).run(fullName, username, passwordHash, encryptPassword(password), role, shopId);
 
     writeAuditLog({
         actorId: req.user.id,
@@ -1663,6 +1691,25 @@ app.get("/api/super/shops/:id/users", authenticate, requireSuperAdmin, (req, res
     res.json({ users });
 });
 
+app.get("/api/super/users/:id/password", authenticate, requireSuperAdmin, (req, res) => {
+    const userId = Number(req.params.id);
+    const user = db.prepare("SELECT id, username, shop_id, role, password_enc FROM users WHERE id = ?").get(userId);
+    if (!user || user.role === "super_admin") {
+        return res.status(404).json({ message: "User not found." });
+    }
+
+    writeAuditLog({
+        actorId: req.user.id,
+        shopId: user.shop_id,
+        action: "PASSWORD_VIEWED",
+        entityType: "user",
+        entityId: userId,
+        description: `Super admin viewed the password of ${user.username}`,
+        ipAddress: getClientIp(req)
+    });
+    res.json({ password: decryptPassword(user.password_enc) });
+});
+
 app.post("/api/super/shops/:id/users", authenticate, requireSuperAdmin, (req, res) => {
     const shopId = Number(req.params.id);
     const fullName = String(req.body.fullName || "").trim();
@@ -1681,8 +1728,8 @@ app.post("/api/super/shops/:id/users", authenticate, requireSuperAdmin, (req, re
 
     const passwordHash = bcrypt.hashSync(password, 10);
     const result = db.prepare(
-        "INSERT INTO users (full_name, username, password_hash, role, shop_id) VALUES (?, ?, ?, ?, ?)"
-    ).run(fullName, username, passwordHash, role, shopId);
+        "INSERT INTO users (full_name, username, password_hash, password_enc, role, shop_id) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run(fullName, username, passwordHash, encryptPassword(password), role, shopId);
 
     writeAuditLog({
         actorId: req.user.id,
@@ -1723,6 +1770,8 @@ app.put("/api/super/users/:id", authenticate, requireSuperAdmin, (req, res) => {
         const passwordHash = bcrypt.hashSync(password, 10);
         updates.push("password_hash = ?");
         params.push(passwordHash);
+        updates.push("password_enc = ?");
+        params.push(encryptPassword(password));
     }
     if (role && ["admin", "cashier", "super_admin"].includes(role)) {
         updates.push("role = ?");

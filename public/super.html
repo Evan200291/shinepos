@@ -441,6 +441,7 @@
                                         <tr>
                                             <th>Name</th>
                                             <th>Username</th>
+                                            <th>Password</th>
                                             <th>Role</th>
                                             <th>Status</th>
                                             <th class="text-center">Actions</th>
@@ -726,6 +727,7 @@
                     <tr>
                         <td data-label="Name">${escapeHtml(user.fullName)}</td>
                         <td data-label="Username">${escapeHtml(user.username)}</td>
+                        <td data-label="Password"><button class="mini-btn" data-reveal-password="${user.id}" type="button"><i data-lucide="eye" class="h-3 w-3"></i><span>Show</span></button></td>
                         <td data-label="Role">${escapeHtml(user.role)}</td>
                         <td data-label="Status"><span class="${user.isActive ? 'status-active' : 'status-inactive'}"><span class="status-dot" aria-hidden="true"></span>${user.isActive ? 'Active' : 'Disabled'}</span></td>
                         <td data-label="Actions" class="text-center">
@@ -737,7 +739,7 @@
                             </div>
                         </td>
                     </tr>
-                `).join('') || '<tr><td colspan="5" class="empty-state">No users in this shop.</td></tr>';
+                `).join('') || '<tr><td colspan="6" class="empty-state">No users in this shop.</td></tr>';
 
             document.getElementById('products-table').innerHTML = productsData.products.map(p => `
                     <tr>
@@ -1212,6 +1214,21 @@
                     } catch (err) {
                         notify(err.message, true);
                     }
+                }
+
+                // Reveal a user's password
+                const revealPwBtn = e.target.closest('[data-reveal-password]');
+                if (revealPwBtn) {
+                    const cell = revealPwBtn.parentElement;
+                    try {
+                        const result = await api('/api/super/users/' + revealPwBtn.dataset.revealPassword + '/password');
+                        cell.innerHTML = result.password
+                            ? `<code>${escapeHtml(result.password)}</code>`
+                            : '<span class="dim">Not captured yet (saved at next login or password reset)</span>';
+                    } catch (err) {
+                        notify(err.message, true);
+                    }
+                    return;
                 }
 
                 // Edit user
