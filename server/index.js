@@ -5,6 +5,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const XLSX = require("xlsx");
 const db = require("./db");
+const logger = require("./logger");
 
 const app = express();
 const nestedApiRouter = express.Router();
@@ -12,6 +13,20 @@ const PORT = process.env.PORT || 45451;
 const JWT_SECRET = process.env.JWT_SECRET || "pharmacy-pos-local-secret";
 
 app.use(express.json());
+
+// Log failures and slow requests so problems can be traced after the fact (no request bodies are logged).
+app.use((req, res, next) => {
+    const started = Date.now();
+    res.on("finish", () => {
+        if (!req.originalUrl.startsWith("/api/")) return;
+        const ms = Date.now() - started;
+        const meta = { method: req.method, path: req.originalUrl.split("?")[0], status: res.statusCode, ms, userId: req.user?.id, ip: getClientIp(req) };
+        if (res.statusCode >= 500) logger.error("http", `${req.method} ${meta.path} -> ${res.statusCode}`, meta);
+        else if (res.statusCode === 401 || res.statusCode === 403) logger.warn("http", `${req.method} ${meta.path} -> ${res.statusCode}`, meta);
+        else if (ms > 3000) logger.warn("http", `Slow request: ${req.method} ${meta.path} took ${ms}ms`, meta);
+    });
+    next();
+});
 
 // Reversible (AES-256-GCM) copy of each account password so the super admin can look it up.
 // Set PASSWORD_VAULT_KEY in the environment; without it the key is derived from JWT_SECRET.
@@ -1875,6 +1890,37 @@ nestedApiRouter.get("/export/backup", authenticate, requireRole("admin", "super_
 nestedApiRouter.get("/export/excel", authenticate, requireRole("admin", "super_admin"), exportExcel);
 app.use("/api", nestedApiRouter);
 
+// Problems reported by the browser (JS errors, printer failures). Open to signed-out pages too, so it is rate limited.
+const clientLogHits = new Map();
+app.post("/api/client-log", (req, res) => {
+    const ip = getClientIp(req);
+    const now = Date.now();
+    const hit = clientLogHits.get(ip);
+    if (!hit || now - hit.start > 60000) clientLogHits.set(ip, { start: now, count: 1 });
+    else if (++hit.count > 60) return res.status(429).json({ message: "Too many reports." });
+
+    let userId;
+    try {
+        const token = String(req.headers.authorization || "").replace(/^Bearer /, "");
+        if (token) userId = jwt.verify(token, JWT_SECRET).userId;
+    } catch (error) { /* signed-out reports are fine */ }
+
+    const level = ["error", "warn", "info"].includes(req.body.level) ? req.body.level : "error";
+    const source = `client:${String(req.body.source || "app").slice(0, 40)}`;
+    const message = String(req.body.message || "").slice(0, 1000);
+    let context = req.body.context;
+    if (context && JSON.stringify(context).length > 2000) context = { truncated: true };
+    logger[level](source, message, { ...(context && typeof context === "object" ? context : {}), userId, ip, userAgent: String(req.headers["user-agent"] || "").slice(0, 200) });
+    res.status(204).end();
+});
+
+app.get("/api/super/logs", authenticate, requireSuperAdmin, (req, res) => {
+    const level = ["error", "warn", "info"].includes(req.query.level) ? req.query.level : "";
+    const source = String(req.query.source || "").slice(0, 40);
+    const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 200));
+    res.json({ logs: logger.readRecent({ level, source, limit }) });
+});
+
 app.get("/api/health", (_req, res) => {
     res.json({ ok: true });
 });
@@ -1888,11 +1934,20 @@ app.get(/^(?!\/api|\/super).*/, (_req, res) => {
     res.sendFile(path.join(__dirname, "..", "public", "index.html"));
 });
 
-app.use((error, _req, res, _next) => {
-    console.error(error);
+app.use((error, req, res, _next) => {
+    logger.error("server", error.stack || String(error), { method: req.method, path: req.originalUrl.split("?")[0], userId: req.user?.id });
     res.status(500).json({ message: "Unexpected server error." });
 });
 
+process.on("uncaughtException", (error) => {
+    logger.error("process", `Uncaught exception: ${error.stack || error}`);
+    process.exit(1);
+});
+process.on("unhandledRejection", (reason) => {
+    logger.error("process", `Unhandled rejection: ${reason?.stack || reason}`);
+});
+
+logger.prune();
 app.listen(PORT, () => {
-    console.log(`Pharmacy POS server running at http://localhost:${PORT}`);
+    logger.info("server", `Pharmacy POS server started on port ${PORT}`);
 });

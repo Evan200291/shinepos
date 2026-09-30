@@ -260,6 +260,10 @@
                     <i data-lucide="database-backup" class="h-5 w-5"></i>
                     <span>System Backup</span>
                 </button>
+                <button type="button" data-view="logs" class="nav-button">
+                    <i data-lucide="activity" class="h-5 w-5"></i>
+                    <span>System Logs</span>
+                </button>
             </nav>
 
             <div class="sidebar-user surface-card">
@@ -391,6 +395,40 @@
                     </div>
                 </section>
 
+                <!-- ===== SYSTEM LOGS VIEW ===== -->
+                <section id="logs-view" data-view="logs" class="view-section section-stack hidden">
+                    <div class="surface-panel">
+                        <div class="section-heading row">
+                            <h3>System Logs</h3>
+                            <div class="button-pair">
+                                <select id="logs-level" class="field-input">
+                                    <option value="">All levels</option>
+                                    <option value="error">Errors only</option>
+                                    <option value="warn">Warnings only</option>
+                                    <option value="info">Info only</option>
+                                </select>
+                                <select id="logs-source" class="field-input">
+                                    <option value="">All sources</option>
+                                    <option value="client:printer">Printer</option>
+                                    <option value="client">Browser (all)</option>
+                                    <option value="http">Server requests</option>
+                                    <option value="server">Server errors</option>
+                                </select>
+                                <button id="logs-refresh" type="button" class="secondary-btn">Refresh</button>
+                            </div>
+                        </div>
+                        <p class="hero-subtitle">Errors from the server and from every shop's browser (including printer connection failures). Logs are kept for 30 days in the <code>logs</code> folder on the server.</p>
+                        <div class="table-wrap">
+                            <table class="data-table responsive-table">
+                                <thead>
+                                    <tr><th>Time</th><th>Level</th><th>Source</th><th>Message</th></tr>
+                                </thead>
+                                <tbody id="logs-table"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- ===== SHOP DETAILS VIEW ===== -->
                 <section id="shop-details-view" data-view="shop-details" class="view-section section-stack hidden">
                     <div class="back-row">
@@ -517,6 +555,10 @@
                 <button type="button" data-view="backups" class="footer-button">
                     <i data-lucide="database-backup" class="h-5 w-5"></i>
                     <span>Backup</span>
+                </button>
+                <button type="button" data-view="logs" class="footer-button">
+                    <i data-lucide="activity" class="h-5 w-5"></i>
+                    <span>Logs</span>
                 </button>
             </nav>
         </div>
@@ -788,6 +830,7 @@
         // ---- Navigation ----
         function showShopsView() {
             document.getElementById('backups-view').classList.add('hidden');
+            document.getElementById('logs-view').classList.add('hidden');
             document.getElementById('shop-details-view').classList.add('hidden');
             document.getElementById('shops-view').classList.remove('hidden');
             const pt = document.getElementById('page-title');
@@ -796,7 +839,44 @@
             setActiveNav('shops');
         }
 
+        async function loadLogs() {
+            const tbody = document.getElementById('logs-table');
+            const params = new URLSearchParams({ limit: '200' });
+            const level = document.getElementById('logs-level').value;
+            const source = document.getElementById('logs-source').value;
+            if (level) params.set('level', level);
+            if (source) params.set('source', source);
+            try {
+                const data = await api('/api/super/logs?' + params.toString());
+                tbody.innerHTML = data.logs.map(log => {
+                    const shown = log.meta ? Object.entries(log.meta).filter(([key]) => key !== 'userAgent').map(([key, value]) => key + '=' + value).join(' · ') : '';
+                    const meta = shown ? '<div class="muted" style="font-size: 12px; margin-top: 4px;">' + escapeHtml(shown) + '</div>' : '';
+                    const levelClass = log.level === 'error' ? 'status-inactive' : log.level === 'warn' ? 'status-suspended' : 'status-active';
+                    return `<tr>
+                        <td data-label="Time">${escapeHtml(new Date(log.time).toLocaleString())}</td>
+                        <td data-label="Level"><span class="${levelClass}">${escapeHtml(log.level)}</span></td>
+                        <td data-label="Source">${escapeHtml(log.source)}</td>
+                        <td data-label="Message" style="word-break: break-word; white-space: pre-wrap;">${escapeHtml(log.message)}${meta}</td>
+                    </tr>`;
+                }).join('') || '<tr><td colspan="4" class="empty-state">No log entries.</td></tr>';
+            } catch (err) {
+                notify(err.message, true);
+            }
+        }
+
+        function showLogsView() {
+            document.getElementById('shops-view').classList.add('hidden');
+            document.getElementById('shop-details-view').classList.add('hidden');
+            document.getElementById('backups-view').classList.add('hidden');
+            document.getElementById('logs-view').classList.remove('hidden');
+            document.getElementById('page-title').textContent = 'System Logs';
+            state.selectedShop = null;
+            setActiveNav('logs');
+            loadLogs();
+        }
+
         function showBackupsView() {
+            document.getElementById('logs-view').classList.add('hidden');
             document.getElementById('shops-view').classList.add('hidden');
             document.getElementById('shop-details-view').classList.add('hidden');
             document.getElementById('backups-view').classList.remove('hidden');
@@ -881,6 +961,7 @@
                     const view = btn.dataset.view;
                     if (view === 'shops') showShopsView();
                     if (view === 'backups') showBackupsView();
+                    if (view === 'logs') showLogsView();
                     closeSidebar();
                 });
             });
@@ -891,8 +972,13 @@
                     const view = btn.dataset.view;
                     if (view === 'shops') showShopsView();
                     if (view === 'backups') showBackupsView();
+                    if (view === 'logs') showLogsView();
                 });
             });
+
+            document.getElementById('logs-refresh').addEventListener('click', loadLogs);
+            document.getElementById('logs-level').addEventListener('change', loadLogs);
+            document.getElementById('logs-source').addEventListener('change', loadLogs);
 
             document.getElementById('download-system-backup-json').addEventListener('click', async () => {
                 try { await downloadSystemBackup('backup'); notify('System JSON backup downloaded.'); }

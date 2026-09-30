@@ -961,3 +961,15 @@ button, input, select, textarea,
 .notification::before {
   border-radius: 50% !important;
 }
+
+/* Login header: logo, label and clinic name share one left edge and one vertical centre */
+.login-head .brand-lockup { align-items: center; gap: 14px; }
+.login-head .brand-lockup > div { display: grid; gap: 4px; justify-items: start; }
+.login-head .brand-label { margin: 0; padding: 0; background: transparent; color: #db0202; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; line-height: 1.2; }
+.login-head .brand-name { margin: 0; line-height: 1.15; }
+
+/* Login page uses the same dark / white / red theme as the app interior */
+.login-screen { background: #171717 !important; }
+.login-head .brand-name { color: #ffffff !important; font-size: 1.6rem; }
+.login-head .brand-mark { border-radius: 14px; box-shadow: none; background: #db0202; }
+.login-shell .form-panel { background: #ffffff !important; border: 1px solid #000000 !important; border-left: 5px solid #db0202 !important; box-shadow: 0 18px 40px rgba(0, 0, 0, .45); }

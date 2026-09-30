@@ -65,8 +65,6 @@ const PAGE_SIZES = {
 
 const translations = {
     en: {
-        vendor_label: "Clinic POS",
-        app_name: "Clinic POS System",
         login_title: "Secure pharmacy operations",
         login_subtitle: "Inventory, sales, admin control, receipt printing, and audit history.",
         sign_in: "Sign In",
@@ -227,8 +225,6 @@ const translations = {
         print_save_pdf: "Print / Save PDF"
     },
     mm: {
-        vendor_label: "ဆေးခန်း POS",
-        app_name: "ဆေးခန်း POS စနစ်",
         login_title: "ဆေးဆိုင်လုပ်ငန်းအတွက် ယုံကြည်စိတ်ချရသော စနစ်",
         login_subtitle: "ကုန်ပစ္စည်းစာရင်း၊ အရောင်း၊ အသုံးပြုသူခွင့်ပြုချက်၊ ဘောင်ချာထုတ်ခြင်းနှင့် မှတ်တမ်းစီမံမှုကို တစ်နေရာတည်းမှာ အသုံးပြုနိုင်ပါသည်။",
         sign_in: "ဝင်မည်",
@@ -685,6 +681,34 @@ function setLoading(isLoading) {
     document.body.classList.toggle("is-loading", state.loadingRequests > 0);
 }
 
+const reportedIssues = new Map();
+
+// Sends a problem to the server log (deduplicated per minute) so it can be reviewed later by the super admin.
+function reportIssue(level, source, message, context = {}) {
+    const key = `${source}:${message}`;
+    const now = Date.now();
+    if (now - (reportedIssues.get(key) || 0) < 60000 || reportedIssues.size > 200) return;
+    reportedIssues.set(key, now);
+    try {
+        fetch("/api/client-log", {
+            method: "POST",
+            keepalive: true,
+            headers: {
+                "Content-Type": "application/json",
+                ...(state.token ? { Authorization: `Bearer ${state.token}` } : {})
+            },
+            body: JSON.stringify({ level, source, message: String(message), context: { page: location.hash || "/", ...context } })
+        }).catch(() => {});
+    } catch (error) { /* logging must never break the app */ }
+}
+
+window.addEventListener("error", (event) => {
+    reportIssue("error", "js", event.message || "Script error", { file: event.filename, line: event.lineno, col: event.colno });
+});
+window.addEventListener("unhandledrejection", (event) => {
+    reportIssue("error", "promise", event.reason?.message || String(event.reason));
+});
+
 async function api(url, options = {}) {
     let loadingShown = false;
     const delayTimer = window.setTimeout(() => {
@@ -700,6 +724,9 @@ async function api(url, options = {}) {
                 ...(state.token ? { Authorization: `Bearer ${state.token}` } : {})
             },
             body: options.body ? JSON.stringify(options.body) : undefined
+        }).catch((error) => {
+            reportIssue("error", "network", `${options.method || "GET"} ${url}: ${error.message}`);
+            throw error;
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -2194,7 +2221,6 @@ function buildReceiptMarkup(sale, options = {}) {
             <div class="receipt-head">
                 <div class="receipt-head-brand">
                     <h3>${escapeHtml(VENDOR_NAME)}</h3>
-                    <p class="receipt-meta">${escapeHtml(t("app_name"))}</p>
                 </div>
                 <div class="receipt-head-invoice">
                     <strong>${escapeHtml(sale.invoiceNo)}</strong>
@@ -2641,6 +2667,10 @@ const voucherPrinter = {
         "e7810a71-73ae-499d-8c15-faa9aef0c3f2"
     ],
 
+    report(level, message, extra = {}) {
+        reportIssue(level, "printer", message, { connectionMode: this.connectionMode, printerType: this.printerType, ...extra });
+    },
+
     init() {
         this.updateUI();
         this.restoreConnection();
@@ -2651,6 +2681,7 @@ const voucherPrinter = {
                     this.usbInterfaceNumber = null;
                     this.usbEndpointNumber = null;
                     showNotification("USB printer was unplugged. Plug it back in and click Connect.", "error");
+                    this.report("warn", "USB printer was unplugged");
                     this.updateUI();
                 }
             });
@@ -2672,7 +2703,7 @@ const voucherPrinter = {
                     this.serialPort = port;
                 }
             }
-        } catch (error) { /* needs a manual reconnect */ }
+        } catch (error) { this.report("warn", `Could not reopen the saved printer: ${error.name}: ${error.message}`); }
         this.updateUI();
     },
 
@@ -2711,7 +2742,10 @@ const voucherPrinter = {
             localStorage.setItem("pharmacy_printer_connmode", "serial");
             showNotification("Thermal printer connected (Serial).");
         } catch (error) {
-            if (error.name !== "NotFoundError") showNotification(error.message, "error");
+            if (error.name !== "NotFoundError") {
+                showNotification(error.message, "error");
+                this.report("error", `Serial connect failed: ${error.name}: ${error.message}`);
+            }
         }
         this.updateUI();
     },
@@ -2726,6 +2760,7 @@ const voucherPrinter = {
             await this.openUsbDevice(device);
             showNotification("Thermal printer connected (USB).");
         } catch (error) {
+            if (error.name !== "NotFoundError") this.report("error", `USB connect failed: ${error.name}: ${error.message}`);
             if (error.name === "NotFoundError") {
                 // user closed the picker
             } else if (/access denied|claim|busy|protected/i.test(error.message)) {
@@ -2777,7 +2812,10 @@ const voucherPrinter = {
             localStorage.setItem("pharmacy_printer_connmode", "bluetooth");
             showNotification("Portable printer connected (Bluetooth).");
         } catch (error) {
-            if (error.name !== "NotFoundError") showNotification(error.message, "error");
+            if (error.name !== "NotFoundError") {
+                showNotification(error.message, "error");
+                this.report("error", `Bluetooth connect failed: ${error.name}: ${error.message}`);
+            }
         }
         this.updateUI();
     },
@@ -2874,7 +2912,6 @@ const voucherPrinter = {
         textLine(this.headerText || VENDOR_NAME);
         size(0, 0);
         bold(false);
-        textLine(t("app_name"));
         align(0);
         hr();
         textLine(`${t("invoice")}: ${sale.invoiceNo}`);
@@ -2993,7 +3030,6 @@ const voucherPrinter = {
 
         const body = `
             <div class="center bold big">${escapeHtml(this.headerText || VENDOR_NAME)}</div>
-            <div class="center dim">${escapeHtml(t("app_name"))}</div>
             <div class="line"></div>
             <div class="meta"><span>${escapeHtml(t("invoice"))}</span><span>${escapeHtml(sale.invoiceNo)}</span></div>
             <div class="meta"><span>${escapeHtml(t("date"))}</span><span>${escapeHtml(formatDate(sale.saleDate))}</span></div>
@@ -3045,12 +3081,14 @@ const voucherPrinter = {
                 return;
             } catch (error) {
                 showNotification(`Direct print failed (${error.message}). Falling back to the print dialog.`, "error");
+                this.report("error", `Direct print failed: ${error.name}: ${error.message}`);
             }
         }
 
         const printWindow = window.open("", "_blank", "width=420,height=640");
         if (!printWindow) {
             showNotification("Popup blocked. Allow popups to print vouchers.", "error");
+            this.report("warn", "Print popup was blocked by the browser");
             return;
         }
         printWindow.document.write(this.buildVoucher(sale));
