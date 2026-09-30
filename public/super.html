@@ -19,14 +19,14 @@
             --sa-white: #ffffff;
             --sa-red: #db0202;
             --sa-gray: #b2aeae;
-            --sa-black: #000000;
+            --sa-blue: #0d47a1;
             --sa-green: #22c55e;
             --sa-green-soft: #d4f4dd;
             --sa-amber: #f59e0b;
             --sa-amber-soft: #fff4de;
             --sa-red-soft: #ffecec;
             --sa-border: #e0e0e0;
-            --sa-muted: #666666;
+            --sa-muted: #4a6797;
         }
 
         /* Detail tabs */
@@ -36,7 +36,7 @@
             border-radius: 6px;
             border: 1px solid var(--sa-border);
             background: var(--sa-white);
-            color: var(--sa-black);
+            color: var(--sa-blue);
             font-weight: 700;
             font-size: 13px;
             cursor: pointer;
@@ -129,7 +129,7 @@
             /* Row 1: shop name + status */
             .super-admin-page .shops-table td:nth-child(1) {
                 grid-column: 1; grid-row: 1;
-                font-size: 15px; font-weight: 800; color: #000;
+                font-size: 15px; font-weight: 800; color: #0b2f75;
             }
             .super-admin-page .shops-table td:nth-child(2) {
                 grid-column: 2; grid-row: 1;
@@ -138,7 +138,7 @@
             /* Row 2: subscription + actions */
             .super-admin-page .shops-table td:nth-child(3) {
                 grid-column: 1; grid-row: 2;
-                font-size: 12px; color: #555; align-self: center;
+                font-size: 12px; color: #4a6797; align-self: center;
             }
             .super-admin-page .shops-table td:nth-child(4) {
                 grid-column: 2; grid-row: 2;
@@ -186,7 +186,7 @@
             .super-admin-page .sa-detail-table td:first-child {
                 font-size: 14px;
                 font-weight: 800;
-                color: #000000;
+                color: #0b2f75;
             }
             .super-admin-page .sa-detail-table td[data-label="Actions"] {
                 margin-top: 6px;
@@ -419,7 +419,7 @@
                         </div>
                         <p class="hero-subtitle">Errors from the server and from every shop's browser (including printer connection failures). Logs are kept for 30 days in the <code>logs</code> folder on the server.</p>
                         <div class="table-wrap">
-                            <table class="data-table responsive-table">
+                            <table class="data-table responsive-table sa-detail-table">
                                 <thead>
                                     <tr><th>Time</th><th>Level</th><th>Source</th><th>Message</th></tr>
                                 </thead>
