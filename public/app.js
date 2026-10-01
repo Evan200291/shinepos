@@ -1116,8 +1116,9 @@ function renderPager(containerId, key, totalPages) {
 
     const currentPage = state.pagination[key] || 1;
     const pages = [];
-    const startPage = Math.max(1, currentPage - 2);
-    const endPage = Math.min(totalPages, currentPage + 2);
+    const radius = window.innerWidth <= 720 ? 1 : 2;
+    const startPage = Math.max(1, currentPage - radius);
+    const endPage = Math.min(totalPages, currentPage + radius);
 
     for (let page = startPage; page <= endPage; page += 1) {
         pages.push(`
