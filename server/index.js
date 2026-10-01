@@ -1086,6 +1086,14 @@ app.post("/api/users", authenticate, requireRole("admin", "super_admin"), (req, 
     if (!fullName || !username || !password || !["admin", "cashier"].includes(role)) {
         return res.status(400).json({ message: "Full name, username, password, and valid role are required." });
     }
+    if (password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters." });
+    }
+
+    const shopRow = db.prepare("SELECT id FROM shops WHERE id = ?").get(shopId);
+    if (!shopRow) {
+        return res.status(404).json({ message: "Shop not found." });
+    }
 
     const existing = db.prepare("SELECT id FROM users WHERE username = ?").get(username);
     if (existing) {
@@ -1650,18 +1658,44 @@ app.delete("/api/super/shops/:id", authenticate, requireSuperAdmin, (req, res) =
         return res.status(404).json({ message: "Shop not found." });
     }
 
-    // Soft delete by deactivating the shop
-    db.prepare("UPDATE shops SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(shopId);
+    const confirmName = String(req.body?.confirmName || req.query.confirmName || "").trim();
+    if (confirmName !== shop.name) {
+        return res.status(400).json({ message: "Type the exact shop name to confirm permanent deletion." });
+    }
+
+    const removeShop = db.transaction(() => {
+        const byShop = (table) => db.prepare(`DELETE FROM ${table} WHERE shop_id = ?`).run(shopId);
+        const userIds = db.prepare("SELECT id FROM users WHERE shop_id = ?").all(shopId).map((row) => row.id);
+
+        db.prepare("DELETE FROM sale_items WHERE sale_id IN (SELECT id FROM sales WHERE shop_id = ?)").run(shopId);
+        ["sale_items", "stock_movements", "sales", "supplier_ledger", "suppliers", "customer_ledger", "customers", "expenses", "products"].forEach(byShop);
+
+        db.prepare("UPDATE audit_logs SET shop_id = NULL WHERE shop_id = ?").run(shopId);
+        if (userIds.length) {
+            const marks = userIds.map(() => "?").join(",");
+            db.prepare(`UPDATE audit_logs SET actor_id = NULL WHERE actor_id IN (${marks})`).run(...userIds);
+        }
+        byShop("users");
+        byShop("subscriptions");
+        db.prepare("DELETE FROM shops WHERE id = ?").run(shopId);
+    });
+
+    try {
+        removeShop();
+    } catch (error) {
+        console.error("Shop delete failed:", error);
+        return res.status(500).json({ message: `Could not delete shop: ${error.message}` });
+    }
 
     writeAuditLog({
         actorId: req.user.id,
         action: "SHOP_DELETED",
         entityType: "shop",
         entityId: shopId,
-        description: `Shop ${shop.name} deleted (deactivated)`,
+        description: `Shop ${shop.name} permanently deleted with all its data`,
         ipAddress: getClientIp(req)
     });
-    res.json({ message: "Shop deleted successfully." });
+    res.json({ message: "Shop and all its data were permanently deleted." });
 });
 
 app.get("/api/super/shops/:id/subscriptions", authenticate, requireSuperAdmin, (req, res) => {
@@ -1773,6 +1807,17 @@ app.put("/api/super/users/:id", authenticate, requireSuperAdmin, (req, res) => {
     if (!existing) {
         return res.status(404).json({ message: "User not found." });
     }
+    if (existing.role === "super_admin") {
+        if (userId !== req.user.id) {
+            return res.status(403).json({ message: "Other super admin accounts cannot be changed here." });
+        }
+        if (isActive === 0 || (role && role !== "super_admin")) {
+            return res.status(400).json({ message: "You cannot deactivate or demote your own super admin account." });
+        }
+    }
+    if (password && password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters." });
+    }
 
     const updates = [];
     const params = [];
@@ -1788,7 +1833,7 @@ app.put("/api/super/users/:id", authenticate, requireSuperAdmin, (req, res) => {
         updates.push("password_enc = ?");
         params.push(encryptPassword(password));
     }
-    if (role && ["admin", "cashier", "super_admin"].includes(role)) {
+    if (role && existing.role !== "super_admin" && ["admin", "cashier"].includes(role)) {
         updates.push("role = ?");
         params.push(role);
     }
@@ -1821,19 +1866,37 @@ app.delete("/api/super/users/:id", authenticate, requireSuperAdmin, (req, res) =
         return res.status(404).json({ message: "User not found." });
     }
 
-    db.prepare("UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(userId);
-    
+    if (existing.role === "super_admin") {
+        return res.status(403).json({ message: "Super admin accounts cannot be deleted here." });
+    }
+
+    let removed = false;
+    try {
+        db.transaction(() => {
+            db.prepare("UPDATE audit_logs SET actor_id = NULL WHERE actor_id = ?").run(userId);
+            db.prepare("DELETE FROM users WHERE id = ?").run(userId);
+        })();
+        removed = true;
+    } catch (error) {
+        db.prepare("UPDATE users SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(userId);
+    }
+
     writeAuditLog({
         actorId: req.user.id,
         shopId: existing.shop_id,
-        action: "USER_DEACTIVATED",
+        action: removed ? "USER_DELETED" : "USER_DEACTIVATED",
         entityType: "user",
         entityId: userId,
-        description: `User ${existing.username} deactivated`,
+        description: `User ${existing.username} ${removed ? "deleted" : "deactivated (has sales/stock history)"}`,
         ipAddress: getClientIp(req)
     });
 
-    res.json({ message: "User deactivated successfully." });
+    res.json({
+        removed,
+        message: removed
+            ? "User deleted."
+            : "This user has sales or stock history, so the account was deactivated instead of deleted."
+    });
 });
 
 // Get all products for a shop (super admin)

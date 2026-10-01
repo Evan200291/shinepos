@@ -451,6 +451,7 @@ function bindEvents() {
         if (event.target === $("inbound-modal")) closeInboundModal();
     });
     $("inbound-form").addEventListener("submit", handleInboundSubmit);
+    bindBulkInbound();
     $("sales-report-type").addEventListener("change", handleSalesFilterChange);
     $("sales-date-filter").addEventListener("change", loadFilteredSalesAndRender);
     $("sales-month-filter").addEventListener("change", loadFilteredSalesAndRender);
@@ -1641,7 +1642,7 @@ function renderInventory() {
                     ${product.barcode ? `<div class="table-sub table-sub-barcode">${escapeHtml(product.barcode)}</div>` : ""}
                 </td>
                 <td data-label="${escapeHtml(t("brand"))}">${escapeHtml(product.brand || "-")}</td>
-                <td data-label="${escapeHtml(t("product_name"))}">${escapeHtml(product.name)}</td>
+                <td data-label="${escapeHtml(t("product_name"))}">${escapeHtml(product.name)}<div class="table-sub inv-sub">${escapeHtml([product.brand, product.category].filter((v) => v && v !== "-").join(" · "))}</div></td>
                 <td data-label="${escapeHtml(t("category"))}">${escapeHtml(product.category || "-")}</td>
                 <td data-label="${escapeHtml(t("expiry_date"))}" class="expiry-cell">${escapeHtml(product.expiryDate)}</td>
                 <td data-label="${escapeHtml(t("sell_price"))}" class="text-right">${escapeHtml(formatCurrency(product.sellPrice))}</td>
@@ -1726,9 +1727,289 @@ async function deleteProduct(productId) {
     }
 }
 
+const BULK_DRAFT_KEY = "pharmacy_inbound_draft";
+const bulkState = { lines: [], nextId: 1 };
+
+function bulkLoadDraft() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(BULK_DRAFT_KEY) || "null");
+        if (saved && Array.isArray(saved.lines)) {
+            bulkState.lines = saved.lines;
+            bulkState.nextId = saved.nextId || saved.lines.length + 1;
+        }
+    } catch (error) { /* ignore a corrupt draft */ }
+}
+
+function bulkPersist() {
+    try {
+        localStorage.setItem(BULK_DRAFT_KEY, JSON.stringify({ lines: bulkState.lines, nextId: bulkState.nextId }));
+    } catch (error) { /* draft is a convenience only */ }
+}
+
+function bulkNewLine(overrides = {}) {
+    return {
+        id: bulkState.nextId++,
+        existing: false,
+        code: "",
+        barcode: "",
+        brand: "",
+        name: "",
+        category: "",
+        expiryDate: "",
+        quantity: 1,
+        costPrice: "",
+        sellPrice: "",
+        threshold: 10,
+        error: "",
+        ...overrides
+    };
+}
+
+function bulkLineFromProduct(product) {
+    return bulkNewLine({
+        existing: true,
+        code: product.code,
+        barcode: product.barcode || "",
+        brand: product.brand || "",
+        name: product.name,
+        category: product.category || "",
+        expiryDate: product.expiryDate || "",
+        costPrice: product.costPrice,
+        sellPrice: product.sellPrice,
+        threshold: product.lowStockThreshold || 10
+    });
+}
+
+function bulkFindProduct(text) {
+    const needle = text.trim().toLowerCase();
+    if (!needle) return null;
+    return state.products.find((p) => String(p.code).toLowerCase() === needle)
+        || state.products.find((p) => String(p.barcode || "").toLowerCase() === needle)
+        || null;
+}
+
+function bulkSuggestions(text) {
+    const needle = text.trim().toLowerCase();
+    if (needle.length < 2) return [];
+    return state.products.filter((p) =>
+        [p.name, p.code, p.barcode, p.brand].join(" ").toLowerCase().includes(needle)
+    ).slice(0, 6);
+}
+
+function bulkAddFromInput(rawText) {
+    const text = rawText.trim();
+    if (!text) return;
+    const existingProduct = bulkFindProduct(text);
+    if (existingProduct) {
+        bulkAddProduct(existingProduct);
+        return;
+    }
+    const lineMatch = bulkState.lines.find((line) => line.barcode && line.barcode.toLowerCase() === text.toLowerCase());
+    if (lineMatch) {
+        lineMatch.quantity = Number(lineMatch.quantity || 0) + 1;
+        bulkAfterChange(lineMatch.id, "quantity");
+        return;
+    }
+    const looksLikeCode = /^[A-Za-z0-9\-_.]{4,}$/.test(text) && /\d/.test(text);
+    const line = looksLikeCode
+        ? bulkNewLine({ barcode: text, code: text.toUpperCase() })
+        : bulkNewLine({ name: text });
+    bulkState.lines.unshift(line);
+    bulkAfterChange(line.id, looksLikeCode ? "name" : "code");
+}
+
+function bulkAddProduct(product) {
+    const lineMatch = bulkState.lines.find((line) => line.existing && line.code === product.code);
+    if (lineMatch) {
+        lineMatch.quantity = Number(lineMatch.quantity || 0) + 1;
+        bulkAfterChange(lineMatch.id, "quantity");
+        return;
+    }
+    const line = bulkLineFromProduct(product);
+    bulkState.lines.unshift(line);
+    bulkAfterChange(line.id, "quantity");
+}
+
+function bulkAfterChange(focusLineId, focusField) {
+    bulkPersist();
+    renderBulkLines();
+    if (focusLineId) {
+        const input = document.querySelector(`[data-bulk-id="${focusLineId}"][data-bulk-field="${focusField}"]`);
+        if (input) {
+            input.focus();
+            if (input.select) input.select();
+        }
+    }
+}
+
+function bulkLineTotals() {
+    const valid = bulkState.lines.filter((line) => Number(line.quantity) > 0);
+    const units = valid.reduce((sum, line) => sum + Number(line.quantity || 0), 0);
+    const cost = valid.reduce((sum, line) => sum + Number(line.quantity || 0) * Number(line.costPrice || 0), 0);
+    return { count: bulkState.lines.length, units, cost };
+}
+
+function renderBulkTotals() {
+    const totals = bulkLineTotals();
+    $("bulk-totals").innerHTML = `
+        <span><strong>${totals.count}</strong> ${totals.count === 1 ? "line" : "lines"}</span>
+        <span><strong>${totals.units}</strong> units</span>
+        <span>Total cost <strong>${escapeHtml(formatCurrency(totals.cost))}</strong></span>
+    `;
+    $("bulk-save").textContent = totals.count ? `Save all (${totals.count})` : "Save all";
+    $("bulk-save").disabled = !totals.count;
+    $("bulk-clear").disabled = !totals.count;
+}
+
+function bulkField(line, field, label, type, extra = "") {
+    const value = line[field] ?? "";
+    return `
+        <label class="bulk-field bulk-f-${field}">
+            <span>${label}</span>
+            <input type="${type}" class="field-input" data-bulk-id="${line.id}" data-bulk-field="${field}" value="${escapeHtml(String(value))}" ${extra}>
+        </label>`;
+}
+
+function renderBulkLines() {
+    const box = $("bulk-lines");
+    if (!bulkState.lines.length) {
+        box.innerHTML = `
+            <div class="bulk-empty">
+                <strong>No items yet</strong>
+                <p>Scan a barcode or search above. Existing products add stock to what you already have; new barcodes create a new product. Add as many lines as you need, then press Save all.</p>
+            </div>`;
+        renderBulkTotals();
+        return;
+    }
+    const categories = ["", "Tablets & Capsules", "Syrups & Liquids", "Injections", "Syringes & Supplies", "Medical Electronics", "First Aid", "Personal Care"];
+    box.innerHTML = bulkState.lines.map((line, index) => `
+        <article class="bulk-line ${line.error ? "has-error" : ""}" data-line="${line.id}">
+            <header class="bulk-line-head">
+                <span class="bulk-index">${bulkState.lines.length - index}</span>
+                <span class="bulk-badge ${line.existing ? "is-existing" : "is-new"}">${line.existing ? "Existing &middot; adds stock" : "New product"}</span>
+                <button type="button" class="bulk-remove" data-bulk-remove="${line.id}" aria-label="Remove line">&times;</button>
+            </header>
+            <div class="bulk-grid">
+                ${bulkField(line, "name", "Product name", "text")}
+                ${bulkField(line, "code", "Code", "text", 'placeholder="auto"')}
+                ${bulkField(line, "barcode", "Barcode", "text", 'data-scan-field placeholder="scan"')}
+                ${bulkField(line, "expiryDate", "Expiry", "date")}
+                ${bulkField(line, "quantity", "Qty in", "number", 'min="1" inputmode="numeric"')}
+                ${bulkField(line, "costPrice", "Cost", "number", 'min="0" inputmode="decimal"')}
+                ${bulkField(line, "sellPrice", "Sell", "number", 'min="0" inputmode="decimal"')}
+            </div>
+            <details class="bulk-more">
+                <summary>More details</summary>
+                <div class="bulk-grid bulk-grid-more">
+                    ${bulkField(line, "brand", "Brand", "text")}
+                    <label class="bulk-field">
+                        <span>Category</span>
+                        <select class="field-input" data-bulk-id="${line.id}" data-bulk-field="category">
+                            ${categories.map((cat) => `<option value="${escapeHtml(cat)}" ${cat === line.category ? "selected" : ""}>${cat || "None"}</option>`).join("")}
+                        </select>
+                    </label>
+                    ${bulkField(line, "threshold", "Low stock alert", "number", 'min="1"')}
+                </div>
+            </details>
+            ${line.error ? `<p class="bulk-error">${escapeHtml(line.error)}</p>` : ""}
+        </article>
+    `).join("");
+    renderBulkTotals();
+}
+
+function renderBulkSuggestions() {
+    const box = $("bulk-suggestions");
+    const list = bulkSuggestions($("bulk-scan-input").value);
+    if (!list.length) {
+        box.classList.add("hidden");
+        box.innerHTML = "";
+        return;
+    }
+    box.classList.remove("hidden");
+    box.innerHTML = list.map((p) => `
+        <button type="button" class="bulk-suggestion" data-bulk-pick="${p.id}">
+            <strong>${escapeHtml(p.name)}</strong>
+            <span>${escapeHtml(p.code)}${p.barcode ? " &middot; " + escapeHtml(p.barcode) : ""} &middot; stock ${escapeHtml(p.quantity)}</span>
+        </button>
+    `).join("");
+}
+
+function bindBulkInbound() {
+    const scan = $("bulk-scan-input");
+    scan.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        event.stopPropagation();
+        bulkAddFromInput(scan.value);
+        scan.value = "";
+        renderBulkSuggestions();
+    });
+    scan.addEventListener("input", renderBulkSuggestions);
+    $("bulk-suggestions").addEventListener("click", (event) => {
+        const pick = event.target.closest("[data-bulk-pick]");
+        if (!pick) return;
+        const product = state.products.find((p) => p.id === Number(pick.dataset.bulkPick));
+        if (product) bulkAddProduct(product);
+        scan.value = "";
+        renderBulkSuggestions();
+        scan.focus();
+    });
+    $("bulk-add-blank").addEventListener("click", () => {
+        const line = bulkNewLine();
+        bulkState.lines.unshift(line);
+        bulkAfterChange(line.id, "name");
+    });
+    $("bulk-clear").addEventListener("click", () => {
+        if (!bulkState.lines.length || !confirm("Remove all lines from this stock-in sheet?")) return;
+        bulkState.lines = [];
+        bulkPersist();
+        renderBulkLines();
+        scan.focus();
+    });
+    const lines = $("bulk-lines");
+    lines.addEventListener("input", (event) => {
+        const input = event.target.closest("[data-bulk-field]");
+        if (!input) return;
+        const line = bulkState.lines.find((item) => item.id === Number(input.dataset.bulkId));
+        if (!line) return;
+        line[input.dataset.bulkField] = input.value;
+        line.error = "";
+        input.closest(".bulk-line")?.classList.remove("has-error");
+        input.closest(".bulk-line")?.querySelector(".bulk-error")?.remove();
+        bulkPersist();
+        renderBulkTotals();
+    });
+    lines.addEventListener("keydown", (event) => {
+        const input = event.target.closest("[data-bulk-field]");
+        if (input && event.key === "Enter") {
+            event.preventDefault();
+            if (input.dataset.bulkField === "barcode" && input.value.trim()) {
+                const line = bulkState.lines.find((item) => item.id === Number(input.dataset.bulkId));
+                const match = bulkFindProduct(input.value);
+                if (line && match && !line.existing) {
+                    Object.assign(line, bulkLineFromProduct(match), { id: line.id });
+                    bulkAfterChange(line.id, "quantity");
+                    return;
+                }
+            }
+            $("bulk-scan-input").focus();
+        }
+    });
+    lines.addEventListener("click", (event) => {
+        const remove = event.target.closest("[data-bulk-remove]");
+        if (!remove) return;
+        const id = Number(remove.dataset.bulkRemove);
+        bulkState.lines = bulkState.lines.filter((line) => line.id !== id);
+        bulkPersist();
+        renderBulkLines();
+    });
+}
+
 function openInboundModal() {
+    bulkLoadDraft();
+    renderBulkLines();
     $("inbound-modal").classList.remove("hidden");
-    $("inbound-code").focus();
+    $("bulk-scan-input").focus();
 }
 
 function closeInboundModal() {
@@ -1737,30 +2018,65 @@ function closeInboundModal() {
 
 async function handleInboundSubmit(event) {
     event.preventDefault();
-    try {
-        await api("/api/inbound", {
-            method: "POST",
-            body: {
-                code: $("inbound-code").value.trim(),
-                barcode: $("inbound-barcode").value.trim(),
-                brand: $("inbound-brand").value.trim(),
-                name: $("inbound-name").value.trim(),
-                category: $("inbound-category").value.trim(),
-                expiryDate: $("inbound-expiry").value,
-                quantity: Number($("inbound-quantity").value),
-                costPrice: Number($("inbound-cost").value),
-                sellPrice: Number($("inbound-price").value),
-                lowStockThreshold: Number($("inbound-threshold").value),
-                supplierId: $("inbound-supplier").value || null
-            }
-        });
-        $("inbound-form").reset();
-        $("inbound-threshold").value = 10;
+    if (!bulkState.lines.length) return;
+
+    const problems = [];
+    bulkState.lines.forEach((line) => {
+        line.error = "";
+        if (!line.existing && !String(line.code).trim() && String(line.name).trim()) {
+            line.code = String(line.barcode).trim().toUpperCase() || `N${Date.now().toString(36).toUpperCase().slice(-6)}`;
+        }
+        if (!String(line.name).trim()) line.error = "Enter a product name.";
+        else if (!String(line.code).trim()) line.error = "Enter a product code.";
+        else if (!line.expiryDate) line.error = "Choose an expiry date.";
+        else if (!(Number(line.quantity) > 0)) line.error = "Quantity must be at least 1.";
+        else if (line.costPrice === "" || Number(line.costPrice) < 0) line.error = "Enter the cost price.";
+        else if (line.sellPrice === "" || Number(line.sellPrice) < 0) line.error = "Enter the sell price.";
+        if (line.error) problems.push(line);
+    });
+    if (problems.length) {
+        renderBulkLines();
+        document.querySelector(`[data-line="${problems[0].id}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+        showNotification(`${problems.length} line${problems.length === 1 ? " needs" : "s need"} attention before saving.`, "error");
+        return;
+    }
+
+    const saveButton = $("bulk-save");
+    saveButton.disabled = true;
+    const supplierId = $("inbound-supplier").value || null;
+    let saved = 0;
+    for (const line of [...bulkState.lines]) {
+        try {
+            await api("/api/inbound", {
+                method: "POST",
+                body: {
+                    code: String(line.code).trim(),
+                    barcode: String(line.barcode).trim(),
+                    brand: String(line.brand).trim(),
+                    name: String(line.name).trim(),
+                    category: String(line.category).trim(),
+                    expiryDate: line.expiryDate,
+                    quantity: Number(line.quantity),
+                    costPrice: Number(line.costPrice),
+                    sellPrice: Number(line.sellPrice),
+                    lowStockThreshold: Number(line.threshold) || 10,
+                    supplierId
+                }
+            });
+            bulkState.lines = bulkState.lines.filter((item) => item.id !== line.id);
+            saved += 1;
+        } catch (error) {
+            line.error = error.message;
+        }
+    }
+    bulkPersist();
+    renderBulkLines();
+    await loadInitialData();
+    if (!bulkState.lines.length) {
         closeInboundModal();
-        await loadInitialData();
-        showNotification(t("msg_inbound_saved"));
-    } catch (error) {
-        showNotification(error.message, "error");
+        showNotification(saved === 1 ? t("msg_inbound_saved") : `${saved} items saved to stock.`);
+    } else {
+        showNotification(`${saved} saved, ${bulkState.lines.length} still need attention.`, "error");
     }
 }
 
@@ -1779,15 +2095,15 @@ function renderSales() {
     const showProfit = canSeeProfit();
 
     $("sales-summary-strip").innerHTML = `
-        <div class="sales-report-metric">
+        <div class="sales-report-metric sales-metric-count">
             <div class="metric-label">${escapeHtml(t("sales_count"))}</div>
             <strong>${escapeHtml(state.sales.length)}</strong>
         </div>
-        <div class="sales-report-metric">
+        <div class="sales-report-metric sales-metric-total">
             <div class="metric-label">${escapeHtml(t("report_total_sales"))}</div>
             <strong>${escapeHtml(formatCurrency(totalSales))}</strong>
         </div>
-        ${showProfit ? `<div class="sales-report-metric">
+        ${showProfit ? `<div class="sales-report-metric sales-metric-profit">
             <div class="metric-label">${escapeHtml(t("report_total_profit"))}</div>
             <strong>${escapeHtml(formatCurrency(totalProfit))}</strong>
         </div>` : ""}
@@ -1796,9 +2112,13 @@ function renderSales() {
     $("sales-table-body").innerHTML = state.sales.length
         ? page.rows.map((sale) => {
             const itemSummary = sale.items.map((item) => `${item.productName} x${item.quantity}`).join(", ");
+            const itemCount = sale.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
             return `
-                <tr>
-                    <td data-label="${escapeHtml(t("invoice"))}"><strong>${escapeHtml(sale.invoiceNo)}</strong></td>
+                <tr class="row-clickable" data-sale-row="${sale.id}">
+                    <td data-label="${escapeHtml(t("invoice"))}">
+                        <strong>${escapeHtml(sale.invoiceNo)}</strong>
+                        <div class="table-sub sale-sub">${escapeHtml(sale.saleDate)} &middot; ${escapeHtml(sale.cashierName)} &middot; ${escapeHtml(itemCount)} ${itemCount === 1 ? "item" : "items"}</div>
+                    </td>
                     <td data-label="${escapeHtml(t("date"))}">${escapeHtml(sale.saleDate)}</td>
                     <td data-label="${escapeHtml(t("cashier"))}">${escapeHtml(sale.cashierName)}</td>
                     <td data-label="${escapeHtml(t("items"))}">${escapeHtml(itemSummary)}</td>
@@ -1879,7 +2199,7 @@ function renderMovements() {
                     <div class="table-sub">${escapeHtml(movement.productCode)}</div>
                     <div class="table-sub history-time-sub">${escapeHtml(formatDateTime(movement.createdAt))}</div>
                 </td>
-                <td data-label="${escapeHtml(t("type"))}">${escapeHtml(movement.movementType)}</td>
+                <td data-label="${escapeHtml(t("type"))}"><span class="type-badge type-${escapeHtml(movement.movementType)}">${escapeHtml(movement.movementType === "deactivate" ? "archived" : movement.movementType)}</span></td>
                 <td data-label="${escapeHtml(t("qty_change"))}" class="text-right">${escapeHtml(movement.quantityChange)}</td>
                 <td data-label="${escapeHtml(t("balance"))}" class="text-right">${escapeHtml(movement.balanceAfter)}</td>
                 <td data-label="${escapeHtml(t("actor"))}">${escapeHtml(movement.actorName)}</td>
@@ -2272,10 +2592,12 @@ async function handlePasswordChange(event) {
 
 function handleSaleActionClick(event) {
     const button = event.target.closest("[data-print-sale]");
-    if (!button) {
-        return;
+    const row = event.target.closest("tr[data-sale-row]");
+    if (button) {
+        openReceiptById(Number(button.dataset.printSale));
+    } else if (row) {
+        openReceiptById(Number(row.dataset.saleRow));
     }
-    openReceiptById(Number(button.dataset.printSale));
 }
 
 async function openReceiptById(saleId) {
@@ -2660,7 +2982,30 @@ const barcodeScanner = {
         }, 15000);
     },
 
+    feedback(success) {
+        try {
+            this.audio = this.audio || new (window.AudioContext || window.webkitAudioContext)();
+            const osc = this.audio.createOscillator();
+            const gain = this.audio.createGain();
+            osc.type = "sine";
+            osc.frequency.value = success ? 1760 : 220;
+            gain.gain.value = 0.08;
+            osc.connect(gain);
+            gain.connect(this.audio.destination);
+            osc.start();
+            osc.stop(this.audio.currentTime + (success ? 0.08 : 0.25));
+        } catch (error) { /* audio is optional */ }
+        if (navigator.vibrate) navigator.vibrate(success ? 40 : [60, 40, 60]);
+    },
+
     flashIndicator(success, message) {
+        this.feedback(success);
+        const cameraMessage = document.getElementById("camera-scanner-message");
+        const cameraModal = document.getElementById("camera-scanner-modal");
+        if (cameraMessage && cameraModal && !cameraModal.classList.contains("hidden")) {
+            cameraMessage.textContent = (success ? "\u2713 " : "\u2715 ") + message + (success ? " \u2014 keep scanning" : "");
+            cameraMessage.hidden = false;
+        }
         const indicator = document.getElementById("barcode-indicator");
         if (!indicator) return;
         indicator.hidden = false;
@@ -3272,13 +3617,17 @@ const cameraScanner = {
             const codes = await this.detector.detect(video);
             if (codes.length) {
                 const value = codes[0].rawValue;
-                this.close();
                 if (this.testMode) {
+                    this.close();
                     barcodeScanner.reportTest(value);
-                } else {
+                    return;
+                }
+                const now = Date.now();
+                if (value !== this.lastValue || now - this.lastTime > 2000) {
+                    this.lastValue = value;
+                    this.lastTime = now;
                     barcodeScanner.processBarcode(value);
                 }
-                return;
             }
         } catch (error) { /* transient decode errors are expected between frames */ }
         this.rafId = requestAnimationFrame(() => this.loop(video));

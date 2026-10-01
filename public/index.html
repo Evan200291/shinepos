@@ -304,77 +304,46 @@
                     <div class="modal-card inbound-modal-card">
                         <div class="inbound-modal-header">
                             <div>
-                                <p>Inventory registry</p>
+                                <p>Receive stock</p>
                                 <h3 id="inbound-modal-title" data-i18n="inbound_stock_entry">Inbound Stock Entry</h3>
                             </div>
                             <button id="close-inbound-modal" type="button" class="icon-btn" aria-label="Close inbound form">
                                 <i data-lucide="x" class="h-5 w-5"></i>
                             </button>
                         </div>
-                        <form id="inbound-form" class="form-grid">
-                            <div>
-                                <label class="field-label" for="inbound-code" data-i18n="product_code">Product Code</label>
-                                <input id="inbound-code" type="text" class="field-input" required>
-                            </div>
-                            <div>
-                                <label class="field-label" for="inbound-barcode">Barcode <span class="field-hint">scan or type</span></label>
-                                <input id="inbound-barcode" type="text" class="field-input" data-scan-field autocomplete="off" placeholder="EAN / UPC on the box">
-                            </div>
-                            <div>
-                                <label class="field-label" for="inbound-brand" data-i18n="brand">Brand</label>
-                                <input id="inbound-brand" type="text" class="field-input">
-                            </div>
-                            <div class="span-2">
-                                <label class="field-label" for="inbound-name" data-i18n="product_name">Product Name</label>
-                                <input id="inbound-name" type="text" class="field-input" required>
-                            </div>
-                            <div class="span-2">
-                                <label class="field-label" for="inbound-category" data-i18n="category">Category</label>
-                                <select id="inbound-category" class="field-input">
-                                    <option value="">Choose category (optional)</option>
-                                    <option value="Tablets & Capsules">Tablets & Capsules</option>
-                                    <option value="Syrups & Liquids">Syrups & Liquids</option>
-                                    <option value="Injections">Injections</option>
-                                    <option value="Syringes & Supplies">Syringes & Supplies</option>
-                                    <option value="Medical Electronics">Medical Electronics</option>
-                                    <option value="First Aid">First Aid</option>
-                                    <option value="Personal Care">Personal Care</option>
-                                </select>
-                            </div>
-                            <div class="span-2">
-                                <label class="field-label" for="inbound-supplier">Supplier <span class="field-hint">optional — adds to their balance owed</span></label>
-                                <select id="inbound-supplier" class="field-input">
-                                    <option value="">No supplier</option>
-                                </select>
-                                <button id="inbound-new-supplier-toggle" type="button" class="mini-btn mt-6">+ Add new supplier</button>
-                                <div id="inbound-new-supplier" class="hidden mt-6">
-                                    <input id="inbound-new-supplier-name" type="text" class="field-input" placeholder="Supplier name">
-                                    <input id="inbound-new-supplier-phone" type="text" class="field-input mt-6" placeholder="Phone (optional)">
-                                    <button id="inbound-new-supplier-save" type="button" class="secondary-btn full-width mt-6">Save supplier &amp; select</button>
+                        <form id="inbound-form" class="bulk-sheet" autocomplete="off">
+                            <div class="bulk-top">
+                                <div class="bulk-scan">
+                                    <label class="field-label" for="bulk-scan-input">Scan barcode or search product <span class="field-hint">press Enter to add</span></label>
+                                    <div class="pos-search-bar bulk-scan-bar">
+                                        <i data-lucide="scan-barcode" class="h-5 w-5" aria-hidden="true"></i>
+                                        <input id="bulk-scan-input" type="text" class="pos-search-input" data-scan-field placeholder="Scan, or type a code / barcode / name" autocomplete="off">
+                                        <button id="bulk-add-blank" type="button" class="mini-btn">+ Blank line</button>
+                                    </div>
+                                    <div id="bulk-suggestions" class="bulk-suggestions hidden" role="listbox"></div>
+                                </div>
+                                <div class="bulk-supplier">
+                                    <label class="field-label" for="inbound-supplier">Supplier <span class="field-hint">optional</span></label>
+                                    <div class="bulk-supplier-row">
+                                        <select id="inbound-supplier" class="field-input">
+                                            <option value="">No supplier</option>
+                                        </select>
+                                        <button id="inbound-new-supplier-toggle" type="button" class="mini-btn">+ New</button>
+                                    </div>
+                                    <div id="inbound-new-supplier" class="hidden mt-6">
+                                        <input id="inbound-new-supplier-name" type="text" class="field-input" placeholder="Supplier name">
+                                        <input id="inbound-new-supplier-phone" type="text" class="field-input mt-6" placeholder="Phone (optional)">
+                                        <button id="inbound-new-supplier-save" type="button" class="secondary-btn full-width mt-6">Save supplier &amp; select</button>
+                                    </div>
                                 </div>
                             </div>
-                            <div>
-                                <label class="field-label" for="inbound-expiry" data-i18n="expiry_date">Expiry Date</label>
-                                <input id="inbound-expiry" type="date" class="field-input" required>
-                            </div>
-                            <div>
-                                <label class="field-label" for="inbound-quantity" data-i18n="quantity">Quantity</label>
-                                <input id="inbound-quantity" type="number" min="1" class="field-input" required>
-                            </div>
-                            <div>
-                                <label class="field-label" for="inbound-cost" data-i18n="cost_price">Cost Price</label>
-                                <input id="inbound-cost" type="number" min="0" class="field-input" required>
-                            </div>
-                            <div>
-                                <label class="field-label" for="inbound-price" data-i18n="sell_price">Sell Price</label>
-                                <input id="inbound-price" type="number" min="0" class="field-input" required>
-                            </div>
-                            <div class="span-2">
-                                <label class="field-label" for="inbound-threshold" data-i18n="low_stock_threshold">Low Stock Threshold</label>
-                                <input id="inbound-threshold" type="number" min="1" value="10" class="field-input">
-                            </div>
-                            <div class="span-2">
-                                <button type="submit" class="primary-btn full-width" data-i18n="save_inbound">Save Inbound</button>
+                            <div id="bulk-lines" class="bulk-lines" aria-live="polite"></div>
+                            <div class="bulk-footer">
+                                <div id="bulk-totals" class="bulk-totals"></div>
+                                <div class="bulk-actions">
+                                    <button id="bulk-clear" type="button" class="ghost-btn">Clear all</button>
+                                    <button id="bulk-save" type="submit" class="primary-btn">Save all</button>
+                                </div>
                             </div>
                         </form>
                     </div>
@@ -771,6 +740,11 @@
                                         </label>
                                     </div>
                                     <div id="barcode-scanner-settings" class="device-setting-body hidden">
+                                        <ol class="device-steps">
+                                            <li>Plug the scanner into a USB port, or pair it over Bluetooth as a <strong>keyboard (HID)</strong>.</li>
+                                            <li>Click <strong>Test Scanner</strong> below and scan any barcode. The value should appear in the readout.</li>
+                                            <li>Open the POS tab and scan products. They are added to the cart with a beep.</li>
+                                        </ol>
                                         <div class="form-group">
                                             <label class="field-label" for="barcode-prefix">Scan Prefix (optional)</label>
                                             <input id="barcode-prefix" type="text" class="field-input" placeholder="e.g. ]E0 or none">
@@ -1095,7 +1069,7 @@
                 <div class="camera-scanner-reticle" aria-hidden="true"></div>
             </div>
             <p id="camera-scanner-message" class="device-setting-note" hidden></p>
-            <p class="device-setting-note">Point the camera at a barcode. It's added to the cart automatically as soon as it's recognized.</p>
+            <p class="device-setting-note">Point the camera at a barcode. Each item is added to the cart as soon as it's recognized and the camera stays open so you can keep scanning. Tap the X when you're finished.</p>
         </div>
     </div>
 

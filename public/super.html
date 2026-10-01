@@ -1406,10 +1406,11 @@
                     const shopId = Number(deleteShopBtn.dataset.deleteShop);
                     const shop = state.shops.find(s => s.id === shopId);
                     const shopName = shop ? shop.name : 'this shop';
-                    if (!confirm(`Are you sure you want to delete "${shopName}"? This will deactivate the shop and all its data.`)) return;
+                    const typed = prompt(`PERMANENT DELETE\n\nThis removes "${shopName}" with all its products, sales, stock history, suppliers, customers, expenses and staff accounts. It cannot be undone.\n\nTo only block access, use Disable instead.\n\nType the shop name to confirm:`);
+                    if (typed === null) return;
                     try {
-                        await api('/api/super/shops/' + shopId, { method: 'DELETE' });
-                        notify('Shop deleted successfully.');
+                        await api('/api/super/shops/' + shopId, { method: 'DELETE', body: { confirmName: typed.trim() } });
+                        notify('Shop and all its data were permanently deleted.');
                         state.selectedShop = null;
                         await loadShops();
                     } catch (err) {
