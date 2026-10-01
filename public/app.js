@@ -34,7 +34,10 @@ const state = {
         users: 1,
         suppliers: 1,
         customers: 1,
-        expenses: 1
+        expenses: 1,
+        alertLow: 1,
+        alertExpired: 1,
+        alertExpiring: 1
     },
     receiptSale: null,
     activeAlertView: "low",
@@ -60,7 +63,10 @@ const PAGE_SIZES = {
     users: 8,
     suppliers: 8,
     customers: 8,
-    expenses: 8
+    expenses: 8,
+    alertLow: 8,
+    alertExpired: 8,
+    alertExpiring: 8
 };
 
 const translations = {
@@ -460,6 +466,16 @@ function bindEvents() {
     $("receipt-print-button").addEventListener("click", handlePrintReceipt);
     $("password-form").addEventListener("submit", handlePasswordChange);
     document.addEventListener("click", handlePagerClick);
+    let resizeTimer = null;
+    window.addEventListener("resize", () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            if (!state.user) return;
+            renderInventory(); renderSales(); renderMovements(); renderUsers();
+            renderSuppliers(); renderCustomers(); renderExpenses(); renderAlerts();
+            lucide.createIcons();
+        }, 200);
+    });
     document.addEventListener("keydown", (event) => {
         // A hardware scanner ends its burst with Enter; inside a scan field that
         // would submit the form before the operator finished the rest of it.
@@ -520,27 +536,32 @@ function bindEvents() {
     $("inventory-table-body").addEventListener("click", (event) => {
         const editButton = event.target.closest("[data-edit-product]");
         const deleteButton = event.target.closest("[data-delete-product]");
-
-        if (editButton) {
-            openProductModal(Number(editButton.dataset.editProduct));
-        }
+        const row = event.target.closest("tr[data-product-id]");
 
         if (deleteButton) {
             deleteProduct(Number(deleteButton.dataset.deleteProduct));
+        } else if (editButton) {
+            openProductModal(Number(editButton.dataset.editProduct));
+        } else if (row) {
+            openProductModal(Number(row.dataset.productId));
         }
     });
 
     $("suppliers-table-body").addEventListener("click", (event) => {
         const ledgerButton = event.target.closest("[data-ledger-type]");
         const deleteButton = event.target.closest("[data-delete-supplier]");
-        if (ledgerButton) openLedgerModal(ledgerButton.dataset.ledgerType, Number(ledgerButton.dataset.ledgerId));
+        const row = event.target.closest("tr[data-ledger-row]");
         if (deleteButton) handleDeleteSupplier(Number(deleteButton.dataset.deleteSupplier));
+        else if (ledgerButton) openLedgerModal(ledgerButton.dataset.ledgerType, Number(ledgerButton.dataset.ledgerId));
+        else if (row) openLedgerModal("supplier", Number(row.dataset.ledgerRow));
     });
     $("customers-table-body").addEventListener("click", (event) => {
         const ledgerButton = event.target.closest("[data-ledger-type]");
         const deleteButton = event.target.closest("[data-delete-customer]");
-        if (ledgerButton) openLedgerModal(ledgerButton.dataset.ledgerType, Number(ledgerButton.dataset.ledgerId));
+        const row = event.target.closest("tr[data-ledger-row]");
         if (deleteButton) handleDeleteCustomer(Number(deleteButton.dataset.deleteCustomer));
+        else if (ledgerButton) openLedgerModal(ledgerButton.dataset.ledgerType, Number(ledgerButton.dataset.ledgerId));
+        else if (row) openLedgerModal("customer", Number(row.dataset.ledgerRow));
     });
     $("expenses-table-body").addEventListener("click", (event) => {
         const deleteButton = event.target.closest("[data-delete-expense]");
@@ -1062,8 +1083,15 @@ function renderAll() {
     lucide.createIcons();
 }
 
+function getAdaptivePageSize(key) {
+    const compact = window.innerWidth <= 980;
+    const rowHeight = key === "history" ? (compact ? 64 : 58) : (compact ? 62 : 56);
+    const available = window.innerHeight - (compact ? 245 : 300);
+    return Math.min(30, Math.max(PAGE_SIZES[key] || 8, Math.floor(available / rowHeight)));
+}
+
 function getPageSlice(rows, key) {
-    const pageSize = key === "history" && window.innerWidth <= 720 ? 6 : (PAGE_SIZES[key] || 8);
+    const pageSize = getAdaptivePageSize(key);
     const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
     state.pagination[key] = Math.min(Math.max(state.pagination[key] || 1, 1), totalPages);
     const start = (state.pagination[key] - 1) * pageSize;
@@ -1143,6 +1171,8 @@ function handlePagerClick(event) {
         renderCustomers();
     } else if (key === "expenses") {
         renderExpenses();
+    } else if (key.startsWith("alert")) {
+        renderAlerts();
     }
 }
 
@@ -1568,7 +1598,7 @@ function renderInventory() {
 
     $("inventory-table-body").innerHTML = rows.length
         ? page.rows.map((product) => `
-            <tr>
+            <tr ${isAdmin ? `class="row-clickable" data-product-id="${product.id}"` : ""}>
                 <td data-label="${escapeHtml(t("product_code"))}">
                     <strong>${escapeHtml(product.code)}</strong>
                     ${product.barcode ? `<div class="table-sub table-sub-barcode">${escapeHtml(product.barcode)}</div>` : ""}
@@ -1766,9 +1796,15 @@ function renderAlertRows(items) {
 }
 
 function renderAlerts() {
-    $("low-stock-body").innerHTML = renderAlertRows(state.alerts.lowStock);
-    $("expired-body").innerHTML = renderAlertRows(state.alerts.expired);
-    $("expiring-body").innerHTML = renderAlertRows(state.alerts.expiringSoon);
+    [
+        ["low-stock-body", "alertLow", state.alerts.lowStock],
+        ["expired-body", "alertExpired", state.alerts.expired],
+        ["expiring-body", "alertExpiring", state.alerts.expiringSoon]
+    ].forEach(([bodyId, key, items]) => {
+        const page = getPageSlice(items, key);
+        $(bodyId).innerHTML = renderAlertRows(page.rows);
+        renderPager(`${key}-pager`, key, page.totalPages);
+    });
     setAlertView(state.activeAlertView);
 }
 
@@ -1777,11 +1813,12 @@ function renderMovements() {
 
     $("history-table-body").innerHTML = state.movements.length
         ? page.rows.map((movement) => `
-            <tr>
+            <tr class="row-clickable">
                 <td data-label="${escapeHtml(t("time"))}">${escapeHtml(formatDateTime(movement.createdAt))}</td>
                 <td data-label="${escapeHtml(t("product_name"))}">
                     <strong>${escapeHtml(movement.productName)}</strong>
                     <div class="table-sub">${escapeHtml(movement.productCode)}</div>
+                    <div class="table-sub history-time-sub">${escapeHtml(formatDateTime(movement.createdAt))}</div>
                 </td>
                 <td data-label="${escapeHtml(t("type"))}">${escapeHtml(movement.movementType)}</td>
                 <td data-label="${escapeHtml(t("qty_change"))}" class="text-right">${escapeHtml(movement.quantityChange)}</td>
@@ -1798,13 +1835,12 @@ function renderMovements() {
 }
 
 function handleHistoryRowAction(event) {
-    const button = event.target.closest("[data-history-more]");
-    if (!button) {
+    const row = event.target.closest("tr.row-clickable");
+    if (!row) {
         return;
     }
-    const row = button.closest("tr");
     const expanded = row.classList.toggle("history-row-expanded");
-    button.setAttribute("aria-expanded", String(expanded));
+    row.querySelector("[data-history-more]")?.setAttribute("aria-expanded", String(expanded));
 }
 
 function renderUsers() {
@@ -1828,7 +1864,7 @@ function renderSuppliers() {
     const page = getPageSlice(state.suppliers, "suppliers");
     $("suppliers-table-body").innerHTML = state.suppliers.length
         ? page.rows.map((supplier) => `
-            <tr>
+            <tr class="row-clickable" data-ledger-row="${supplier.id}">
                 <td data-label="Name"><strong>${escapeHtml(supplier.name)}</strong></td>
                 <td data-label="Phone">${escapeHtml(supplier.phone || "-")}</td>
                 <td data-label="Balance Owed" class="text-right">${escapeHtml(formatCurrency(supplier.balance))}</td>
@@ -1909,7 +1945,7 @@ function renderCustomers() {
     const page = getPageSlice(state.customers, "customers");
     $("customers-table-body").innerHTML = state.customers.length
         ? page.rows.map((customer) => `
-            <tr>
+            <tr class="row-clickable" data-ledger-row="${customer.id}">
                 <td data-label="Name"><strong>${escapeHtml(customer.name)}</strong></td>
                 <td data-label="Phone">${escapeHtml(customer.phone || "-")}</td>
                 <td data-label="Credit Balance" class="text-right">${escapeHtml(formatCurrency(customer.creditBalance))}</td>
