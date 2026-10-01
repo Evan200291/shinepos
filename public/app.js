@@ -26,6 +26,7 @@ const state = {
     posCategoryOpen: false,
     posSearchOpen: false,
     posProductPage: 1,
+    posProductTotalPages: 1,
     activeTab: getInitialActiveTab(),
     pagination: {
         inventory: 1,
@@ -567,6 +568,10 @@ function bindEvents() {
         const deleteButton = event.target.closest("[data-delete-expense]");
         if (deleteButton) handleDeleteExpense(Number(deleteButton.dataset.deleteExpense));
     });
+    $("history-search").addEventListener("input", () => { state.pagination.history = 1; renderMovements(); lucide.createIcons(); });
+    $("history-type").addEventListener("change", () => { state.pagination.history = 1; renderMovements(); });
+    $("alert-search").addEventListener("input", () => { state.pagination.alertLow = 1; state.pagination.alertExpired = 1; state.pagination.alertExpiring = 1; renderAlerts(); });
+    bindPOSSwipe();
     $("supplier-form").addEventListener("submit", handleCreateSupplier);
     $("inbound-new-supplier-toggle").addEventListener("click", () => {
         $("inbound-new-supplier").classList.toggle("hidden");
@@ -1376,8 +1381,9 @@ function renderPOSProducts() {
     }
 
     const products = filteredProducts();
-    const pageSize = 8;
+    const pageSize = window.innerWidth <= 720 ? 5 : 8;
     const totalPages = Math.max(1, Math.ceil(products.length / pageSize));
+    state.posProductTotalPages = totalPages;
     state.posProductPage = Math.min(Math.max(state.posProductPage, 1), totalPages);
     const start = (state.posProductPage - 1) * pageSize;
     const visibleProducts = products.slice(start, start + pageSize);
@@ -1389,15 +1395,45 @@ function renderPOSProducts() {
 }
 
 function renderPOSProductDots(totalPages) {
-    const dots = $("pos-product-dots");
-    dots.classList.toggle("hidden", totalPages <= 1);
-    dots.innerHTML = totalPages > 1
+    const nav = $("pos-product-dots");
+    nav.classList.toggle("hidden", totalPages <= 1);
+    if (totalPages <= 1) {
+        nav.innerHTML = "";
+        return;
+    }
+    const current = state.posProductPage;
+    const dots = totalPages <= 7
         ? Array.from({ length: totalPages }, (_, index) => {
             const page = index + 1;
-            const active = page === state.posProductPage;
+            const active = page === current;
             return `<button type="button" class="pos-product-dot ${active ? "active" : ""}" data-pos-product-page="${page}" aria-label="Show product page ${page}" aria-current="${active ? "page" : "false"}"></button>`;
         }).join("")
         : "";
+    nav.innerHTML = `
+        <button type="button" class="pos-page-arrow" data-pos-product-page="${current - 1}" aria-label="Previous products" ${current <= 1 ? "disabled" : ""}>&lsaquo;</button>
+        ${dots}
+        <span class="pos-page-label">${current} / ${totalPages}</span>
+        <button type="button" class="pos-page-arrow" data-pos-product-page="${current + 1}" aria-label="Next products" ${current >= totalPages ? "disabled" : ""}>&rsaquo;</button>
+    `;
+}
+
+function bindPOSSwipe() {
+    const area = $("pos-products-grid");
+    let startX = 0;
+    let startY = 0;
+    area.addEventListener("touchstart", (event) => {
+        startX = event.touches[0].clientX;
+        startY = event.touches[0].clientY;
+    }, { passive: true });
+    area.addEventListener("touchend", (event) => {
+        const dx = event.changedTouches[0].clientX - startX;
+        const dy = event.changedTouches[0].clientY - startY;
+        if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+        const next = state.posProductPage + (dx < 0 ? 1 : -1);
+        if (next < 1 || next > state.posProductTotalPages) return;
+        state.posProductPage = next;
+        renderPOSProducts();
+    }, { passive: true });
 }
 
 function addToCart(productId) {
@@ -1802,17 +1838,39 @@ function renderAlerts() {
         ["expired-body", "alertExpired", state.alerts.expired],
         ["expiring-body", "alertExpiring", state.alerts.expiringSoon]
     ].forEach(([bodyId, key, items]) => {
-        const page = getPageSlice(items, key);
+        const page = getPageSlice(filterAlertItems(items), key);
         $(bodyId).innerHTML = renderAlertRows(page.rows);
         renderPager(`${key}-pager`, key, page.totalPages);
     });
     setAlertView(state.activeAlertView);
 }
 
-function renderMovements() {
-    const page = getPageSlice(state.movements, "history");
+function productBarcodeByCode(code) {
+    return state.products.find((product) => product.code === code)?.barcode || "";
+}
 
-    $("history-table-body").innerHTML = state.movements.length
+function filteredMovements() {
+    const query = ($("history-search")?.value || "").trim().toLowerCase();
+    const type = $("history-type")?.value || "";
+    return state.movements.filter((movement) => {
+        if (type && movement.movementType !== type) return false;
+        if (!query) return true;
+        return [movement.productName, movement.productCode, productBarcodeByCode(movement.productCode), movement.note, movement.actorName, movement.movementType, movement.id]
+            .join(" ").toLowerCase().includes(query);
+    });
+}
+
+function filterAlertItems(items) {
+    const query = ($("alert-search")?.value || "").trim().toLowerCase();
+    if (!query) return items;
+    return items.filter((item) => [item.name, item.code, productBarcodeByCode(item.code)].join(" ").toLowerCase().includes(query));
+}
+
+function renderMovements() {
+    const movements = filteredMovements();
+    const page = getPageSlice(movements, "history");
+
+    $("history-table-body").innerHTML = movements.length
         ? page.rows.map((movement) => `
             <tr class="row-clickable">
                 <td data-label="${escapeHtml(t("time"))}">${escapeHtml(formatDateTime(movement.createdAt))}</td>

@@ -576,7 +576,7 @@ button:disabled, input:disabled, select:disabled, .disabled {
   .pos-category-icon svg { width: 12px; height: 12px; }
   .pos-category-name { font-size: 11px; }
   .pos-results-popover { position: absolute; top: calc(100% + 8px); left: 0; right: 0; z-index: 30; gap: 7px; padding: 8px; border: 1px solid #d7d7d7; border-radius: 10px; background: #ffffff; box-shadow: 0 14px 34px rgba(11,47,117,.18); }
-  .pos-results-popover .pos-product-grid { grid-template-columns: 1fr; gap: 6px; max-height: min(48vh, 380px); overflow-y: auto; overscroll-behavior: contain; }
+  .pos-results-popover .pos-product-grid { grid-template-columns: 1fr; gap: 6px; touch-action: pan-y; }
   .pos-results-popover .pos-product-card { min-height: 54px; grid-template-columns: minmax(0, 1fr) 36px; grid-template-rows: 1fr; gap: 8px; padding: 7px 8px; background: #fafafa; }
   .pos-results-popover .pos-product-card:hover, .pos-results-popover .pos-product-card:focus-within { border-color: #db0202; background: #fff7f7; }
   .pos-results-popover .pos-product-visual, .pos-results-popover .pos-product-info p, .pos-results-popover .pos-product-stock { display: none; }
@@ -1010,3 +1010,36 @@ button, input, select, textarea,
   .content-scroll { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
 }
 .pager-track { flex-wrap: nowrap; max-width: 100%; }
+
+/* POS product paging */
+.pos-product-dots { gap: 8px; }
+.pos-page-arrow { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0 0 2px; border: 1px solid #d5d5d5; border-radius: 4px; background: #ffffff; color: #1857b8; font-size: 20px; line-height: 1; font-weight: 700; cursor: pointer; }
+.pos-page-arrow:disabled { opacity: .35; cursor: not-allowed; }
+.pos-page-label { min-width: 44px; text-align: center; color: #4a6797; font-size: 12px; font-weight: 700; }
+
+/* List search toolbars */
+.list-toolbar { display: flex; align-items: center; gap: 8px; }
+.list-search-bar { flex: 1 1 auto; min-width: 0; min-height: 40px; padding: 0 10px; }
+.list-search-bar .pos-search-input { min-height: 38px; font-size: 13px; }
+.list-filter-select { flex: 0 0 auto; width: auto; min-width: 112px; min-height: 40px; }
+.alerts-workspace > .list-search-bar { margin-bottom: 10px; }
+@media (max-width: 720px) {
+  .list-toolbar { flex-direction: column; align-items: stretch; }
+  .list-filter-select { width: 100%; }
+}
+
+/* Modals: fit the visible mobile viewport with even gutters */
+.modal-shell { padding: 16px; }
+.modal-card { width: min(920px, 100%); }
+@supports (height: 100dvh) {
+  .modal-shell { height: 100dvh; }
+  .modal-card { max-height: calc(100dvh - 32px); }
+  .inbound-modal-card { max-height: calc(100dvh - 32px); }
+}
+.modal-card > form .button-pair { position: sticky; bottom: -4px; z-index: 2; margin-top: 4px; padding: 12px 0 4px; background: #ffffff; border-top: 1px solid #e5e5e5; }
+@media (max-width: 720px) {
+  .modal-shell { padding: max(16px, env(safe-area-inset-top)) 12px max(16px, env(safe-area-inset-bottom)); }
+  .modal-card { padding: 14px; gap: 10px; }
+  .modal-card .button-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .modal-card .button-pair > button { width: 100%; }
+}

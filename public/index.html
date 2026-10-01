@@ -419,6 +419,10 @@
 
                 <section data-view="alerts" class="view-section hidden">
                     <div class="alerts-workspace">
+                        <label class="pos-search-bar list-search-bar">
+                            <i data-lucide="search" class="h-5 w-5" aria-hidden="true"></i>
+                            <input id="alert-search" type="search" class="pos-search-input" placeholder="Search product, code or barcode" autocomplete="off">
+                        </label>
                         <div class="alert-view-switch" role="tablist" aria-label="Stock alert detail views">
                             <button type="button" class="alert-view-button active" role="tab" aria-selected="true" data-alert-view="low">
                                 <i data-lucide="triangle-alert" class="h-4 w-4"></i><span data-i18n="low_stock">Low Stock</span>
@@ -480,6 +484,19 @@
 
                 <section data-view="history" class="view-section hidden">
                     <div class="history-page">
+                        <div class="list-toolbar">
+                            <label class="pos-search-bar list-search-bar">
+                                <i data-lucide="search" class="h-5 w-5" aria-hidden="true"></i>
+                                <input id="history-search" type="search" class="pos-search-input" placeholder="Search product, code, barcode, invoice, staff" autocomplete="off">
+                            </label>
+                            <select id="history-type" class="field-input list-filter-select" aria-label="Movement type">
+                                <option value="">All types</option>
+                                <option value="inbound">Inbound</option>
+                                <option value="sale">Sale</option>
+                                <option value="adjustment">Adjustment</option>
+                                <option value="deactivate">Archived</option>
+                            </select>
+                        </div>
                         <div class="table-wrap history-table-wrap">
                             <table class="data-table history-table">
                                 <thead>
