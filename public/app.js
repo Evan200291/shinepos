@@ -394,7 +394,17 @@ const translations = {
     }
 };
 
+function syncMobileFooterHeight() {
+    const footer = document.getElementById("mobile-footer");
+    const height = footer && footer.offsetParent !== null ? footer.offsetHeight : 0;
+    document.documentElement.style.setProperty("--mobile-footer-h", `${height || 76}px`);
+}
+
+window.addEventListener("resize", syncMobileFooterHeight);
+window.addEventListener("orientationchange", syncMobileFooterHeight);
+
 document.addEventListener("DOMContentLoaded", () => {
+    syncMobileFooterHeight();
     setDefaultDates();
     bindEvents();
     initDeviceSettings();
@@ -1084,6 +1094,7 @@ async function loadFilteredSalesAndRender() {
 }
 
 function renderAll() {
+    syncMobileFooterHeight();
     if (!state.user) {
         return;
     }
@@ -1550,6 +1561,7 @@ function renderCart() {
     $("cart-subtotal").textContent = formatCurrency(subtotal);
     $("cart-total").textContent = formatCurrency(total);
     $("checkout-button").disabled = state.cart.length === 0;
+    $("pos-cart").classList.toggle("is-empty", state.cart.length === 0);
     $("cart-item-count").textContent = `${itemCount} ${itemCount === 1 ? "item" : "items"}`;
 
     if (!state.cart.length) {

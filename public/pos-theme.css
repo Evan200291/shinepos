@@ -1261,3 +1261,35 @@ tr.row-clickable:hover td { background: #f6f9fe; }
 .rc-items-body { scrollbar-width: thin; scrollbar-gutter: stable; padding-right: 4px; }
 .rc-items-head { padding-right: 10px; }
 .rc-item { padding-right: 2px; }
+
+/* ===== POS cart: compact rows + always-reachable checkout bar ===== */
+.pos-checkout-bar { display: grid; gap: 9px; margin-top: 9px; }
+@media (max-width: 980px) {
+  .pos-cart-item { grid-template-columns: minmax(0, 1fr) 84px 76px 28px; grid-template-areas: "info step total remove"; align-items: center; gap: 8px; padding: 8px 0; }
+  .pos-cart-item-visual { display: none; }
+  .pos-cart-item-info { grid-area: info; align-self: center; }
+  .pos-cart-remove { grid-area: remove; width: 28px; height: 28px; }
+  .pos-cart-item-footer { display: contents; }
+  .pos-cart-stepper { grid-area: step; grid-template-columns: 26px 30px 26px; justify-self: center; }
+  .pos-cart-stepper button, .pos-cart-stepper input { height: 30px; min-height: 30px; }
+  .pos-cart-line-total { grid-area: total; justify-self: end; font-size: 12px; }
+  .pos-cart-item-name { font-size: 13px; }
+  .pos-cart-item-meta { margin-top: 2px; font-size: 10px; }
+  .pos-cart-summary { margin-top: 4px; padding-top: 8px; gap: 6px; }
+
+  .pos-checkout-bar { position: sticky; bottom: 0; z-index: 6; display: flex; align-items: center; gap: 12px; margin: 8px -12px 0; padding: 10px 12px; border-top: 1px solid #d5d9e2; background: #ffffff; box-shadow: 0 -6px 16px rgba(11, 47, 117, .08); }
+  .pos-checkout-bar .pos-cart-grand-total { flex: 0 0 auto; display: grid; gap: 0; padding: 0; border: 0; }
+  .pos-checkout-bar .pos-cart-grand-total span { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #6b7a90; }
+  .pos-checkout-bar .pos-cart-grand-total strong { font-size: 17px; line-height: 1.15; }
+  .pos-checkout-bar .pos-checkout-button { flex: 1 1 auto; width: auto; min-height: 46px; }
+}
+@media (max-width: 360px) {
+  .pos-cart-item { grid-template-columns: minmax(0, 1fr) 80px 68px 26px; gap: 6px; }
+  .pos-cart-stepper { grid-template-columns: 24px 30px 24px; }
+}
+
+@media (max-width: 980px) {
+  .content-scroll { padding-bottom: calc(var(--mobile-footer-h, 76px) + 8px); }
+  .pos-checkout-bar { bottom: -8px; }
+  .pos-cart.is-empty .pos-checkout-bar { display: none; }
+}
