@@ -25,6 +25,7 @@ const state = {
     posCategory: "all",
     posCategoryOpen: false,
     posSearchOpen: false,
+    checkingOut: false,
     posProductPage: 1,
     posProductTotalPages: 1,
     activeTab: getInitialActiveTab(),
@@ -307,7 +308,6 @@ const translations = {
         change_password: "စကားဝှက်ပြောင်းမည်",
         system_tools: "စနစ်ကိရိယာများ",
         export_excel: "Excel ထုတ်မည်",
-        backup_json: "JSON Backup",
         edit_product: "ပစ္စည်းပြင်မည်",
         cancel: "မလုပ်တော့ပါ",
         save_changes: "ပြင်ဆင်ချက်သိမ်းမည်",
@@ -319,6 +319,24 @@ const translations = {
         page_sales: "အရောင်း",
         page_alerts: "သတိပေးချက်",
         page_inbound: "ပစ္စည်းသွင်း",
+        suppliers: "ပေးသွင်းသူများ",
+        customers: "ဖောက်သည်များ",
+        expenses: "အသုံးစရိတ်",
+        add_supplier: "ပေးသွင်းသူ ထည့်မည်",
+        add_customer: "ဖောက်သည် ထည့်မည်",
+        add_expense: "အသုံးစရိတ် ထည့်မည်",
+        supplier_name: "ပေးသွင်းသူ အမည်",
+        customer_name: "ဖောက်သည် အမည်",
+        phone: "ဖုန်းနံပါတ်",
+        balance_owed: "ပေးရန်ကျန်ငွေ",
+        credit_balance: "အကြွေးကျန်ငွေ",
+        amount: "ငွေပမာဏ",
+        page_suppliers: "ပေးသွင်းသူများ",
+        page_customers: "ဖောက်သည်များ",
+        page_expenses: "အသုံးစရိတ်",
+        weekly_sales_chart: "အပတ်စဉ် ရောင်းအား",
+        best_sellers: "အရောင်းရဆုံး ပစ္စည်းများ",
+        backup_json: "JSON အရန်ဖိုင်",
         page_history: "စတော့မှတ်တမ်း",
         page_logs: "လှုပ်ရှားမှုမှတ်တမ်း",
         page_users: "အသုံးပြုသူများ",
@@ -450,6 +468,7 @@ function bindEvents() {
     $("inbound-modal").addEventListener("click", (event) => {
         if (event.target === $("inbound-modal")) closeInboundModal();
     });
+    $("receipt-done-button").addEventListener("click", () => $("receipt-modal").classList.add("hidden"));
     $("inbound-form").addEventListener("submit", handleInboundSubmit);
     bindBulkInbound();
     $("sales-report-type").addEventListener("change", handleSalesFilterChange);
@@ -1586,10 +1605,12 @@ function renderCart() {
 }
 
 async function handleCheckout() {
-    if (!state.cart.length) {
+    if (!state.cart.length || state.checkingOut) {
         return;
     }
 
+    state.checkingOut = true;
+    $("checkout-button").disabled = true;
     try {
         const response = await api("/api/sales", {
             method: "POST",
@@ -1615,6 +1636,9 @@ async function handleCheckout() {
         showNotification(`${t("msg_sale_complete")} ${response.invoiceNo}`);
     } catch (error) {
         showNotification(error.message, "error");
+    } finally {
+        state.checkingOut = false;
+        renderCart();
     }
 }
 
@@ -2018,7 +2042,7 @@ function closeInboundModal() {
 
 async function handleInboundSubmit(event) {
     event.preventDefault();
-    if (!bulkState.lines.length) return;
+    if (!bulkState.lines.length || bulkState.saving) return;
 
     const problems = [];
     bulkState.lines.forEach((line) => {
@@ -2042,6 +2066,7 @@ async function handleInboundSubmit(event) {
     }
 
     const saveButton = $("bulk-save");
+    bulkState.saving = true;
     saveButton.disabled = true;
     const supplierId = $("inbound-supplier").value || null;
     let saved = 0;
@@ -2069,6 +2094,7 @@ async function handleInboundSubmit(event) {
             line.error = error.message;
         }
     }
+    bulkState.saving = false;
     bulkPersist();
     renderBulkLines();
     await loadInitialData();
@@ -2614,7 +2640,7 @@ async function openReceiptById(saleId) {
 
 function openReceiptModal(sale) {
     state.receiptSale = sale;
-    $("receipt-content").innerHTML = buildReceiptMarkup(sale, { showProfit: canSeeProfit() });
+    $("receipt-content").innerHTML = buildReceiptPaper(sale, { showProfit: canSeeProfit() });
     $("receipt-modal").classList.remove("hidden");
     lucide.createIcons();
 }
@@ -2625,6 +2651,83 @@ function closeReceiptModal() {
 
 function canSeeProfit() {
     return state.user?.role === "admin" || state.user?.role === "super_admin";
+}
+
+
+function closeTopModal() {
+    const open = [...document.querySelectorAll(".modal-shell:not(.hidden)")].pop();
+    if (!open) return false;
+    if (open.id === "camera-scanner-modal") {
+        cameraScanner.close();
+        return true;
+    }
+    const closer = open.querySelector('[id*="close"], [id*="cancel"]');
+    if (closer) {
+        closer.click();
+    } else {
+        open.classList.add("hidden");
+    }
+    return true;
+}
+
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && closeTopModal()) event.stopPropagation();
+}, true);
+
+document.addEventListener("mousedown", (event) => {
+    if (event.target.classList?.contains("modal-shell") && event.target.id !== "camera-scanner-modal") {
+        closeTopModal();
+    }
+});
+
+function buildReceiptPaper(sale, options = {}) {
+    const itemCount = sale.items.reduce((sum, item) => sum + Number(item.quantity), 0);
+    const when = sale.createdAt ? formatDateTime(sale.createdAt) : formatDate(sale.saleDate);
+    const footer = voucherPrinter.footerText || "Thank you!";
+    const discount = Number(sale.discount || 0);
+    return `
+        <div class="rc-paper">
+            <header class="rc-head">
+                <img class="rc-logo" src="/logo.svg" alt="" width="32" height="32">
+                <div>
+                    <h3>${escapeHtml(VENDOR_NAME)}</h3>
+                    <p class="rc-kicker">Sales receipt</p>
+                </div>
+            </header>
+
+            <dl class="rc-meta">
+                <div class="rc-meta-wide"><dt>${escapeHtml(t("invoice"))}</dt><dd class="rc-mono">${escapeHtml(sale.invoiceNo)}</dd></div>
+                <div><dt>${escapeHtml(t("date"))}</dt><dd>${escapeHtml(when)}</dd></div>
+                <div><dt>${escapeHtml(t("cashier"))}</dt><dd>${escapeHtml(sale.cashierName)}</dd></div>
+            </dl>
+
+            <div class="rc-items" role="table">
+                <div class="rc-items-head" role="row">
+                    <span>${escapeHtml(t("product_name"))}</span><span class="rc-r">Qty</span><span class="rc-r">${escapeHtml(t("total"))}</span>
+                </div>
+                <div class="rc-items-body">
+                    ${sale.items.map((item) => `
+                        <div class="rc-item" role="row">
+                            <span class="rc-item-name">${escapeHtml(item.productName)}<small>@ ${escapeHtml(formatCurrency(item.sellPrice))}</small></span>
+                            <span class="rc-r rc-num">${escapeHtml(item.quantity)}</span>
+                            <span class="rc-r rc-num rc-amount">${escapeHtml(formatCurrency(item.lineTotal))}</span>
+                        </div>
+                    `).join("")}
+                </div>
+            </div>
+
+            <div class="rc-summary">
+                <div class="rc-sums">
+                    <div><span>${escapeHtml(t("items"))}</span><b>${escapeHtml(itemCount)}</b></div>
+                    <div><span>${escapeHtml(t("subtotal"))}</span><b>${escapeHtml(formatCurrency(sale.subtotal))}</b></div>
+                    ${discount > 0 ? `<div class="rc-discount"><span>${escapeHtml(t("discount"))}</span><b>&minus;${escapeHtml(formatCurrency(discount))}</b></div>` : ""}
+                </div>
+                <div class="rc-grand"><span>${escapeHtml(t("total"))}</span><strong>${escapeHtml(formatCurrency(sale.total))}</strong></div>
+                ${options.showProfit ? `<div class="rc-internal"><span>${escapeHtml(t("profit"))} <em>staff only &middot; not printed</em></span><b>${escapeHtml(formatCurrency(sale.profit))}</b></div>` : ""}
+                <footer class="rc-foot">${escapeHtml(footer)}</footer>
+            </div>
+        </div>
+    `;
 }
 
 function buildReceiptMarkup(sale, options = {}) {
@@ -3091,6 +3194,8 @@ const voucherPrinter = {
     // "serial" / "usb" send raw ESC/POS bytes directly to a connected thermal printer.
     connectionMode: localStorage.getItem("pharmacy_printer_connmode") || "dialog",
     serialPort: null,
+    baudRate: Number(localStorage.getItem("pharmacy_printer_baud")) || 9600,
+    reconnecting: null,
     usbDevice: null,
     usbInterfaceNumber: null,
     usbEndpointNumber: null,
@@ -3120,30 +3225,80 @@ const voucherPrinter = {
                     this.usbDevice = null;
                     this.usbInterfaceNumber = null;
                     this.usbEndpointNumber = null;
-                    showNotification("USB printer was unplugged. Plug it back in and click Connect.", "error");
+                    showNotification("USB printer was unplugged. Plug it back in and it reconnects automatically.", "error");
                     this.report("warn", "USB printer was unplugged");
                     this.updateUI();
                 }
             });
+            navigator.usb.addEventListener("connect", () => this.ensureConnected());
         }
+        if ("serial" in navigator) {
+            navigator.serial.addEventListener("disconnect", (event) => {
+                if (event.target === this.serialPort) {
+                    this.serialPort = null;
+                    this.updateUI();
+                }
+            });
+            navigator.serial.addEventListener("connect", () => this.ensureConnected());
+        }
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") this.ensureConnected();
+        });
     },
 
-    // Browsers forget the live connection on refresh, so re-open devices the user already approved.
+    // Re-open the remembered printer without any prompt. Safe to call any time.
+    async ensureConnected() {
+        if (!this.enabled || this.connectionMode === "dialog") return false;
+        if (this.isDirectConnected()) return true;
+        if (!this.reconnecting) {
+            this.reconnecting = this.restoreConnection().finally(() => {
+                this.reconnecting = null;
+                this.updateUI();
+            });
+            this.updateUI();
+        }
+        await this.reconnecting;
+        return this.isDirectConnected();
+    },
+
+    // Browsers drop the live connection on refresh, sleep or unplug, but remember which devices the user approved.
     async restoreConnection() {
         try {
             if (this.connectionMode === "usb" && "usb" in navigator) {
-                const savedId = localStorage.getItem("pharmacy_printer_usb_id");
-                const devices = await navigator.usb.getDevices();
-                const device = devices.find((d) => `${d.vendorId}:${d.productId}` === savedId);
-                if (device) await this.openUsbDevice(device);
+                if (!this.usbDevice?.opened) {
+                    const savedId = localStorage.getItem("pharmacy_printer_usb_id");
+                    const devices = await navigator.usb.getDevices();
+                    const device = devices.find((d) => `${d.vendorId}:${d.productId}` === savedId) || (devices.length === 1 ? devices[0] : null);
+                    if (device) await this.openUsbDevice(device);
+                }
             } else if (this.connectionMode === "serial" && "serial" in navigator) {
-                const [port] = await navigator.serial.getPorts();
-                if (port) {
-                    await port.open({ baudRate: 9600 });
-                    this.serialPort = port;
+                if (!this.serialPort?.writable) {
+                    let info = null;
+                    try { info = JSON.parse(localStorage.getItem("pharmacy_printer_serial_info") || "null"); } catch (error) { /* no saved info */ }
+                    const ports = await navigator.serial.getPorts();
+                    const port = ports.find((p) => {
+                        const details = p.getInfo();
+                        return info && details.usbVendorId === info.usbVendorId && details.usbProductId === info.usbProductId;
+                    }) || ports[0];
+                    if (port) {
+                        if (!port.writable) await port.open({ baudRate: this.baudRate });
+                        this.serialPort = port;
+                    }
+                }
+            } else if (this.connectionMode === "bluetooth" && "bluetooth" in navigator) {
+                if (!this.bleCharacteristic || !this.bleDevice?.gatt?.connected) {
+                    let device = this.bleDevice;
+                    if (!device && navigator.bluetooth.getDevices) {
+                        const savedId = localStorage.getItem("pharmacy_printer_ble_id");
+                        const known = await navigator.bluetooth.getDevices();
+                        device = known.find((d) => d.id === savedId) || null;
+                    }
+                    if (device) await this.attachBle(device);
                 }
             }
-        } catch (error) { this.report("warn", `Could not reopen the saved printer: ${error.name}: ${error.message}`); }
+        } catch (error) {
+            this.report("warn", `Could not reopen the saved printer: ${error.name}: ${error.message}`);
+        }
         this.updateUI();
     },
 
@@ -3175,11 +3330,12 @@ const voucherPrinter = {
         }
         try {
             const port = await navigator.serial.requestPort();
-            await port.open({ baudRate: 9600 });
             await this.disconnect(false);
+            await port.open({ baudRate: this.baudRate });
             this.serialPort = port;
             this.connectionMode = "serial";
             localStorage.setItem("pharmacy_printer_connmode", "serial");
+            try { localStorage.setItem("pharmacy_printer_serial_info", JSON.stringify(port.getInfo())); } catch (error) { /* optional */ }
             showNotification("Thermal printer connected (Serial).");
         } catch (error) {
             if (error.name !== "NotFoundError") {
@@ -3222,34 +3378,8 @@ const voucherPrinter = {
                 acceptAllDevices: true,
                 optionalServices: this.bleServices
             });
-            const server = await device.gatt.connect();
-            let characteristic = null;
-            for (const service of await server.getPrimaryServices()) {
-                for (const candidate of await service.getCharacteristics()) {
-                    if (candidate.properties.write || candidate.properties.writeWithoutResponse) {
-                        characteristic = candidate;
-                        break;
-                    }
-                }
-                if (characteristic) break;
-            }
-            if (!characteristic) {
-                device.gatt.disconnect();
-                throw new Error("No writable Bluetooth channel found. If this printer uses classic Bluetooth, pair it in Windows Bluetooth settings and use \"Connect via Serial\" instead.");
-            }
             await this.disconnect(false);
-            this.bleDevice = device;
-            this.bleCharacteristic = characteristic;
-            device.addEventListener("gattserverdisconnected", () => {
-                if (this.bleDevice === device) {
-                    this.bleDevice = null;
-                    this.bleCharacteristic = null;
-                    showNotification("Bluetooth printer disconnected.", "error");
-                    this.updateUI();
-                }
-            });
-            this.connectionMode = "bluetooth";
-            localStorage.setItem("pharmacy_printer_connmode", "bluetooth");
+            await this.attachBle(device);
             showNotification("Portable printer connected (Bluetooth).");
         } catch (error) {
             if (error.name !== "NotFoundError") {
@@ -3258,6 +3388,39 @@ const voucherPrinter = {
             }
         }
         this.updateUI();
+    },
+
+    async attachBle(device) {
+        const server = await device.gatt.connect();
+        let characteristic = null;
+        for (const service of await server.getPrimaryServices()) {
+            for (const candidate of await service.getCharacteristics()) {
+                if (candidate.properties.write || candidate.properties.writeWithoutResponse) {
+                    characteristic = candidate;
+                    break;
+                }
+            }
+            if (characteristic) break;
+        }
+        if (!characteristic) {
+            device.gatt.disconnect();
+            throw new Error("No writable Bluetooth channel found. If this printer uses classic Bluetooth, pair it in Windows Bluetooth settings and use \"Connect via Serial\" instead.");
+        }
+        this.bleDevice = device;
+        this.bleCharacteristic = characteristic;
+        if (!device.kksListening) {
+            device.kksListening = true;
+            // Keep the device so it can reconnect after the printer sleeps; only the live channel is dropped.
+            device.addEventListener("gattserverdisconnected", () => {
+                if (this.bleDevice === device) {
+                    this.bleCharacteristic = null;
+                    this.updateUI();
+                }
+            });
+        }
+        this.connectionMode = "bluetooth";
+        localStorage.setItem("pharmacy_printer_connmode", "bluetooth");
+        localStorage.setItem("pharmacy_printer_ble_id", device.id);
     },
 
     async disconnect(resetMode = true) {
@@ -3289,8 +3452,8 @@ const voucherPrinter = {
     },
 
     isDirectConnected() {
-        return (this.connectionMode === "serial" && !!this.serialPort)
-            || (this.connectionMode === "usb" && !!this.usbDevice)
+        return (this.connectionMode === "serial" && !!this.serialPort?.writable)
+            || (this.connectionMode === "usb" && !!this.usbDevice?.opened)
             || (this.connectionMode === "bluetooth" && !!this.bleCharacteristic && !!this.bleDevice?.gatt?.connected);
     },
 
@@ -3456,7 +3619,9 @@ const voucherPrinter = {
             if (text) text.textContent = `Connected directly (${this.connectionMode.toUpperCase()}) — ${label}, ${this.copies} ${this.copies === 1 ? "copy" : "copies"}`;
         } else {
             if (dot) dot.className = "status-indicator listening";
-            if (text) text.textContent = "Not connected — click Connect below";
+            if (text) text.textContent = this.reconnecting
+                ? "Reconnecting to the saved printer\u2026"
+                : "Not connected \u2014 switch the printer on and it reconnects automatically, or click Connect below";
         }
     },
 
@@ -3511,17 +3676,27 @@ const voucherPrinter = {
     },
 
     async printVoucher(sale) {
+        if (this.connectionMode !== "dialog") await this.ensureConnected();
         if (this.isDirectConnected()) {
-            try {
-                const bytes = this.buildEscPosBytes(sale);
-                for (let copy = 0; copy < this.copies; copy += 1) {
-                    const sent = await this.sendBytes(bytes);
-                    if (!sent) throw new Error("Printer is not connected.");
+            const bytes = this.buildEscPosBytes(sale);
+            for (let attempt = 1; attempt <= 2; attempt += 1) {
+                try {
+                    for (let copy = 0; copy < this.copies; copy += 1) {
+                        const sent = await this.sendBytes(bytes);
+                        if (!sent) throw new Error("Printer is not connected.");
+                    }
+                    return;
+                } catch (error) {
+                    this.report("error", `Direct print failed (attempt ${attempt}): ${error.name}: ${error.message}`);
+                    if (attempt === 1) {
+                        // The link probably went stale (printer slept or cable moved): drop it and reopen once.
+                        this.bleCharacteristic = null;
+                        if (this.serialPort) { try { await this.serialPort.close(); } catch (closeError) { /* already closed */ } this.serialPort = null; }
+                        if (await this.ensureConnected()) continue;
+                    }
+                    showNotification(`Direct print failed (${error.message}). Falling back to the print dialog.`, "error");
+                    break;
                 }
-                return;
-            } catch (error) {
-                showNotification(`Direct print failed (${error.message}). Falling back to the print dialog.`, "error");
-                this.report("error", `Direct print failed: ${error.name}: ${error.message}`);
             }
         }
 
@@ -3622,12 +3797,13 @@ const cameraScanner = {
                     barcodeScanner.reportTest(value);
                     return;
                 }
-                const now = Date.now();
-                if (value !== this.lastValue || now - this.lastTime > 2000) {
+                this.lastSeen = Date.now();
+                if (value !== this.lastValue) {
                     this.lastValue = value;
-                    this.lastTime = now;
                     barcodeScanner.processBarcode(value);
                 }
+            } else if (this.lastValue && Date.now() - (this.lastSeen || 0) > 700) {
+                this.lastValue = null;
             }
         } catch (error) { /* transient decode errors are expected between frames */ }
         this.rafId = requestAnimationFrame(() => this.loop(video));
@@ -3635,6 +3811,7 @@ const cameraScanner = {
 
     close() {
         this.detecting = false;
+        this.lastValue = null;
         if (this.rafId) cancelAnimationFrame(this.rafId);
         if (this.stream) {
             this.stream.getTracks().forEach((track) => track.stop());
