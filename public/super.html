@@ -542,6 +542,7 @@
                                 <tbody id="shops-table"></tbody>
                             </table>
                         </div>
+                            <div id="shops-pager" class="pager"></div>
                     </div>
                 </section>
 
@@ -601,6 +602,7 @@
                                 <tbody id="logs-table"></tbody>
                             </table>
                         </div>
+                            <div id="logs-pager" class="pager"></div>
                     </div>
                 </section>
 
@@ -662,6 +664,7 @@
                                 </select>
                             </div>
                             <ul id="activity-feed" class="activity-feed"></ul>
+                            <div id="activity-pager" class="pager"></div>
                         </div>
 
                         <!-- Sales Panel -->
@@ -681,6 +684,7 @@
                                     <tbody id="sales-table"></tbody>
                                 </table>
                             </div>
+                            <div id="sales-pager" class="pager"></div>
                         </div>
 
                         <!-- Users Panel -->
@@ -706,6 +710,7 @@
                                     <tbody id="users-table"></tbody>
                                 </table>
                             </div>
+                            <div id="users-pager" class="pager"></div>
                         </div>
 
                         <!-- Products Panel -->
@@ -723,6 +728,7 @@
                                     <tbody id="products-table"></tbody>
                                 </table>
                             </div>
+                            <div id="products-pager" class="pager"></div>
                         </div>
 
                         <!-- Stock Movements Panel -->
@@ -742,6 +748,7 @@
                                     <tbody id="movements-table"></tbody>
                                 </table>
                             </div>
+                            <div id="movements-pager" class="pager"></div>
                         </div>
 
                         <!-- Subscriptions Panel -->
@@ -759,6 +766,7 @@
                                     <tbody id="subscriptions-table"></tbody>
                                 </table>
                             </div>
+                            <div id="subscriptions-pager" class="pager"></div>
                         </div>
                     </div>
                 </section>
@@ -872,7 +880,7 @@
             const rows = (state.activity || []).filter(item =>
                 (!kind || activityKind(item.action) === kind) &&
                 (!term || [item.description, item.actorName, item.action, item.ipAddress].some(v => String(v || '').toLowerCase().includes(term))));
-            list.innerHTML = rows.slice(0, 200).map(item => {
+            renderPaged('activity', rows, item => {
                 const k = activityKind(item.action);
                 return `<li class="activity-item">
                     <span class="activity-icon" data-kind="${k}"><i data-lucide="${ACTIVITY_KINDS[k].icon}"></i></span>
@@ -880,8 +888,7 @@
                         <span>${escapeHtml(item.actorName)}${item.actorRole ? ' · ' + escapeHtml(item.actorRole) : ''}${item.ipAddress ? ' · IP ' + escapeHtml(item.ipAddress) : ''}</span></div>
                     <div class="activity-time"><b>${escapeHtml(timeAgo(item.createdAt))}</b>${escapeHtml(formatDateTimeShort(item.createdAt))}</div>
                 </li>`;
-            }).join('') || '<li class="empty-state">No activity recorded for this filter.</li>';
-            lucide.createIcons();
+            }, '<li class="empty-state">No activity recorded for this filter.</li>');
         }
 
         function formatDateTimeShort(value) {
@@ -912,6 +919,59 @@
                 img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('This image could not be read.')); };
                 img.src = url;
             });
+        }
+
+        // ---- Pagination (same pager look as the shop app) ----
+        const PAGED = {
+            shops: { body: 'shops-table', size: 10 },
+            users: { body: 'users-table', size: 10 },
+            products: { body: 'products-table', size: 10 },
+            movements: { body: 'movements-table', size: 10 },
+            subscriptions: { body: 'subscriptions-table', size: 8 },
+            sales: { body: 'sales-table', size: 10 },
+            activity: { body: 'activity-feed', size: 15 },
+            logs: { body: 'logs-table', size: 15 }
+        };
+        const pageState = {};
+
+        function renderPaged(key, rows, rowFn, emptyHtml) {
+            const config = PAGED[key];
+            const entry = pageState[key] = { page: 1, ...(pageState[key] || {}), rows, rowFn, emptyHtml };
+            const totalPages = Math.max(1, Math.ceil(rows.length / config.size));
+            entry.page = Math.min(Math.max(entry.page, 1), totalPages);
+            const start = (entry.page - 1) * config.size;
+            document.getElementById(config.body).innerHTML =
+                rows.slice(start, start + config.size).map((row, i) => rowFn(row, start + i)).join('') || emptyHtml;
+            renderSaPager(key, entry.page, totalPages);
+            lucide.createIcons();
+        }
+
+        function resetPages(...keys) {
+            keys.forEach(key => { if (pageState[key]) pageState[key].page = 1; });
+        }
+
+        function renderSaPager(key, current, totalPages) {
+            const container = document.getElementById(key + '-pager');
+            if (!container) return;
+            if (totalPages <= 1) {
+                container.innerHTML = '';
+                return;
+            }
+            const radius = window.innerWidth <= 720 ? 1 : 2;
+            const startPage = Math.max(1, current - radius);
+            const endPage = Math.min(totalPages, current + radius);
+            const button = (page, label = page, extra = '') =>
+                `<button type="button" class="pager-button ${page === current ? 'pager-button-active' : ''}" data-sa-page="${key}" data-page-number="${page}" ${extra}>${label}</button>`;
+            const pages = [];
+            for (let page = startPage; page <= endPage; page += 1) pages.push(button(page));
+            container.innerHTML = `
+                <div class="pager-track">
+                    <button type="button" class="pager-arrow" data-sa-page="${key}" data-page-number="${Math.max(1, current - 1)}" ${current === 1 ? 'disabled' : ''}>‹</button>
+                    ${startPage > 1 ? button(1) + '<span class="pager-gap">...</span>' : ''}
+                    ${pages.join('')}
+                    ${endPage < totalPages ? '<span class="pager-gap">...</span>' + button(totalPages) : ''}
+                    <button type="button" class="pager-arrow" data-sa-page="${key}" data-page-number="${Math.min(totalPages, current + 1)}" ${current === totalPages ? 'disabled' : ''}>›</button>
+                </div>`;
         }
 
         // ---- Utility ----
@@ -1054,7 +1114,7 @@
         function renderShops() {
             renderShopKpis();
             const tbody = document.getElementById('shops-table');
-            tbody.innerHTML = state.shops.map(shop => {
+            renderPaged('shops', state.shops, shop => {
                 const subscriptionText = shop.subscription ? formatDaysLeft(shop.subscription.end_date) : 'No subscription';
                 // Three distinct states: the server only blocks access for
                 // disabled shops and expired plans, so an unmetered shop is
@@ -1089,7 +1149,7 @@
                             </div>
                         </td>
                     </tr>`;
-            }).join('') || '<tr><td colspan="7" class="empty-state">No shops found. Click "Add Shop" to create one.</td></tr>';
+            }, '<tr><td colspan="7" class="empty-state">No shops found. Click "Add Shop" to create one.</td></tr>');
             lucide.createIcons();
         }
 
@@ -1105,6 +1165,11 @@
             const pt = document.getElementById('page-title');
             if (pt) pt.textContent = shop.name;
             setActiveNav(null);
+
+            if (state.pagedShopId !== shop.id) {
+                resetPages('activity', 'sales', 'users', 'products', 'movements', 'subscriptions');
+                state.pagedShopId = shop.id;
+            }
 
             let shopsData, usersData, productsData, movementsData, subsData, overview, activityData, salesData;
             try {
@@ -1169,7 +1234,7 @@
             state.activity = activityData.activity;
             renderActivity();
 
-            document.getElementById('sales-table').innerHTML = salesData.sales.slice(0, 200).map(sale => `
+            renderPaged('sales', salesData.sales, sale => `
                     <tr>
                         <td data-label="Invoice"><strong>${escapeHtml(sale.invoiceNo)}</strong></td>
                         <td data-label="Date">${escapeHtml(formatDateTimeShort(sale.createdAt))}</td>
@@ -1178,14 +1243,14 @@
                         <td data-label="Total" class="text-right"><strong>${formatKs(sale.total)}</strong></td>
                         <td data-label="Profit" class="text-right">${formatKs(sale.profit)}</td>
                     </tr>
-                `).join('') || '<tr><td colspan="6" class="empty-state">No sales yet.</td></tr>';
+                `, '<tr><td colspan="6" class="empty-state">No sales yet.</td></tr>');
 
             const hasSub = subsData.subscriptions.length > 0;
             document.getElementById('add-sub-btn').innerHTML = hasSub
                 ? '<i data-lucide="pencil" class="h-4 w-4"></i> Edit Subscription'
                 : '<i data-lucide="calendar-plus" class="h-4 w-4"></i> Add Subscription';
 
-            document.getElementById('users-table').innerHTML = usersData.users.map(user => `
+            renderPaged('users', usersData.users, user => `
                     <tr>
                         <td data-label="Name">${escapeHtml(user.fullName)}</td>
                         <td data-label="Username">${escapeHtml(user.username)}</td>
@@ -1201,9 +1266,9 @@
                             </div>
                         </td>
                     </tr>
-                `).join('') || '<tr><td colspan="6" class="empty-state">No users in this shop.</td></tr>';
+                `, '<tr><td colspan="6" class="empty-state">No users in this shop.</td></tr>');
 
-            document.getElementById('products-table').innerHTML = productsData.products.map(p => `
+            renderPaged('products', productsData.products, p => `
                     <tr>
                         <td data-label="Code">${escapeHtml(p.code)}</td>
                         <td data-label="Product">${escapeHtml(p.name)}</td>
@@ -1214,9 +1279,9 @@
                             </span>
                         </td>
                     </tr>
-                `).join('') || '<tr><td colspan="4" class="empty-state">No products in this shop.</td></tr>';
+                `, '<tr><td colspan="4" class="empty-state">No products in this shop.</td></tr>');
 
-            document.getElementById('movements-table').innerHTML = movementsData.movements.map(m => `
+            renderPaged('movements', movementsData.movements, m => `
                     <tr>
                         <td data-label="Date">${formatDate(m.createdAt)}</td>
                         <td data-label="Product">${escapeHtml(m.productName)}</td>
@@ -1225,9 +1290,9 @@
                         <td data-label="Balance" class="text-right">${m.balanceAfter}</td>
                         <td data-label="Note">${escapeHtml(m.note || '')}</td>
                     </tr>
-                `).join('') || '<tr><td colspan="6" class="empty-state">No stock movements recorded.</td></tr>';
+                `, '<tr><td colspan="6" class="empty-state">No stock movements recorded.</td></tr>');
 
-            document.getElementById('subscriptions-table').innerHTML = subsData.subscriptions.map((s, index) => {
+            renderPaged('subscriptions', subsData.subscriptions, (s, index) => {
                 const today = todayIso();
                 const pill = index !== 0
                     ? ''
@@ -1242,7 +1307,7 @@
                         <td data-label="Created"><span class="cell-value">${formatDate(s.created_at)}</span></td>
                     </tr>
                 `;
-            }).join('') || '<tr><td colspan="4" class="empty-state">No subscriptions found.</td></tr>';
+            }, '<tr><td colspan="4" class="empty-state">No subscriptions found.</td></tr>');
 
             lucide.createIcons();
         }
@@ -1261,14 +1326,15 @@
 
         async function loadLogs() {
             const tbody = document.getElementById('logs-table');
-            const params = new URLSearchParams({ limit: '200' });
+            const params = new URLSearchParams({ limit: '500' });
             const level = document.getElementById('logs-level').value;
             const source = document.getElementById('logs-source').value;
             if (level) params.set('level', level);
             if (source) params.set('source', source);
             try {
                 const data = await api('/api/super/logs?' + params.toString());
-                tbody.innerHTML = data.logs.map(log => {
+                resetPages('logs');
+                renderPaged('logs', data.logs, log => {
                     const shown = log.meta ? Object.entries(log.meta).filter(([key]) => key !== 'userAgent').map(([key, value]) => key + '=' + value).join(' · ') : '';
                     const meta = shown ? '<div class="muted" style="font-size: 12px; margin-top: 4px;">' + escapeHtml(shown) + '</div>' : '';
                     const levelClass = log.level === 'error' ? 'status-inactive' : log.level === 'warn' ? 'status-suspended' : 'status-active';
@@ -1278,7 +1344,7 @@
                         <td data-label="Source">${escapeHtml(log.source)}</td>
                         <td data-label="Message" style="word-break: break-word; white-space: pre-wrap;">${escapeHtml(log.message)}${meta}</td>
                     </tr>`;
-                }).join('') || '<tr><td colspan="4" class="empty-state">No log entries.</td></tr>';
+                }, '<tr><td colspan="4" class="empty-state">No log entries.</td></tr>');
             } catch (err) {
                 notify(err.message, true);
             }
@@ -1378,8 +1444,18 @@
                 const copy = e.target.closest('[data-copy]');
                 if (copy) copyText(copy.dataset.copy);
             });
-            document.getElementById('activity-search').addEventListener('input', renderActivity);
-            document.getElementById('activity-kind').addEventListener('change', renderActivity);
+            document.getElementById('activity-search').addEventListener('input', () => { resetPages('activity'); renderActivity(); });
+            document.getElementById('activity-kind').addEventListener('change', () => { resetPages('activity'); renderActivity(); });
+            document.addEventListener('click', (e) => {
+                const pagerButton = e.target.closest('[data-sa-page]');
+                if (!pagerButton || pagerButton.disabled) return;
+                const key = pagerButton.dataset.saPage;
+                const entry = pageState[key];
+                if (!entry) return;
+                entry.page = Number(pagerButton.dataset.pageNumber);
+                renderPaged(key, entry.rows, entry.rowFn, entry.emptyHtml);
+                document.getElementById(PAGED[key].body).closest('.table-wrap, .detail-panel, .surface-panel')?.scrollIntoView({ block: 'nearest' });
+            });
 
             document.getElementById('sa-login-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
