@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exabyte POS — Point of sale for clinics, stores and online shops</title>
+    <meta name="description" content="Cloud point of sale for Myanmar businesses: sales, stock, expiry alerts, suppliers, expenses and monthly profit. Works on phone, tablet and PC with receipt printers and barcode scanners.">
+    <link rel="icon" href="/logo.svg" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --brand-50: #f0fdfa; --brand-100: #ccfbf1; --brand-200: #99f6e4; --brand-500: #14b8a6;
+            --brand-600: #0d9488; --brand-700: #0f766e; --brand-800: #115e59; --brand-900: #134e4a;
+            --bg: #f4f6f8; --surface: #fff; --surface-2: #f8fafc; --border: #e2e8f0; --border-strong: #cbd5e1;
+            --text: #1e293b; --text-2: #475569; --muted: #64748b; --faint: #94a3b8;
+            --amber: #f59e0b; --indigo: #6366f1; --rose: #f43f5e; --green: #16a34a;
+            --radius: 10px; --radius-lg: 16px;
+            --e1: 0 1px 2px rgba(15, 23, 42, .05);
+            --e2: 0 1px 2px rgba(15, 23, 42, .04), 0 6px 20px rgba(15, 23, 42, .07);
+            --e3: 0 30px 60px -20px rgba(15, 23, 42, .28);
+            --font: Inter, "Segoe UI", "Myanmar Text", "Pyidaungsu", "Padauk", system-ui, sans-serif;
+            --wrap: 1180px;
+        }
+        * { box-sizing: border-box; }
+        html { scroll-behavior: smooth; scroll-padding-top: 76px; }
+        body { margin: 0; font-family: var(--font); color: var(--text); background: var(--surface); font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+        html[lang="my"] body { line-height: 1.75; }
+        a { color: var(--brand-700); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        img, svg { display: block; }
+        h1, h2, h3, h4 { margin: 0; letter-spacing: -0.02em; line-height: 1.2; color: var(--text); }
+        html[lang="my"] h1, html[lang="my"] h2, html[lang="my"] h3 { letter-spacing: 0; line-height: 1.45; }
+        p { margin: 0; }
+        button, input { font: inherit; }
+        :focus-visible { outline: 2px solid var(--brand-600); outline-offset: 2px; }
+
+        /* Bilingual content: every translatable block comes in an EN and an MM twin. */
+        html[lang="my"] [data-l="en"], html:not([lang="my"]) [data-l="mm"] { display: none !important; }
+
+        .wrap { width: 100%; max-width: var(--wrap); margin: 0 auto; padding: 0 20px; }
+        .section { padding: 84px 0; }
+        .section.alt { background: var(--bg); }
+        .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--brand-700); }
+        .section-head { max-width: 720px; margin: 0 auto 44px; text-align: center; }
+        .section-head h2 { font-size: clamp(26px, 3.2vw, 38px); font-weight: 800; margin-top: 10px; }
+        .section-head p { margin-top: 12px; color: var(--text-2); font-size: 16.5px; }
+
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: var(--radius); font-weight: 600; font-size: 14.5px; border: 1px solid transparent; cursor: pointer; text-decoration: none !important; transition: background .15s, border-color .15s, transform .15s, box-shadow .15s; white-space: nowrap; }
+        .btn svg { width: 18px; height: 18px; }
+        .btn-primary { background: var(--brand-600); color: #fff; box-shadow: 0 6px 16px -6px rgba(13, 148, 136, .55); }
+        .btn-primary:hover { background: var(--brand-700); }
+        .btn-ghost { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
+        .btn-ghost:hover { border-color: var(--brand-500); color: var(--brand-700); }
+        .btn-light { background: #fff; color: var(--brand-800); }
+        .btn-light:hover { background: var(--brand-50); }
+        .btn-outline-light { background: transparent; color: #fff; border-color: rgba(255, 255, 255, .45); }
+        .btn-outline-light:hover { background: rgba(255, 255, 255, .1); }
+        .btn-lg { min-height: 50px; padding: 0 22px; font-size: 15.5px; border-radius: 12px; }
+
+        /* ---------- Top bar ---------- */
+        .topbar { position: sticky; top: 0; z-index: 50; background: rgba(255, 255, 255, .86); backdrop-filter: saturate(1.6) blur(14px); border-bottom: 1px solid transparent; transition: border-color .2s; }
+        .topbar.scrolled { border-bottom-color: var(--border); }
+        .topbar .wrap { display: flex; align-items: center; gap: 24px; height: 68px; }
+        .brand { flex: none; display: flex; align-items: center; gap: 10px; color: var(--text); font-weight: 800; font-size: 17px; letter-spacing: -0.02em; text-decoration: none !important; }
+        .brand-logo { width: 38px; height: 38px; border-radius: 9px; }
+        .brand-divider { width: 1px; height: 30px; background: var(--border-strong); }
+        .brand-word { color: #0f4c5c; font-weight: 800; font-size: 19px; letter-spacing: -0.01em; line-height: 1; }
+        .brand-word small { display: block; white-space: nowrap; font-size: 8.5px; font-weight: 600; letter-spacing: .42em; margin-top: 4px; color: #0f4c5c; }
+        .brand-pos { font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--brand-700); background: var(--brand-50); border: 1px solid var(--brand-200); border-radius: 6px; padding: 3px 7px; }
+        .nav-links { display: flex; gap: 4px; margin-left: 12px; }
+        .nav-links a { white-space: nowrap; color: var(--text-2); font-weight: 500; font-size: 14px; padding: 8px 12px; border-radius: 8px; text-decoration: none; }
+        .nav-links a:hover { background: var(--surface-2); color: var(--text); }
+        .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+        .lang { display: inline-flex; padding: 3px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; }
+        .lang button { border: 0; background: transparent; padding: 5px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 700; color: var(--muted); cursor: pointer; }
+        .lang button.on { background: #fff; color: var(--brand-700); box-shadow: var(--e1); }
+        .menu-btn { display: none; width: 42px; height: 42px; border-radius: 10px; border: 1px solid var(--border); background: #fff; place-items: center; cursor: pointer; }
+        .mobile-nav { display: none; }
+
+        /* ---------- Hero ---------- */
+        .hero { position: relative; overflow: hidden; padding: 64px 0 76px; background:
+            radial-gradient(900px 420px at 85% -10%, rgba(20, 184, 166, .16), transparent 60%),
+            radial-gradient(700px 380px at -10% 20%, rgba(99, 102, 241, .08), transparent 60%), var(--surface); }
+        .hero .wrap { display: grid; grid-template-columns: 1.02fr 1fr; gap: 56px; align-items: center; }
+        .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 999px; background: #fff; border: 1px solid var(--border); font-size: 13px; color: var(--text-2); box-shadow: var(--e1); }
+        .pill b { background: var(--brand-50); color: var(--brand-700); border-radius: 999px; padding: 2px 9px; font-size: 12px; }
+        .hero h1 { font-size: clamp(34px, 4.6vw, 56px); font-weight: 800; margin-top: 18px; line-height: 1.08; }
+        html[lang="my"] .hero h1 { font-size: clamp(22px, 3vw, 34px); line-height: 1.55; }
+        html[lang="my"] body { font-size: 14px; }
+        html[lang="my"] .hero-sub, html[lang="my"] .section-head p { font-size: 14.5px; }
+        html[lang="my"] .section-head h2 { font-size: clamp(20px, 2.6vw, 30px); }
+        html[lang="my"] .card h3, html[lang="my"] .step h3 { font-size: 15px; }
+        html[lang="my"] .card p, html[lang="my"] .biz ul, html[lang="my"] .guide-steps li, html[lang="my"] .screen-parts { font-size: 13.5px; }
+        html[lang="my"] .btn { font-size: 13.5px; }
+        html[lang="my"] .btn-lg { font-size: 14px; }
+        html[lang="my"] .nav-links a, html[lang="my"] .guide-tab { font-size: 13px; }
+        .hero h1 em { font-style: normal; background: linear-gradient(90deg, var(--brand-600), var(--brand-500)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+        .hero-sub { margin-top: 18px; font-size: 17.5px; color: var(--text-2); max-width: 560px; }
+        .hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+        .shop-finder { margin-top: 26px; max-width: 520px; background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 14px; box-shadow: var(--e2); }
+        .shop-finder label { display: block; font-size: 13px; font-weight: 600; color: var(--text-2); margin-bottom: 8px; }
+        .finder-row { display: flex; gap: 8px; }
+        .finder-input { flex: 1; min-width: 0; display: flex; align-items: center; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface-2); overflow: hidden; }
+        .finder-input:focus-within { border-color: var(--brand-600); box-shadow: 0 0 0 3px rgba(13, 148, 136, .18); background: #fff; }
+        .finder-input span { padding-left: 12px; color: var(--muted); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
+        .finder-input input { flex: 1; min-width: 60px; border: 0; outline: 0; background: transparent; height: 44px; padding: 0 12px 0 2px; font-weight: 600; color: var(--text); }
+        .finder-msg { margin-top: 8px; font-size: 13px; color: #dc2626; min-height: 0; }
+        .finder-msg:empty { display: none; }
+        .hero-trust { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 22px; color: var(--muted); font-size: 13.5px; }
+        .hero-trust span { display: inline-flex; align-items: center; gap: 6px; }
+        .hero-trust svg { width: 16px; height: 16px; color: var(--brand-600); }
+
+        /* Product preview (drawn with CSS so it always matches the real app) */
+        .mock { position: relative; }
+        .mock-window { background: #fff; border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--e3); overflow: hidden; }
+        .mock-bar { display: flex; align-items: center; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
+        .mock-bar i { width: 10px; height: 10px; border-radius: 50%; background: var(--border-strong); }
+        .mock-bar em { margin-left: 10px; font-style: normal; font-size: 12px; color: var(--muted); background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 2px 10px; }
+        .mock-body { display: grid; grid-template-columns: 132px 1fr; min-height: 340px; }
+        .mock-side { border-right: 1px solid var(--border); padding: 14px 10px; display: grid; align-content: start; gap: 6px; }
+        .mock-side b { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+        .mock-side b::before { content: ""; width: 20px; height: 20px; border-radius: 6px; background: linear-gradient(135deg, var(--brand-500), var(--brand-700)); }
+        .mock-nav { height: 26px; border-radius: 7px; background: var(--surface-2); display: flex; align-items: center; padding: 0 8px; gap: 6px; font-size: 11px; color: var(--muted); }
+        .mock-nav.on { background: var(--brand-50); color: var(--brand-700); font-weight: 700; }
+        .mock-main { padding: 14px; display: grid; gap: 12px; align-content: start; }
+        .mock-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .mock-card { border: 1px solid var(--border); border-radius: 10px; padding: 9px 10px; }
+        .mock-card small { display: block; font-size: 10.5px; color: var(--muted); }
+        .mock-card strong { font-size: 15px; }
+        .mock-card .up { font-size: 10px; color: var(--green); font-weight: 700; }
+        .mock-chart { border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: flex; align-items: flex-end; gap: 8px; height: 120px; }
+        .mock-chart span { flex: 1; border-radius: 5px 5px 2px 2px; background: linear-gradient(180deg, var(--brand-500), var(--brand-600)); opacity: .9; }
+        .mock-chart span:nth-child(odd) { background: linear-gradient(180deg, #99f6e4, #5eead4); }
+        .mock-float { position: absolute; background: #fff; border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--e2); padding: 12px 14px; display: flex; align-items: center; gap: 10px; font-size: 13px; }
+        .mock-float .ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; }
+        .mock-float .ic svg { width: 18px; height: 18px; }
+        .mock-float small { display: block; color: var(--muted); font-size: 11.5px; }
+        .mock-float.f1 { left: -26px; bottom: 34px; }
+        .mock-float.f1 .ic { background: #dcfce7; color: var(--green); }
+        .mock-float.f2 { right: -18px; top: -22px; }
+        .mock-float.f2 .ic { background: #fef3c7; color: #b45309; }
+
+        /* ---------- Strip ---------- */
+        .strip { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--surface-2); }
+        .strip .wrap { display: grid; grid-template-columns: repeat(4, 1fr); }
+        .strip div.item { padding: 22px 18px; display: flex; gap: 12px; align-items: center; border-right: 1px solid var(--border); }
+        .strip div.item:last-child { border-right: 0; }
+        .strip .ic { width: 40px; height: 40px; border-radius: 10px; background: #fff; border: 1px solid var(--border); display: grid; place-items: center; color: var(--brand-600); flex: none; }
+        .strip .ic svg { width: 20px; height: 20px; }
+        .strip strong { display: block; font-size: 14.5px; }
+        .strip small { color: var(--muted); font-size: 12.5px; }
+
+        /* ---------- Cards ---------- */
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+        .card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 22px; box-shadow: var(--e1); transition: box-shadow .2s, transform .2s, border-color .2s; }
+        .card:hover { box-shadow: var(--e2); border-color: var(--border-strong); }
+        .card h3 { font-size: 16.5px; font-weight: 700; margin-top: 14px; }
+        .card p { color: var(--text-2); margin-top: 6px; font-size: 14.5px; }
+        .icon-tile { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--brand-50); color: var(--brand-700); }
+        .icon-tile svg { width: 22px; height: 22px; }
+        .tone-indigo { background: #eef2ff; color: #4f46e5; }
+        .tone-amber { background: #fef3c7; color: #b45309; }
+        .tone-rose { background: #ffe4e6; color: #e11d48; }
+        .tone-green { background: #dcfce7; color: #15803d; }
+        .tone-violet { background: #f3e8ff; color: #7c3aed; }
+        .tone-sky { background: #e0f2fe; color: #0369a1; }
+
+        .biz { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+        .biz-top { padding: 22px 22px 18px; background: linear-gradient(160deg, var(--brand-50), #fff 70%); border-bottom: 1px solid var(--border); }
+        .biz:nth-child(2) .biz-top { background: linear-gradient(160deg, #fef3c7, #fff 70%); }
+        .biz:nth-child(3) .biz-top { background: linear-gradient(160deg, #eef2ff, #fff 70%); }
+        .biz:nth-child(4) .biz-top { background: linear-gradient(160deg, #ffe4e6, #fff 70%); }
+        .biz ul { list-style: none; margin: 0; padding: 18px 22px 22px; display: grid; gap: 9px; font-size: 14px; color: var(--text-2); }
+        .biz li { display: flex; gap: 8px; align-items: flex-start; }
+        .biz li svg { width: 16px; height: 16px; color: var(--brand-600); flex: none; margin-top: 3px; }
+
+        .steps { counter-reset: step; }
+        .step { position: relative; padding-top: 18px; }
+        .step::before { counter-increment: step; content: counter(step); width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--brand-600); color: #fff; font-weight: 800; font-size: 14px; box-shadow: 0 0 0 6px var(--brand-50); }
+        .step h3 { margin-top: 16px; }
+
+        /* ---------- Pricing ---------- */
+        .pricing { display: grid; grid-template-columns: 1.05fr 1fr; gap: 20px; align-items: stretch; }
+        .price-card { position: relative; border-radius: 20px; padding: 30px; color: #fff; background:
+            radial-gradient(500px 260px at 100% 0%, rgba(255, 255, 255, .16), transparent 60%),
+            linear-gradient(150deg, var(--brand-600), var(--brand-800)); box-shadow: var(--e3); overflow: hidden; }
+        .price-card h3 { color: #fff; font-size: 18px; }
+        .price-tag { display: flex; align-items: baseline; gap: 8px; margin-top: 14px; }
+        .price-tag strong { font-size: 54px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+        .price-tag span { font-size: 16px; opacity: .85; }
+        .price-note { margin-top: 10px; display: inline-flex; gap: 8px; align-items: center; background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .22); padding: 6px 12px; border-radius: 999px; font-size: 13.5px; font-weight: 600; }
+        .price-card ul { list-style: none; padding: 0; margin: 24px 0 26px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; font-size: 14.5px; }
+        .price-card li { display: flex; gap: 8px; align-items: flex-start; }
+        .price-card li svg { width: 18px; height: 18px; flex: none; margin-top: 2px; color: #99f6e4; }
+        .price-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+        .terms { background: #fff; border: 1px solid var(--border); border-radius: 20px; padding: 26px; box-shadow: var(--e1); }
+        .terms h3 { font-size: 17px; }
+        .plan-table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 14.5px; }
+        .plan-table th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 700; padding: 8px 10px; background: var(--surface-2); border-bottom: 1px solid var(--border); }
+        .plan-table td { padding: 11px 10px; border-bottom: 1px solid var(--border); }
+        .plan-table td:last-child, .plan-table th:last-child { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+        .plan-table tr.min td { background: var(--brand-50); }
+        .tag { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--brand-600); color: #fff; vertical-align: 1px; }
+        .term-list { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 10px; font-size: 14px; color: var(--text-2); }
+        .term-list li { display: flex; gap: 10px; }
+        .term-list li svg { width: 17px; height: 17px; flex: none; margin-top: 3px; color: var(--brand-600); }
+
+        /* ---------- Guides ---------- */
+        .guide-layout { display: grid; grid-template-columns: 250px 1fr; gap: 24px; align-items: start; }
+        .guide-tabs { position: sticky; top: 88px; display: grid; gap: 4px; background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 8px; box-shadow: var(--e1); }
+        .guide-tab { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; background: transparent; padding: 10px 12px; border-radius: 10px; color: var(--text-2); font-weight: 600; font-size: 14px; cursor: pointer; }
+        .guide-tab svg { width: 18px; height: 18px; color: var(--faint); flex: none; }
+        .guide-tab:hover { background: var(--surface-2); color: var(--text); }
+        .guide-tab.on { background: var(--brand-50); color: var(--brand-800); }
+        .guide-tab.on svg { color: var(--brand-600); }
+        .guide-panel { display: none; background: #fff; border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--e1); overflow: hidden; }
+        .guide-panel.on { display: block; }
+        .guide-head { display: flex; gap: 14px; align-items: center; padding: 22px 24px; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, var(--surface-2), #fff); }
+        .guide-head h3 { font-size: 20px; }
+        .guide-head p { color: var(--muted); font-size: 14px; margin-top: 2px; }
+        .guide-head .who { margin-left: auto; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2); white-space: nowrap; }
+        .guide-body { padding: 22px 24px 26px; display: grid; grid-template-columns: 1.25fr 1fr; gap: 26px; }
+        .guide-body h4 { font-size: 13px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 10px; }
+        html[lang="my"] .guide-body h4 { letter-spacing: 0; text-transform: none; font-size: 14px; }
+        .guide-steps { margin: 0; padding: 0; list-style: none; counter-reset: g; display: grid; gap: 12px; }
+        .guide-steps li { counter-increment: g; display: grid; grid-template-columns: 28px 1fr; gap: 12px; font-size: 14.5px; color: var(--text-2); }
+        .guide-steps li::before { content: counter(g); width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--brand-50); color: var(--brand-700); font-weight: 800; font-size: 12.5px; }
+        .guide-steps b, .screen-parts b { color: var(--text); }
+        .screen-parts { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; font-size: 14px; color: var(--text-2); }
+        .screen-parts li { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+        .tip { margin-top: 16px; display: flex; gap: 10px; padding: 12px 14px; border-radius: 10px; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 13.5px; }
+        .tip svg { width: 18px; height: 18px; flex: none; margin-top: 1px; }
+
+        /* ---------- Devices ---------- */
+        .device { padding: 26px; }
+        .device-head { display: flex; gap: 14px; align-items: center; }
+        .device-head h3 { margin: 0; font-size: 19px; }
+        .device-head p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+        .conn { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 18px; }
+        .conn div { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface-2); font-size: 13.5px; color: var(--text-2); }
+        .conn strong { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 14px; margin-bottom: 3px; }
+        .conn strong svg { width: 16px; height: 16px; color: var(--brand-600); }
+        .device .guide-steps { margin-top: 18px; }
+        .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+        .chip { font-size: 12.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2); }
+        .trouble { margin-top: 18px; border-top: 1px dashed var(--border-strong); padding-top: 16px; }
+        .trouble h4 { font-size: 14px; margin-bottom: 8px; }
+        .trouble dl { margin: 0; display: grid; gap: 8px; font-size: 13.5px; }
+        .trouble dt { font-weight: 700; color: var(--text); }
+        .trouble dd { margin: 0; color: var(--text-2); }
+
+        /* ---------- FAQ / CTA / Footer ---------- */
+        .faq { max-width: 820px; margin: 0 auto; display: grid; gap: 10px; }
+        .faq details { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 0 18px; box-shadow: var(--e1); }
+        .faq summary { cursor: pointer; list-style: none; padding: 16px 0; font-weight: 700; display: flex; justify-content: space-between; gap: 12px; }
+        .faq summary::-webkit-details-marker { display: none; }
+        .faq summary::after { content: "+"; font-size: 20px; line-height: 1; color: var(--brand-600); }
+        .faq details[open] summary::after { content: "–"; }
+        .faq details p { padding: 0 0 16px; color: var(--text-2); font-size: 14.5px; }
+        .cta { border-radius: 24px; padding: 48px; color: #fff; text-align: center; background:
+            radial-gradient(600px 300px at 0% 0%, rgba(255, 255, 255, .14), transparent 60%),
+            linear-gradient(135deg, var(--brand-700), var(--brand-900)); box-shadow: var(--e3); }
+        .cta h2 { color: #fff; font-size: clamp(24px, 3vw, 34px); }
+        .cta p { margin: 12px auto 0; max-width: 620px; opacity: .88; font-size: 16px; }
+        .cta .hero-cta { justify-content: center; }
+        .contact-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 22px; margin-top: 22px; font-size: 14.5px; }
+        .contact-row a { color: #fff; display: inline-flex; align-items: center; gap: 8px; }
+        .contact-row svg { width: 17px; height: 17px; }
+        footer { border-top: 1px solid var(--border); background: var(--surface-2); padding: 34px 0; color: var(--muted); font-size: 13.5px; }
+        footer .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; }
+        footer nav { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+        footer a { color: var(--text-2); }
+        .foot-brand { display: inline-flex; align-items: center; gap: 8px; }
+        .foot-brand img { border-radius: 5px; }
+
+        .notfound { display: none; margin: 0 auto 0; max-width: var(--wrap); padding: 14px 20px 0; }
+        .notfound.show { display: block; }
+        .notfound div { display: flex; gap: 12px; align-items: center; padding: 14px 16px; border-radius: 12px; background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; font-size: 14.5px; }
+        .notfound svg { width: 20px; height: 20px; flex: none; }
+
+        /* ---------- Responsive ---------- */
+        @media (max-width: 1140px) {
+            .nav-links { display: none; }
+            .menu-btn { display: grid; }
+            .mobile-nav.open { display: grid; gap: 2px; padding: 8px 16px 14px; border-top: 1px solid var(--border); background: #fff; }
+            .mobile-nav a { padding: 11px 8px; border-radius: 8px; color: var(--text); font-weight: 600; }
+        }
+        @media (max-width: 1080px) {
+            .hero .wrap { grid-template-columns: 1fr; gap: 44px; }
+            .mock { max-width: 620px; }
+            .grid-4 { grid-template-columns: repeat(2, 1fr); }
+            .pricing { grid-template-columns: 1fr; }
+            .guide-layout { grid-template-columns: 1fr; }
+            .guide-tabs { position: static; display: flex; overflow-x: auto; scrollbar-width: none; }
+            .guide-tab { width: auto; white-space: nowrap; }
+        }
+        @media (max-width: 760px) {
+            .section { padding: 60px 0; }
+            .wrap { padding: 0 16px; }
+            .topbar .hide-sm { display: none; }
+            .brand-pos { display: none; }
+            .strip .wrap { grid-template-columns: 1fr 1fr; padding: 0; }
+            .strip div.item { border-bottom: 1px solid var(--border); }
+            .strip div.item:nth-child(2n) { border-right: 0; }
+            .grid-3, .grid-2, .grid-4 { grid-template-columns: 1fr; }
+            .guide-body { grid-template-columns: 1fr; padding: 18px 16px 20px; }
+            .guide-head { padding: 18px 16px; flex-wrap: wrap; }
+            .guide-head .who { margin-left: 0; }
+            .price-card { padding: 24px 20px; }
+            .price-card ul { grid-template-columns: 1fr; }
+            .conn { grid-template-columns: 1fr; }
+            .cta { padding: 34px 20px; border-radius: 18px; }
+            .mock-body { grid-template-columns: 1fr; }
+            .mock-side { display: none; }
+            .mock-float.f1 { left: 8px; bottom: -22px; }
+            .mock-float.f2 { right: 8px; top: -22px; }
+            .finder-row { flex-direction: column; }
+            .hero-cta .btn { flex: 1; }
+        }
+    </style>
+</head>
+<body>
+    <header class="topbar" id="topbar">
+        <div class="wrap">
+            <a class="brand" href="/" aria-label="Exabyte Digital Store — POS">
+                <img class="brand-logo" src="/logo.svg" alt="" width="38" height="38">
+                <span class="brand-divider" aria-hidden="true"></span>
+                <span class="brand-word">EXABYTE<small>DIGITAL STORE</small></span>
+                <span class="brand-pos">POS</span>
+            </a>
+            <nav class="nav-links" aria-label="Sections">
+                <a href="#features"><span data-l="en">Features</span><span data-l="mm">လုပ်ဆောင်ချက်များ</span></a>
+                <a href="#business"><span data-l="en">Business types</span><span data-l="mm">လုပ်ငန်းအမျိုးအစား</span></a>
+                <a href="#pricing"><span data-l="en">Pricing</span><span data-l="mm">ဈေးနှုန်း</span></a>
+                <a href="#guides"><span data-l="en">Guides</span><span data-l="mm">လမ်းညွှန်</span></a>
+                <a href="#devices"><span data-l="en">Printers &amp; scanners</span><span data-l="mm">ပရင်တာ / စကင်နာ</span></a>
+            </nav>
+            <div class="topbar-actions">
+                <div class="lang" role="group" aria-label="Language">
+                    <button type="button" data-set-lang="en">EN</button>
+                    <button type="button" data-set-lang="my">MM</button>
+                </div>
+                <a class="btn btn-ghost hide-sm" href="#signin"><i data-lucide="log-in"></i><span data-l="en">Shop sign in</span><span data-l="mm">ဆိုင်ဝင်ရန်</span></a>
+                <a class="btn btn-primary hide-sm" href="/demo"><i data-lucide="play"></i><span data-l="en">Try demo</span><span data-l="mm">Demo စမ်းရန်</span></a>
+                <button class="menu-btn" type="button" id="menu-btn" aria-label="Menu" aria-expanded="false"><i data-lucide="menu"></i></button>
+            </div>
+        </div>
+        <nav class="mobile-nav" id="mobile-nav" aria-label="Sections">
+            <a href="#features"><span data-l="en">Features</span><span data-l="mm">လုပ်ဆောင်ချက်များ</span></a>
+            <a href="#business"><span data-l="en">Business types</span><span data-l="mm">လုပ်ငန်းအမျိုးအစား</span></a>
+            <a href="#pricing"><span data-l="en">Pricing</span><span data-l="mm">ဈေးနှုန်း</span></a>
+            <a href="#guides"><span data-l="en">Screen guides</span><span data-l="mm">စာမျက်နှာ လမ်းညွှန်</span></a>
+            <a href="#devices"><span data-l="en">Printers &amp; scanners</span><span data-l="mm">ပရင်တာ / စကင်နာ</span></a>
+            <a href="#signin"><span data-l="en">Shop sign in</span><span data-l="mm">ဆိုင်ဝင်ရန်</span></a>
+            <a href="/demo"><span data-l="en">Try the demo</span><span data-l="mm">Demo စမ်းရန်</span></a>
+        </nav>
+    </header>
+
+    <div class="notfound" id="notfound">
+        <div><i data-lucide="search-x"></i>
+            <span data-l="en">We couldn't find a shop at <b id="nf-path-en"></b>. Check the address with your shop owner, or search for it below.</span>
+            <span data-l="mm"><b id="nf-path-mm"></b> လိပ်စာဖြင့် ဆိုင်ကို ရှာမတွေ့ပါ။ ဆိုင်ပိုင်ရှင်ထံ လိပ်စာကို စစ်ဆေးပါ သို့မဟုတ် အောက်တွင် ပြန်ရှာပါ။</span>
+        </div>
+    </div>
+
+    <main>
+        <section class="hero">
+            <div class="wrap">
+                <div>
+                    <span class="pill"><b>2026</b>
+                        <span data-l="en">Built for clinics, convenience stores and online shops</span>
+                        <span data-l="mm">ဆေးခန်း၊ ကုန်စုံဆိုင်နှင့် အွန်လိုင်းဆိုင်များအတွက်</span>
+                    </span>
+                    <h1 data-l="en">Sell faster. Track every item. <em>Know your profit</em> every month.</h1>
+                    <h1 data-l="mm">ပိုမြန်မြန် ရောင်းပါ။ ပစ္စည်းတိုင်းကို ခြေရာခံပါ။ လစဉ် <em>အမြတ်ငွေ</em> ကို သိပါ။</h1>
+                    <p class="hero-sub" data-l="en">Exabyte POS is a cloud point of sale for Myanmar businesses. Checkout with a barcode scanner, print receipts, get low-stock and expiry alerts, and see sales, expenses and net profit on one dashboard — from your phone, tablet or PC.</p>
+                    <p class="hero-sub" data-l="mm">Exabyte POS သည် မြန်မာလုပ်ငန်းများအတွက် Cloud POS စနစ် ဖြစ်ပါသည်။ ဘားကုဒ်ဖြင့် ငွေရှင်းခြင်း၊ ဘောက်ချာ ထုတ်ခြင်း၊ ပစ္စည်းနည်း/သက်တမ်းကုန် သတိပေးချက်များနှင့် ရောင်းအား၊ အသုံးစရိတ်၊ အသားတင်အမြတ်ကို ဖုန်း၊ တက်ဘလက်၊ ကွန်ပျူတာ မည်သည့်ကိရိယာမှမဆို တစ်နေရာတည်းတွင် ကြည့်နိုင်ပါသည်။</p>
+                    <div class="hero-cta">
+                        <a class="btn btn-primary btn-lg" href="/demo"><i data-lucide="play-circle"></i><span data-l="en">Try the live demo</span><span data-l="mm">Demo ကို စမ်းကြည့်ရန်</span></a>
+                        <a class="btn btn-ghost btn-lg" href="#pricing"><i data-lucide="badge-dollar-sign"></i><span data-l="en">See pricing</span><span data-l="mm">ဈေးနှုန်းကြည့်ရန်</span></a>
+                    </div>
+                    <form class="shop-finder" id="signin" autocomplete="off">
+                        <label for="shop-slug"><span data-l="en">Already a customer? Open your shop</span><span data-l="mm">ဖောက်သည်ဟောင်းလား? သင့်ဆိုင်ကို ဖွင့်ပါ</span></label>
+                        <div class="finder-row">
+                            <div class="finder-input">
+                                <span id="host-prefix">pos.exabytedigitalstore.com/</span>
+                                <input id="shop-slug" name="shop" placeholder="yourshop" spellcheck="false" autocapitalize="off" required>
+                            </div>
+                            <button class="btn btn-primary" type="submit"><span data-l="en">Open shop</span><span data-l="mm">ဆိုင်ဖွင့်ရန်</span><i data-lucide="arrow-right"></i></button>
+                        </div>
+                        <p class="finder-msg" id="finder-msg" role="status"></p>
+                    </form>
+                    <div class="hero-trust">
+                        <span><i data-lucide="shield-check"></i><span data-l="en">Each shop has its own private address</span><span data-l="mm">ဆိုင်တစ်ဆိုင်ချင်းစီ သီးသန့်လိပ်စာ</span></span>
+                        <span><i data-lucide="languages"></i><span data-l="en">Myanmar &amp; English</span><span data-l="mm">မြန်မာ / အင်္ဂလိပ်</span></span>
+                    </div>
+                </div>
+
+                <div class="mock" aria-hidden="true">
+                    <div class="mock-window">
+                        <div class="mock-bar"><i></i><i></i><i></i><em>pos.exabytedigitalstore.com/yourshop</em></div>
+                        <div class="mock-body">
+                            <div class="mock-side">
+                                <b>Your Shop</b>
+                                <span class="mock-nav on">▦ Dashboard</span>
+                                <span class="mock-nav">⌁ POS</span>
+                                <span class="mock-nav">▤ Inventory</span>
+                                <span class="mock-nav">₭ Sales</span>
+                                <span class="mock-nav">⚠ Alerts</span>
+                                <span class="mock-nav">⇄ Suppliers</span>
+                                <span class="mock-nav">◫ Expenses</span>
+                            </div>
+                            <div class="mock-main">
+                                <div class="mock-cards">
+                                    <div class="mock-card"><small>Today's sales</small><strong>184,500 Ks</strong> <span class="up">▲ 12%</span></div>
+                                    <div class="mock-card"><small>This month profit</small><strong>1,265,000 Ks</strong></div>
+                                    <div class="mock-card"><small>Expenses</small><strong>342,000 Ks</strong></div>
+                                    <div class="mock-card"><small>Net profit</small><strong>923,000 Ks</strong> <span class="up">▲ 8%</span></div>
+                                </div>
+                                <div class="mock-chart"><span style="height:42%"></span><span style="height:58%"></span><span style="height:47%"></span><span style="height:72%"></span><span style="height:64%"></span><span style="height:88%"></span><span style="height:79%"></span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mock-float f1"><span class="ic"><i data-lucide="receipt"></i></span><div><strong>Receipt printed</strong><small>INV-0412 · 12,800 Ks</small></div></div>
+                    <div class="mock-float f2"><span class="ic"><i data-lucide="bell-ring"></i></span><div><strong>3 items low</strong><small>Reorder before Friday</small></div></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="strip">
+            <div class="wrap">
+                <div class="item"><span class="ic"><i data-lucide="monitor-smartphone"></i></span><div><strong data-l="en">Any device</strong><strong data-l="mm">မည်သည့်ကိရိယာမဆို</strong><small data-l="en">Phone, tablet, laptop, PC</small><small data-l="mm">ဖုန်း၊ တက်ဘလက်၊ ကွန်ပျူတာ</small></div></div>
+                <div class="item"><span class="ic"><i data-lucide="scan-barcode"></i></span><div><strong data-l="en">Barcode checkout</strong><strong data-l="mm">ဘားကုဒ်ဖြင့် ငွေရှင်း</strong><small data-l="en">USB, Bluetooth or camera</small><small data-l="mm">USB၊ Bluetooth သို့ ကင်မရာ</small></div></div>
+                <div class="item"><span class="ic"><i data-lucide="printer"></i></span><div><strong data-l="en">Receipt printing</strong><strong data-l="mm">ဘောက်ချာ ထုတ်ခြင်း</strong><small data-l="en">58mm, 80mm, portable, A4</small><small data-l="mm">58mm၊ 80mm၊ လက်ကိုင်၊ A4</small></div></div>
+                <div class="item"><span class="ic"><i data-lucide="cloud"></i></span><div><strong data-l="en">Cloud backup</strong><strong data-l="mm">Cloud တွင် သိမ်းဆည်း</strong><small data-l="en">Excel &amp; JSON export any time</small><small data-l="mm">Excel / JSON ထုတ်ယူနိုင်</small></div></div>
+            </div>
+        </section>
+
+        <section class="section" id="features">
+            <div class="wrap">
+                <div class="section-head">
+                    <span class="eyebrow" data-l="en">Everything in one system</span><span class="eyebrow" data-l="mm">စနစ်တစ်ခုတည်းတွင် အားလုံးပါဝင်</span>
+                    <h2 data-l="en">From the counter to the monthly report</h2><h2 data-l="mm">ကောင်တာမှ လစဉ်အစီရင်ခံစာအထိ</h2>
+                    <p data-l="en">Every tool a small business needs to sell, restock and understand its numbers — without spreadsheets.</p>
+                    <p data-l="mm">စာရင်းဇယားမလိုဘဲ ရောင်းချခြင်း၊ ပစ္စည်းဖြည့်ခြင်းနှင့် ငွေစာရင်းနားလည်ခြင်းအတွက် လိုအပ်သမျှ ပါဝင်ပါသည်။</p>
+                </div>
+                <div class="grid-4">
+                    <div class="card"><span class="icon-tile"><i data-lucide="shopping-cart"></i></span>
+                        <h3 data-l="en">Fast POS checkout</h3><h3 data-l="mm">မြန်ဆန်သော ငွေရှင်းစနစ်</h3>
+                        <p data-l="en">Search, tap or scan products into the cart, give discounts, take payment and print the receipt in seconds.</p>
+                        <p data-l="mm">ပစ္စည်းကို ရှာ၊ နှိပ် သို့ စကင်ဖတ်ပြီး ခြင်းထဲထည့်၊ လျှော့ဈေးပေး၊ ငွေရှင်းပြီး ဘောက်ချာကို စက္ကန့်ပိုင်းအတွင်း ထုတ်ပါ။</p></div>
+                    <div class="card"><span class="icon-tile tone-indigo"><i data-lucide="boxes"></i></span>
+                        <h3 data-l="en">Inventory &amp; stock-in</h3><h3 data-l="mm">ကုန်ပစ္စည်းနှင့် ပစ္စည်းအဝင်</h3>
+                        <p data-l="en">Receive many items at once on the bulk stock-in sheet, with cost, selling price, supplier and optional expiry date.</p>
+                        <p data-l="mm">အဝယ်ဈေး၊ ရောင်းဈေး၊ ပေးသွင်းသူနှင့် သက်တမ်း (လိုအပ်ပါက) နှင့်အတူ ပစ္စည်းများစွာကို တစ်ပြိုင်နက် စာရင်းသွင်းပါ။</p></div>
+                    <div class="card"><span class="icon-tile tone-amber"><i data-lucide="bell-ring"></i></span>
+                        <h3 data-l="en">Low-stock &amp; expiry alerts</h3><h3 data-l="mm">ပစ္စည်းနည်း / သက်တမ်းကုန် သတိပေးချက်</h3>
+                        <p data-l="en">See what is running out, what expires soon and what has already expired — before customers notice.</p>
+                        <p data-l="mm">ကုန်လုနီးပစ္စည်း၊ မကြာမီ သက်တမ်းကုန်မည့်ပစ္စည်းနှင့် သက်တမ်းကုန်ပြီးပစ္စည်းများကို ကြိုသိပါ။</p></div>
+                    <div class="card"><span class="icon-tile tone-green"><i data-lucide="trending-up"></i></span>
+                        <h3 data-l="en">Monthly profit</h3><h3 data-l="mm">လစဉ် အမြတ်ငွေ</h3>
+                        <p data-l="en">Gross profit from every sale minus your expenses gives the real net profit for this month and the last six.</p>
+                        <p data-l="mm">ရောင်းအားအမြတ်မှ အသုံးစရိတ်ကို နုတ်၍ ယခုလနှင့် ပြီးခဲ့သော ၆ လ၏ အသားတင်အမြတ်ကို ပြပါသည်။</p></div>
+                    <div class="card"><span class="icon-tile tone-violet"><i data-lucide="receipt-text"></i></span>
+                        <h3 data-l="en">Expenses with vouchers</h3><h3 data-l="mm">ဘောက်ချာပုံပါ အသုံးစရိတ်</h3>
+                        <p data-l="en">Record rent, bills and salaries with payment method and reference number, and attach a photo of the voucher.</p>
+                        <p data-l="mm">ဆိုင်ခ၊ မီတာခ၊ လစာ စသည်တို့ကို ငွေပေးချေမှုနည်းလမ်း၊ ဘောက်ချာနံပါတ်နှင့် ဘောက်ချာဓာတ်ပုံဖြင့် မှတ်တမ်းတင်ပါ။</p></div>
+                    <div class="card"><span class="icon-tile tone-sky"><i data-lucide="truck"></i></span>
+                        <h3 data-l="en">Suppliers &amp; customers</h3><h3 data-l="mm">ပေးသွင်းသူနှင့် ဖောက်သည်</h3>
+                        <p data-l="en">Keep a ledger of what you owe suppliers and what customers owe you, with payments and running balances.</p>
+                        <p data-l="mm">ပေးသွင်းသူကို ပေးရန်ကျန်ငွေနှင့် ဖောက်သည်ထံမှ ရရန်ကျန်ငွေကို စာရင်းဖြင့် ထိန်းသိမ်းပါ။</p></div>
+                    <div class="card"><span class="icon-tile tone-rose"><i data-lucide="users-round"></i></span>
+                        <h3 data-l="en">Staff roles</h3><h3 data-l="mm">ဝန်ထမ်း အခန်းကဏ္ဍ</h3>
+                        <p data-l="en">Admins see everything. Cashiers sell and check stock but cannot see costs, expenses or manage users.</p>
+                        <p data-l="mm">Admin သည် အားလုံးကို မြင်ရပြီး Cashier သည် ရောင်းချခြင်းနှင့် ပစ္စည်းစစ်ခြင်းသာ ပြုလုပ်နိုင်ပါသည်။</p></div>
+                    <div class="card"><span class="icon-tile"><i data-lucide="history"></i></span>
+                        <h3 data-l="en">Full stock history</h3><h3 data-l="mm">ပစ္စည်းအဝင်အထွက် မှတ်တမ်း</h3>
+                        <p data-l="en">Every stock-in, sale and adjustment is logged with who did it and the balance after — nothing goes missing.</p>
+                        <p data-l="mm">အဝင်၊ အရောင်းနှင့် ပြင်ဆင်မှုတိုင်းကို ပြုလုပ်သူနှင့် လက်ကျန်နှင့်တကွ မှတ်တမ်းတင်ထားပါသည်။</p></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section alt" id="business">
+            <div class="wrap">
+                <div class="section-head">
+                    <span class="eyebrow" data-l="en">Set up for your trade</span><span class="eyebrow" data-l="mm">သင့်လုပ်ငန်းနှင့် ကိုက်ညီအောင်</span>
+                    <h2 data-l="en">One POS, tuned to your business type</h2><h2 data-l="mm">POS တစ်ခုတည်း၊ လုပ်ငန်းအမျိုးအစားအလိုက် ချိန်ညှိထားသည်</h2>
+                    <p data-l="en">When we open your shop we choose its business type. Product categories, icons and expiry rules follow it automatically.</p>
+                    <p data-l="mm">ဆိုင်ဖွင့်ပေးစဉ် လုပ်ငန်းအမျိုးအစားကို ရွေးချယ်ပါသည်။ ပစ္စည်းအမျိုးအစား၊ အိုင်ကွန်နှင့် သက်တမ်းစည်းမျဉ်းများ အလိုအလျောက် လိုက်ပြောင်းပါသည်။</p>
+                </div>
+                <div class="grid-4">
+                    <div class="card biz"><div class="biz-top"><span class="icon-tile"><i data-lucide="stethoscope"></i></span>
+                        <h3 data-l="en">Clinics &amp; pharmacies</h3><h3 data-l="mm">ဆေးခန်းနှင့် ဆေးဆိုင်</h3></div>
+                        <ul>
+                            <li><i data-lucide="check"></i><span data-l="en">Medicine, ortho supplies, consumables categories</span><span data-l="mm">ဆေးဝါး၊ အရိုးအထောက်အကူ၊ သုံးကုန်ပစ္စည်း အမျိုးအစား</span></li>
+                            <li><i data-lucide="check"></i><span data-l="en">Expiry date required on every batch</span><span data-l="mm">အသုတ်တိုင်းတွင် သက်တမ်းရက် မဖြစ်မနေ</span></li>
+                            <li><i data-lucide="check"></i><span data-l="en">Expiring-soon and expired alerts</span><span data-l="mm">သက်တမ်းနီး / ကုန် သတိပေးချက်</span></li>
+                        </ul></div>
+                    <div class="card biz"><div class="biz-top"><span class="icon-tile tone-amber"><i data-lucide="store"></i></span>
+                        <h3 data-l="en">Convenience stores</h3><h3 data-l="mm">ကုန်စုံဆိုင် / မာ့ထ်</h3></div>
+                        <ul>
+                            <li><i data-lucide="check"></i><span data-l="en">Drinks, snacks, instant food, household…</span><span data-l="mm">အချိုရည်၊ မုန့်၊ အသင့်စား၊ အိမ်သုံး…</span></li>
+                            <li><i data-lucide="check"></i><span data-l="en">Scan-and-go barcode checkout</span><span data-l="mm">ဘားကုဒ် စကင်ဖတ်ပြီး ချက်ချင်းရှင်း</span></li>
+                            <li><i data-lucide="check"></i><span data-l="en">Expiry tracking for fresh goods</span><span data-l="mm">လတ်ဆတ်ကုန်အတွက် သက်တမ်းခြေရာခံ</span></li>
+                        </ul></div>
+                    <div class="card biz"><div class="biz-top"><span class="icon-tile tone-indigo"><i data-lucide="package"></i></span>
+                        <h3 data-l="en">Online shops</h3><h3 data-l="mm">အွန်လိုင်းဆိုင်</h3></div>
+                        <ul>
+                            <li><i data-lucide="check"></i><span data-l="en">Fashion, beauty, electronics, accessories…</span><span data-l="mm">အဝတ်အထည်၊ အလှကုန်၊ အီလက်ထရောနစ်…</span></li>
+                            <li><i data-lucide="check"></i><span data-l="en">Expiry optional — no extra typing</span><span data-l="mm">သက်တမ်းရက် မထည့်လည်းရ</span></li>
+                            <li><i data-lucide="check"></i><span data-l="en">Customer credit ledger for COD &amp; transfers</span><span data-l="mm">COD / ငွေလွှဲ ဖောက်သည်အကြွေးစာရင်း</span></li>
+                        </ul></div>
+                    <div class="card biz"><div class="biz-top"><span class="icon-tile tone-rose"><i data-lucide="shopping-bag"></i></span>
+                        <h3 data-l="en">General retail</h3><h3 data-l="mm">အထွေထွေ လက်လီဆိုင်</h3></div>
+                        <ul>
+                            <li><i data-lucide="check"></i><span data-l="en">Hardware, phone shops, stationery, gifts</span><span data-l="mm">စက်ပစ္စည်း၊ ဖုန်းဆိုင်၊ စာရေးကိရိယာ၊ လက်ဆောင်</span></li>
+                            <li><i data-lucide="check"></i><span data-l="en">Your own categories as you go</span><span data-l="mm">ကိုယ်ပိုင် အမျိုးအစားများ ထည့်နိုင်</span></li>
+                            <li><i data-lucide="check"></i><span data-l="en">Supplier balances and purchase history</span><span data-l="mm">ပေးသွင်းသူ လက်ကျန်ငွေနှင့် အဝယ်မှတ်တမ်း</span></li>
+                        </ul></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="how">
+            <div class="wrap">
+                <div class="section-head">
+                    <span class="eyebrow" data-l="en">Getting started</span><span class="eyebrow" data-l="mm">စတင်အသုံးပြုခြင်း</span>
+                    <h2 data-l="en">Selling within a day</h2><h2 data-l="mm">တစ်ရက်အတွင်း ရောင်းချနိုင်ပါပြီ</h2>
+                </div>
+                <div class="grid-4 steps">
+                    <div class="step"><h3 data-l="en">Choose a plan</h3><h3 data-l="mm">အစီအစဉ် ရွေးပါ</h3>
+                        <p data-l="en">Sign a contract of 3 months or more and pay in advance.</p><p data-l="mm">၃ လ နှင့်အထက် စာချုပ်ချုပ်ပြီး ကြိုတင်ငွေပေးချေပါ။</p></div>
+                    <div class="step"><h3 data-l="en">Get your shop address</h3><h3 data-l="mm">ဆိုင်လိပ်စာ ရယူပါ</h3>
+                        <p data-l="en">We create your shop, e.g. <b>/yourshop</b>, with an admin account and business type.</p><p data-l="mm">ဥပမာ <b>/yourshop</b> ကဲ့သို့ ဆိုင်လိပ်စာ၊ Admin အကောင့်နှင့် လုပ်ငန်းအမျိုးအစားကို ဖန်တီးပေးပါသည်။</p></div>
+                    <div class="step"><h3 data-l="en">Add products &amp; staff</h3><h3 data-l="mm">ပစ္စည်းနှင့် ဝန်ထမ်း ထည့်ပါ</h3>
+                        <p data-l="en">Enter opening stock on the bulk sheet and create cashier logins.</p><p data-l="mm">လက်ကျန်ပစ္စည်းကို စာရင်းသွင်းပြီး Cashier အကောင့်များ ဖွင့်ပါ။</p></div>
+                    <div class="step"><h3 data-l="en">Connect devices &amp; sell</h3><h3 data-l="mm">ကိရိယာချိတ်ပြီး ရောင်းပါ</h3>
+                        <p data-l="en">Pair your receipt printer and scanner, then start checkout.</p><p data-l="mm">ပရင်တာနှင့် စကင်နာကို ချိတ်ဆက်ပြီး စတင်ရောင်းချပါ။</p></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section alt" id="pricing">
+            <div class="wrap">
+                <div class="section-head">
+                    <span class="eyebrow" data-l="en">Simple pricing</span><span class="eyebrow" data-l="mm">ရိုးရှင်းသော ဈေးနှုန်း</span>
+                    <h2 data-l="en">One plan. Every feature. No hidden fees.</h2><h2 data-l="mm">အစီအစဉ်တစ်ခု။ လုပ်ဆောင်ချက်အားလုံး။ ဝှက်ထားသောကြေး မရှိ။</h2>
+                    <p data-l="en">Pay monthly with a minimum contract of 3 months. Unlimited products, sales and staff accounts.</p>
+                    <p data-l="mm">အနည်းဆုံး ၃ လ စာချုပ်ဖြင့် လစဉ်ကြေး ပေးဆောင်ရပါသည်။ ပစ္စည်း၊ အရောင်းနှင့် ဝန်ထမ်းအကောင့် အကန့်အသတ်မရှိ။</p>
+                </div>
+                <div class="pricing">
+                    <div class="price-card">
+                        <h3>Exabyte POS — <span data-l="en">Business plan</span><span data-l="mm">လုပ်ငန်းသုံး အစီအစဉ်</span></h3>
+                        <div class="price-tag"><strong>35,000</strong><span data-l="en">Ks / month</span><span data-l="mm">ကျပ် / တစ်လ</span></div>
+                        <span class="price-note"><i data-lucide="calendar-check" style="width:16px;height:16px"></i><span data-l="en">Minimum 3-month contract · 105,000 Ks to start</span><span data-l="mm">အနည်းဆုံး ၃ လ စာချုပ် · စတင်ငွေ ၁၀၅,၀၀၀ ကျပ်</span></span>
+                        <ul>
+                            <li><i data-lucide="check-circle-2"></i><span data-l="en">Your own shop address</span><span data-l="mm">ကိုယ်ပိုင် ဆိုင်လိပ်စာ</span></li>
+                            <li><i data-lucide="check-circle-2"></i><span data-l="en">Unlimited products &amp; sales</span><span data-l="mm">ပစ္စည်း / အရောင်း အကန့်အသတ်မရှိ</span></li>
+                            <li><i data-lucide="check-circle-2"></i><span data-l="en">Unlimited staff accounts</span><span data-l="mm">ဝန်ထမ်းအကောင့် အကန့်အသတ်မရှိ</span></li>
+                            <li><i data-lucide="check-circle-2"></i><span data-l="en">Use on any number of devices</span><span data-l="mm">ကိရိယာ အရေအတွက် မကန့်သတ်</span></li>
+                            <li><i data-lucide="check-circle-2"></i><span data-l="en">Printer &amp; scanner support</span><span data-l="mm">ပရင်တာ / စကင်နာ အထောက်အပံ့</span></li>
+                            <li><i data-lucide="check-circle-2"></i><span data-l="en">Free setup &amp; staff training</span><span data-l="mm">အခမဲ့ တပ်ဆင်ပေးခြင်းနှင့် သင်တန်း</span></li>
+                            <li><i data-lucide="check-circle-2"></i><span data-l="en">All updates included</span><span data-l="mm">အဆင့်မြှင့်တင်မှုအားလုံး ပါဝင်</span></li>
+                            <li><i data-lucide="check-circle-2"></i><span data-l="en">Phone &amp; chat support</span><span data-l="mm">ဖုန်း / Chat ဖြင့် အကူအညီ</span></li>
+                        </ul>
+                        <div class="price-actions">
+                            <a class="btn btn-light btn-lg" href="#contact"><i data-lucide="phone-call"></i><span data-l="en">Contact sales</span><span data-l="mm">ဆက်သွယ်ရန်</span></a>
+                            <a class="btn btn-outline-light btn-lg" href="/demo"><i data-lucide="play"></i><span data-l="en">Try the demo first</span><span data-l="mm">Demo အရင်စမ်းရန်</span></a>
+                        </div>
+                    </div>
+                    <div class="terms">
+                        <h3 data-l="en">Contract lengths</h3><h3 data-l="mm">စာချုပ် ကာလများ</h3>
+                        <table class="plan-table">
+                            <thead><tr><th data-l="en">Term</th><th data-l="mm">ကာလ</th><th data-l="en">Monthly</th><th data-l="mm">တစ်လ</th><th data-l="en">Paid in advance</th><th data-l="mm">ကြိုတင်ပေးငွေ</th></tr></thead>
+                            <tbody>
+                                <tr class="min"><td><span data-l="en">3 months</span><span data-l="mm">၃ လ</span><span class="tag" data-l="en">Minimum</span><span class="tag" data-l="mm">အနည်းဆုံး</span></td><td>35,000 Ks</td><td>105,000 Ks</td></tr>
+                                <tr><td><span data-l="en">6 months</span><span data-l="mm">၆ လ</span></td><td>35,000 Ks</td><td>210,000 Ks</td></tr>
+                                <tr><td><span data-l="en">12 months</span><span data-l="mm">၁၂ လ</span></td><td>35,000 Ks</td><td>420,000 Ks</td></tr>
+                            </tbody>
+                        </table>
+                        <ul class="term-list">
+                            <li><i data-lucide="file-signature"></i><span data-l="en">The first contract is at least 3 months, paid before your shop is opened.</span><span data-l="mm">ပထမစာချုပ်သည် အနည်းဆုံး ၃ လ ဖြစ်ပြီး ဆိုင်မဖွင့်မီ ကြိုတင်ပေးချေရပါသည်။</span></li>
+                            <li><i data-lucide="refresh-cw"></i><span data-l="en">Renew for 3 months or longer before the end date to keep selling without a break.</span><span data-l="mm">ပြတ်တောက်မှုမရှိစေရန် သက်တမ်းမကုန်မီ ၃ လ နှင့်အထက် သက်တမ်းတိုးပါ။</span></li>
+                            <li><i data-lucide="lock"></i><span data-l="en">If the subscription ends, sign-in pauses. Your data stays safe and comes back the moment you renew.</span><span data-l="mm">သက်တမ်းကုန်ပါက ဝင်ရောက်ခွင့် ခေတ္တရပ်ပါမည်။ အချက်အလက်များ လုံခြုံစွာ ကျန်ရှိပြီး သက်တမ်းတိုးသည်နှင့် ပြန်ရပါမည်။</span></li>
+                            <li><i data-lucide="hard-drive"></i><span data-l="en">Printers, scanners and tablets are not included. We can advise on models that work.</span><span data-l="mm">ပရင်တာ၊ စကင်နာ၊ တက်ဘလက် မပါဝင်ပါ။ အသုံးပြုနိုင်သော မော်ဒယ်များကို အကြံပေးနိုင်ပါသည်။</span></li>
+                            <li><i data-lucide="wallet"></i><span data-l="en">Pay by KBZPay, WavePay, AYA Pay or bank transfer. Prices are in Myanmar Kyats.</span><span data-l="mm">KBZPay၊ WavePay၊ AYA Pay သို့ ဘဏ်ငွေလွှဲဖြင့် ပေးချေနိုင်ပါသည်။ ဈေးနှုန်းများမှာ မြန်မာကျပ်ဖြင့် ဖြစ်ပါသည်။</span></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="guides">
+            <div class="wrap">
+                <div class="section-head">
+                    <span class="eyebrow" data-l="en">Screen-by-screen guide</span><span class="eyebrow" data-l="mm">စာမျက်နှာအလိုက် လမ်းညွှန်</span>
+                    <h2 data-l="en">Learn every screen in a few minutes</h2><h2 data-l="mm">စာမျက်နှာတိုင်းကို မိနစ်အနည်းငယ်အတွင်း လေ့လာပါ</h2>
+                    <p data-l="en">Pick a screen to see what each part does and the steps for everyday work. Open the demo alongside to try as you read.</p>
+                    <p data-l="mm">စာမျက်နှာတစ်ခုကို ရွေးပြီး အစိတ်အပိုင်းတစ်ခုစီ၏ လုပ်ဆောင်ချက်နှင့် နေ့စဉ်လုပ်ငန်းအဆင့်များကို ကြည့်ပါ။ Demo ကိုဖွင့်ပြီး တွဲစမ်းကြည့်နိုင်ပါသည်။</p>
+                </div>
+                <div class="guide-layout">
+                    <div class="guide-tabs" id="guide-tabs" role="tablist"></div>
+                    <div id="guide-panels"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section alt" id="devices">
+            <div class="wrap">
+                <div class="section-head">
+                    <span class="eyebrow" data-l="en">Hardware guide</span><span class="eyebrow" data-l="mm">ကိရိယာ လမ်းညွှန်</span>
+                    <h2 data-l="en">Receipt printers &amp; barcode scanners</h2><h2 data-l="mm">ဘောက်ချာပရင်တာနှင့် ဘားကုဒ်စကင်နာ</h2>
+                    <p data-l="en">Exabyte POS works with the devices most Myanmar shops already own. Set them up in <b>Account → Device settings</b>.</p>
+                    <p data-l="mm">မြန်မာဆိုင်အများစုတွင် ရှိပြီးသား ကိရိယာများဖြင့် အသုံးပြုနိုင်ပါသည်။ <b>Account → Device settings</b> တွင် သတ်မှတ်ပါ။</p>
+                </div>
+                <div class="grid-2">
+                    <div class="card device">
+                        <div class="device-head"><span class="icon-tile"><i data-lucide="printer"></i></span><div>
+                            <h3 data-l="en">Receipt printer</h3><h3 data-l="mm">ဘောက်ချာ ပရင်တာ</h3>
+                            <p data-l="en">Thermal 58 mm / 80 mm, portable Bluetooth, or any A4 printer</p><p data-l="mm">Thermal 58 / 80 mm၊ Bluetooth လက်ကိုင်ပရင်တာ သို့ A4 ပရင်တာ</p></div></div>
+                        <div class="conn">
+                            <div><strong><i data-lucide="app-window"></i><span data-l="en">Print dialog</span><span data-l="mm">Print dialog</span></strong><span data-l="en">Any installed printer. Easiest; works everywhere.</span><span data-l="mm">ထည့်သွင်းထားသော မည်သည့်ပရင်တာမဆို။ အလွယ်ဆုံး။</span></div>
+                            <div><strong><i data-lucide="usb"></i>USB / Serial</strong><span data-l="en">Direct ESC/POS — no dialog, auto paper cut.</span><span data-l="mm">တိုက်ရိုက် ESC/POS — Dialog မပေါ်၊ စက္ကူအလိုအလျောက်ဖြတ်။</span></div>
+                            <div><strong><i data-lucide="bluetooth"></i>Bluetooth</strong><span data-l="en">Portable printers on Android phones and laptops.</span><span data-l="mm">Android ဖုန်းနှင့် လက်ပ်တော့တွင် လက်ကိုင်ပရင်တာ။</span></div>
+                            <div><strong><i data-lucide="file-text"></i>A4</strong><span data-l="en">Full-page invoices for wholesale or clinics.</span><span data-l="mm">လက်ကား / ဆေးခန်းအတွက် စာမျက်နှာပြည့် ဘောက်ချာ။</span></div>
+                        </div>
+                        <ol class="guide-steps">
+                            <li><span data-l="en">Turn the printer on and load paper (shiny side towards the print head).</span><span data-l="mm">ပရင်တာဖွင့်ပြီး စက္ကူထည့်ပါ (တောက်ပသောဘက် ပရင့်ခေါင်းဘက်သို့)။</span></li>
+                            <li><span data-l="en">Open <b>Account → Device settings</b>, switch on <b>Voucher / Receipt Printer</b> and choose the paper size.</span><span data-l="mm"><b>Account → Device settings</b> တွင် <b>Voucher / Receipt Printer</b> ကိုဖွင့်ပြီး စက္ကူအရွယ်ကို ရွေးပါ။</span></li>
+                            <li><span data-l="en">Pick a <b>Connection</b>. For direct printing press <b>Connect</b> and select the printer in the browser popup.</span><span data-l="mm"><b>Connection</b> ကိုရွေးပါ။ တိုက်ရိုက်ပရင့်အတွက် <b>Connect</b> ကိုနှိပ်ပြီး Browser popup တွင် ပရင်တာကို ရွေးပါ။</span></li>
+                            <li><span data-l="en">Set the header (your shop name), footer and auto-print, then press <b>Print Test Page</b>.</span><span data-l="mm">Header (ဆိုင်အမည်)၊ Footer နှင့် Auto-print ကို သတ်မှတ်ပြီး <b>Print Test Page</b> နှိပ်ပါ။</span></li>
+                        </ol>
+                        <div class="chip-row"><span class="chip">Xprinter</span><span class="chip">Epson TM</span><span class="chip">Rongta</span><span class="chip">Gprinter</span><span class="chip">Sunmi</span><span class="chip" data-l="en">Most ESC/POS printers</span><span class="chip" data-l="mm">ESC/POS ပရင်တာအများစု</span></div>
+                        <div class="trouble">
+                            <h4 data-l="en">Troubleshooting</h4><h4 data-l="mm">ပြဿနာဖြေရှင်းခြင်း</h4>
+                            <dl>
+                                <dt data-l="en">USB says "Access denied"</dt><dt data-l="mm">USB တွင် "Access denied" ပြသည်</dt>
+                                <dd data-l="en">Windows already uses its own driver for that printer. Use <b>Browser print dialog</b>, or Serial instead.</dd><dd data-l="mm">Windows က ယင်းပရင်တာအတွက် driver ကို သုံးနေပါသည်။ <b>Browser print dialog</b> သို့ Serial ကို သုံးပါ။</dd>
+                                <dt data-l="en">Bluetooth printer not listed</dt><dt data-l="mm">Bluetooth ပရင်တာ မပေါ်ပါ</dt>
+                                <dd data-l="en">Use Chrome or Edge, turn on Bluetooth and location, and keep the printer within 2 m. iPhone Safari cannot print over Bluetooth — use the print dialog.</dd><dd data-l="mm">Chrome / Edge ကိုသုံး၊ Bluetooth နှင့် Location ဖွင့်ပြီး ပရင်တာကို ၂ မီတာအတွင်းထားပါ။ iPhone Safari တွင် Bluetooth ဖြင့် မပရင့်နိုင်ပါ — Print dialog ကိုသုံးပါ။</dd>
+                                <dt data-l="en">Receipt is blank or too wide</dt><dt data-l="mm">ဘောက်ချာ ဗလာ / အကျယ်လွန်</dt>
+                                <dd data-l="en">Flip the paper roll, and make sure the paper size (58 / 80 mm) matches the printer.</dd><dd data-l="mm">စက္ကူလိပ်ကို ပြောင်းပြန်ထည့်ပြီး စက္ကူအရွယ် (58 / 80 mm) ကိုက်ညီမှု စစ်ပါ။</dd>
+                            </dl>
+                        </div>
+                    </div>
+
+                    <div class="card device">
+                        <div class="device-head"><span class="icon-tile tone-indigo"><i data-lucide="scan-barcode"></i></span><div>
+                            <h3 data-l="en">Barcode scanner</h3><h3 data-l="mm">ဘားကုဒ် စကင်နာ</h3>
+                            <p data-l="en">USB, wireless, Bluetooth, or the phone camera</p><p data-l="mm">USB၊ ကြိုးမဲ့၊ Bluetooth သို့ ဖုန်းကင်မရာ</p></div></div>
+                        <div class="conn">
+                            <div><strong><i data-lucide="usb"></i>USB</strong><span data-l="en">Plug and scan. Acts like a keyboard.</span><span data-l="mm">ချိတ်ပြီး ချက်ချင်းသုံး။ ကီးဘုတ်ကဲ့သို့ အလုပ်လုပ်။</span></div>
+                            <div><strong><i data-lucide="radio"></i><span data-l="en">2.4 GHz wireless</span><span data-l="mm">2.4 GHz ကြိုးမဲ့</span></strong><span data-l="en">Plug in the small receiver; works like USB.</span><span data-l="mm">Receiver လေးကိုတပ်ပါ၊ USB ကဲ့သို့ အလုပ်လုပ်။</span></div>
+                            <div><strong><i data-lucide="bluetooth"></i>Bluetooth</strong><span data-l="en">Pair as a keyboard (HID) with tablet or phone.</span><span data-l="mm">တက်ဘလက် / ဖုန်းနှင့် Keyboard (HID) အဖြစ် ချိတ်ပါ။</span></div>
+                            <div><strong><i data-lucide="camera"></i><span data-l="en">Camera</span><span data-l="mm">ကင်မရာ</span></strong><span data-l="en">No hardware: scan with the phone or webcam.</span><span data-l="mm">ကိရိယာမလို — ဖုန်း / Webcam ဖြင့် ဖတ်ပါ။</span></div>
+                        </div>
+                        <ol class="guide-steps">
+                            <li><span data-l="en">Connect the scanner by USB, its wireless receiver, or Bluetooth <b>keyboard (HID)</b> mode.</span><span data-l="mm">စကင်နာကို USB၊ Receiver သို့ Bluetooth <b>Keyboard (HID)</b> mode ဖြင့် ချိတ်ပါ။</span></li>
+                            <li><span data-l="en">In <b>Account → Device settings</b> switch on <b>Barcode Scanner</b>. Leave the terminator as <b>Enter</b> unless your scanner sends Tab.</span><span data-l="mm"><b>Account → Device settings</b> တွင် <b>Barcode Scanner</b> ကိုဖွင့်ပါ။ Terminator ကို <b>Enter</b> အဖြစ်ထားပါ။</span></li>
+                            <li><span data-l="en">Press <b>Test Scanner</b> and scan any barcode — the code should appear on screen.</span><span data-l="mm"><b>Test Scanner</b> ကိုနှိပ်ပြီး ဘားကုဒ်တစ်ခုဖတ်ပါ — ကုဒ် မျက်နှာပြင်ပေါ် ပေါ်လာရပါမည်။</span></li>
+                            <li><span data-l="en">On the POS screen just scan: the item goes into the cart with a beep. In Stock in, scans fill the sheet.</span><span data-l="mm">POS တွင် စကင်ဖတ်ရုံသာ — ပစ္စည်း ခြင်းထဲ ရောက်ပါမည်။ Stock in တွင် စာရွက်ထဲ ဖြည့်ပေးပါမည်။</span></li>
+                        </ol>
+                        <div class="chip-row"><span class="chip">EAN-13</span><span class="chip">UPC</span><span class="chip">Code 128</span><span class="chip">Code 39</span><span class="chip">QR</span></div>
+                        <div class="trouble">
+                            <h4 data-l="en">Troubleshooting</h4><h4 data-l="mm">ပြဿနာဖြေရှင်းခြင်း</h4>
+                            <dl>
+                                <dt data-l="en">"Product not found" after a scan</dt><dt data-l="mm">စကင်ဖတ်ပြီး "Product not found" ပြသည်</dt>
+                                <dd data-l="en">The product code in Inventory must match the barcode exactly. Scan into the code field when adding the product.</dd><dd data-l="mm">Inventory ရှိ ပစ္စည်းကုဒ်သည် ဘားကုဒ်နှင့် အတိအကျ တူရပါမည်။ ပစ္စည်းထည့်စဉ် ကုဒ်ကွက်ထဲ စကင်ဖတ်ပါ။</dd>
+                                <dt data-l="en">Wrong characters appear</dt><dt data-l="mm">စာလုံးမှားများ ပေါ်သည်</dt>
+                                <dd data-l="en">Set the computer keyboard to English (US) and the scanner to the US layout from its setup manual.</dd><dd data-l="mm">ကွန်ပျူတာ Keyboard ကို English (US) ထားပြီး စကင်နာကို US layout သို့ ပြောင်းပါ။</dd>
+                                <dt data-l="en">Camera won't open</dt><dt data-l="mm">ကင်မရာ မဖွင့်ပါ</dt>
+                                <dd data-l="en">Allow camera access for the site in the browser, and use Chrome or Edge.</dd><dd data-l="mm">Browser တွင် ကင်မရာခွင့်ပြုချက်ပေးပြီး Chrome / Edge ကို သုံးပါ။</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="faq">
+            <div class="wrap">
+                <div class="section-head">
+                    <span class="eyebrow">FAQ</span>
+                    <h2 data-l="en">Questions shop owners ask</h2><h2 data-l="mm">ဆိုင်ပိုင်ရှင်များ မေးလေ့ရှိသော မေးခွန်းများ</h2>
+                </div>
+                <div class="faq">
+                    <details><summary><span data-l="en">What is the shop address?</span><span data-l="mm">ဆိုင်လိပ်စာ ဆိုသည်မှာ အဘယ်နည်း?</span></summary>
+                        <p data-l="en">Each shop gets its own link, for example <b>pos.exabytedigitalstore.com/yourshop</b>. Staff sign in only there, so one shop can never see another shop's data. Bookmark it or add it to your phone's home screen.</p>
+                        <p data-l="mm">ဆိုင်တစ်ဆိုင်စီတွင် <b>pos.exabytedigitalstore.com/yourshop</b> ကဲ့သို့ ကိုယ်ပိုင်လင့်ခ် ရှိပါသည်။ ဝန်ထမ်းများ ထိုနေရာတွင်သာ ဝင်ရောက်နိုင်သဖြင့် အခြားဆိုင်၏ အချက်အလက်ကို မမြင်ရပါ။ Bookmark သို့ ဖုန်း Home screen တွင် ထည့်ထားပါ။</p></details>
+                    <details><summary><span data-l="en">Is the demo real?</span><span data-l="mm">Demo သည် အစစ်လား?</span></summary>
+                        <p data-l="en">Yes — it is the full system with a sample convenience store. Sell, add stock and record expenses freely. Demo data resets automatically every few hours.</p>
+                        <p data-l="mm">ဟုတ်ပါသည် — နမူနာကုန်စုံဆိုင်ပါသော စနစ်အပြည့်အစုံ ဖြစ်ပါသည်။ လွတ်လပ်စွာ စမ်းနိုင်ပြီး Demo အချက်အလက်များ နာရီအနည်းငယ်တိုင်း အလိုအလျောက် ပြန်စပါသည်။</p></details>
+                    <details><summary><span data-l="en">Do I need internet?</span><span data-l="mm">အင်တာနက် လိုပါသလား?</span></summary>
+                        <p data-l="en">Yes, a mobile data or Wi-Fi connection is needed while selling. Data is stored safely on the server, so a lost or broken device loses nothing.</p>
+                        <p data-l="mm">ရောင်းချစဉ် Mobile data သို့ Wi-Fi လိုအပ်ပါသည်။ အချက်အလက်များကို Server တွင် လုံခြုံစွာ သိမ်းသဖြင့် ကိရိယာပျောက် / ပျက်လည်း ဘာမှမဆုံးရှုံးပါ။</p></details>
+                    <details><summary><span data-l="en">Can I move my existing product list in?</span><span data-l="mm">ရှိပြီးသား ပစ္စည်းစာရင်းကို ထည့်နိုင်ပါသလား?</span></summary>
+                        <p data-l="en">Yes. Scan products into the bulk stock-in sheet, or send us your Excel list during setup and we will help import it.</p>
+                        <p data-l="mm">ရပါသည်။ ပစ္စည်းအဝင်စာရွက်တွင် စကင်ဖတ်ထည့်နိုင်သည် သို့မဟုတ် တပ်ဆင်စဉ် Excel စာရင်းကို ပို့ပါက ထည့်ပေးပါမည်။</p></details>
+                    <details><summary><span data-l="en">Why a 3-month minimum?</span><span data-l="mm">အနည်းဆုံး ၃ လ ဘာကြောင့်လဲ?</span></summary>
+                        <p data-l="en">Setup, product import and staff training take real time. Three months gives your shop enough time to see the full benefit. After that, renew for any period of 3 months or more.</p>
+                        <p data-l="mm">တပ်ဆင်ခြင်း၊ ပစ္စည်းထည့်ခြင်းနှင့် ဝန်ထမ်းသင်တန်းတို့ အချိန်ယူရပါသည်။ ၃ လ သည် အကျိုးကျေးဇူးကို အပြည့်အဝ မြင်ရန် လုံလောက်သောအချိန် ဖြစ်ပါသည်။ ထို့နောက် ၃ လ နှင့်အထက် သက်တမ်းတိုးနိုင်ပါသည်။</p></details>
+                    <details><summary><span data-l="en">What happens when my subscription ends?</span><span data-l="mm">သက်တမ်းကုန်လျှင် ဘာဖြစ်မလဲ?</span></summary>
+                        <p data-l="en">Sign-in is paused with a renewal message. Nothing is deleted — renew and everything is exactly where you left it.</p>
+                        <p data-l="mm">သက်တမ်းတိုးရန် စာတိုဖြင့် ဝင်ရောက်ခွင့် ခေတ္တရပ်ပါမည်။ ဘာမှမဖျက်ပါ — သက်တမ်းတိုးလျှင် အရင်အတိုင်း ပြန်ရပါမည်။</p></details>
+                </div>
+            </div>
+        </section>
+
+        <section class="section alt" id="contact" style="padding-top:20px">
+            <div class="wrap">
+                <div class="cta">
+                    <h2 data-l="en">Ready to run your shop on Exabyte POS?</h2><h2 data-l="mm">Exabyte POS ဖြင့် ဆိုင်ကို စီမံရန် အသင့်ဖြစ်ပြီလား?</h2>
+                    <p data-l="en">Try the demo now, then contact us to open your shop. Setup and training are free with every contract.</p>
+                    <p data-l="mm">ယခု Demo ကိုစမ်းပြီး ဆိုင်ဖွင့်ရန် ဆက်သွယ်ပါ။ စာချုပ်တိုင်းတွင် တပ်ဆင်ပေးခြင်းနှင့် သင်တန်း အခမဲ့ ပါဝင်ပါသည်။</p>
+                    <div class="hero-cta">
+                        <a class="btn btn-light btn-lg" href="/demo"><i data-lucide="play-circle"></i><span data-l="en">Open the demo</span><span data-l="mm">Demo ဖွင့်ရန်</span></a>
+                        <a class="btn btn-outline-light btn-lg" href="#signin"><i data-lucide="log-in"></i><span data-l="en">Sign in to my shop</span><span data-l="mm">ကျွန်ုပ်ဆိုင်သို့ ဝင်ရန်</span></a>
+                    </div>
+                    <div class="contact-row" id="contact-row"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="wrap">
+            <span class="foot-brand"><img src="/logo.svg" alt="" width="22" height="22"> © <span id="year">2026</span> Exabyte Digital Store · Exabyte POS</span>
+            <nav>
+                <a href="#features"><span data-l="en">Features</span><span data-l="mm">လုပ်ဆောင်ချက်</span></a>
+                <a href="#pricing"><span data-l="en">Pricing</span><span data-l="mm">ဈေးနှုန်း</span></a>
+                <a href="#guides"><span data-l="en">Guides</span><span data-l="mm">လမ်းညွှန်</span></a>
+                <a href="/demo">Demo</a>
+                <a href="/admin"><span data-l="en">Platform admin</span><span data-l="mm">Platform Admin</span></a>
+            </nav>
+        </div>
+    </footer>
+
+    <script>
+    // Screen guides. Each entry renders as one tab; text is static, written here in both languages.
+    const ALL = { en: "Admin & cashier", mm: "Admin နှင့် Cashier" };
+    const ADMIN = { en: "Admin only", mm: "Admin သာ" };
+    const GUIDES = [
+        {
+            id: "dashboard", icon: "layout-dashboard", who: ALL,
+            title: { en: "Dashboard", mm: "ဒက်ရှ်ဘုတ်" },
+            sub: { en: "Your shop at a glance, updated with every sale.", mm: "အရောင်းတိုင်းနှင့်အတူ အပ်ဒိတ်ဖြစ်သော ဆိုင်၏ အခြေအနေအကျဉ်း။" },
+            parts: [
+                { en: "<b>Summary cards</b> — today's sales and profit, this month's sales, gross profit, expenses and <b>net profit</b>, product count, low-stock and expired counts.", mm: "<b>အကျဉ်းကတ်များ</b> — ယနေ့ရောင်းအားနှင့် အမြတ်၊ ယခုလ ရောင်းအား၊ အမြတ်၊ အသုံးစရိတ်၊ <b>အသားတင်အမြတ်</b>၊ ပစ္စည်းအရေအတွက်၊ ပစ္စည်းနည်း / သက်တမ်းကုန် အရေအတွက်။" },
+                { en: "<b>Weekly sales chart</b> — sales for the last 7 days so you can spot slow days.", mm: "<b>အပတ်စဉ် ရောင်းအားဇယား</b> — နောက်ဆုံး ၇ ရက်၏ ရောင်းအား။" },
+                { en: "<b>Monthly profit chart</b> — six months of gross profit, expenses and net profit side by side.", mm: "<b>လစဉ်အမြတ်ဇယား</b> — ၆ လစာ အမြတ်၊ အသုံးစရိတ်နှင့် အသားတင်အမြတ်။" },
+                { en: "<b>Best-sellers</b> and <b>Recent sales</b> — what sells most, and the latest invoices with a PDF report button.", mm: "<b>အရောင်းရဆုံးပစ္စည်း</b> နှင့် <b>နောက်ဆုံးအရောင်းများ</b> — PDF အစီရင်ခံစာ ခလုတ်ပါဝင်။" }
+            ],
+            steps: [
+                { en: "Open the dashboard at the start of the day to check <b>Low stock</b> and <b>Expired</b> counts.", mm: "နေ့စတွင် <b>ပစ္စည်းနည်း</b> နှင့် <b>သက်တမ်းကုန်</b> အရေအတွက်ကို စစ်ပါ။" },
+                { en: "At month end, read <b>Net profit this month</b>: gross profit from sales minus recorded expenses.", mm: "လကုန်တွင် <b>ယခုလ အသားတင်အမြတ်</b> (ရောင်းအားအမြတ် − အသုံးစရိတ်) ကို ကြည့်ပါ။" },
+                { en: "Press <b>PDF Report</b> to print or save a summary for the owner.", mm: "ပိုင်ရှင်အတွက် <b>PDF Report</b> ကိုနှိပ်ပြီး ပရင့်ထုတ် သို့ သိမ်းပါ။" }
+            ],
+            tip: { en: "Net profit is only accurate if every expense is recorded on the Expenses screen.", mm: "အသုံးစရိတ်အားလုံးကို မှတ်တမ်းတင်မှသာ အသားတင်အမြတ် တိကျပါမည်။" }
+        },
+        {
+            id: "pos", icon: "shopping-cart", who: ALL,
+            title: { en: "POS (checkout)", mm: "POS (ငွေရှင်း)" },
+            sub: { en: "Where every sale happens.", mm: "အရောင်းအားလုံး ဖြစ်ပေါ်ရာနေရာ။" },
+            parts: [
+                { en: "<b>Search bar</b> — type a name or code, or scan a barcode. The camera button scans with your phone.", mm: "<b>ရှာဖွေရေးဘား</b> — အမည် / ကုဒ် ရိုက်ပါ သို့ ဘားကုဒ်ဖတ်ပါ။ ကင်မရာခလုတ်ဖြင့် ဖုန်းဖြင့် စကင်ဖတ်နိုင်သည်။" },
+                { en: "<b>Category tiles</b> — filter products by category; swipe or use the pager on phones.", mm: "<b>အမျိုးအစားကတ်များ</b> — အမျိုးအစားအလိုက် စစ်ထုတ်ပါ။" },
+                { en: "<b>Product cards</b> — show price and stock. Grey cards are out of stock or expired.", mm: "<b>ပစ္စည်းကတ်များ</b> — ဈေးနှုန်းနှင့် လက်ကျန်ပြသည်။ မီးခိုးရောင်ကတ်များသည် ကုန်နေသော / သက်တမ်းကုန်ပစ္စည်းများ။" },
+                { en: "<b>Cart</b> — change quantity with + / −, remove lines, enter a discount, then <b>Checkout</b>. On phones the total and checkout stay pinned at the bottom.", mm: "<b>ခြင်း</b> — + / − ဖြင့် အရေအတွက်ပြောင်း၊ လျှော့ဈေးထည့်ပြီး <b>Checkout</b> နှိပ်ပါ။" }
+            ],
+            steps: [
+                { en: "Scan or tap each item. Scanning the same item again adds one more.", mm: "ပစ္စည်းတစ်ခုစီကို စကင်ဖတ် သို့ နှိပ်ပါ။ ထပ်ဖတ်ပါက တစ်ခုတိုးပါမည်။" },
+                { en: "Check quantities in the cart and enter any discount.", mm: "ခြင်းထဲရှိ အရေအတွက်ကို စစ်ပြီး လျှော့ဈေးထည့်ပါ။" },
+                { en: "Press <b>Checkout</b>. Stock is reduced and the invoice is saved immediately.", mm: "<b>Checkout</b> နှိပ်ပါ။ လက်ကျန် ချက်ချင်းလျော့ပြီး ဘောက်ချာ သိမ်းဆည်းပါမည်။" },
+                { en: "Print the receipt (automatic, ask, or manual — set in Account → Device settings).", mm: "ဘောက်ချာ ပရင့်ထုတ်ပါ (Account → Device settings တွင် သတ်မှတ်ပါ)။" }
+            ],
+            tip: { en: "The checkout button locks while a sale is saving, so a double tap never creates two sales.", mm: "သိမ်းဆည်းနေစဉ် Checkout ခလုတ် ပိတ်ထားသဖြင့် နှစ်ချက်နှိပ်မိလည်း အရောင်းနှစ်ခု မဖြစ်ပါ။" }
+        },
+        {
+            id: "inventory", icon: "boxes", who: ALL,
+            title: { en: "Inventory & stock-in", mm: "ကုန်ပစ္စည်း နှင့် အဝင်" },
+            sub: { en: "Products, prices, stock levels and receiving new stock.", mm: "ပစ္စည်း၊ ဈေးနှုန်း၊ လက်ကျန်နှင့် ပစ္စည်းအသစ်လက်ခံခြင်း။" },
+            parts: [
+                { en: "<b>Product table</b> — code, name, category, expiry, cost, price, quantity and a status pill (Good / Low / Expired).", mm: "<b>ပစ္စည်းဇယား</b> — ကုဒ်၊ အမည်၊ အမျိုးအစား၊ သက်တမ်း၊ အဝယ်ဈေး၊ ရောင်းဈေး၊ အရေအတွက်နှင့် အခြေအနေ။" },
+                { en: "<b>Search &amp; filters</b> — find by name, code or category.", mm: "<b>ရှာဖွေ / စစ်ထုတ်</b> — အမည်၊ ကုဒ် သို့ အမျိုးအစားဖြင့် ရှာပါ။" },
+                { en: "<b>Stock-in sheet</b> — a spreadsheet-style form to receive many products at once, with supplier and totals.", mm: "<b>ပစ္စည်းအဝင်စာရွက်</b> — ပစ္စည်းများစွာကို တစ်ခါတည်း လက်ခံနိုင်သော ဇယားပုံစံ။" },
+                { en: "<b>Edit / archive</b> — admins change prices or archive items no longer sold.", mm: "<b>ပြင်ဆင် / ပိတ်သိမ်း</b> — Admin သည် ဈေးပြင်ခြင်း၊ မရောင်းတော့သောပစ္စည်း ပိတ်ခြင်း ပြုလုပ်နိုင်သည်။" }
+            ],
+            steps: [
+                { en: "(Admin) Click <b>Stock in</b>. Pick the supplier (or quick-add a new one).", mm: "(Admin) <b>Stock in</b> ကိုနှိပ်ပြီး ပေးသွင်းသူကို ရွေးပါ (သို့ အသစ်ထည့်ပါ)။" },
+                { en: "Scan each barcode into the sheet. Known products fill in automatically; new ones get a blank row.", mm: "ဘားကုဒ်တစ်ခုစီကို ဖတ်ပါ။ ရှိပြီးသားပစ္စည်း အလိုအလျောက်ဖြည့်ပြီး အသစ်အတွက် အလွတ်တန်း ပေါ်ပါမည်။" },
+                { en: "Enter quantity, cost, selling price and — for clinics and stores — the expiry date.", mm: "အရေအတွက်၊ အဝယ်ဈေး၊ ရောင်းဈေးနှင့် (ဆေးခန်း / ကုန်စုံဆိုင်များအတွက်) သက်တမ်းရက် ထည့်ပါ။" },
+                { en: "Check the totals and press <b>Save all</b>. Stock history records every line.", mm: "စုစုပေါင်းကို စစ်ပြီး <b>Save all</b> နှိပ်ပါ။" }
+            ],
+            tip: { en: "Online shops and general retail can leave expiry empty; those items never show as expired.", mm: "အွန်လိုင်းဆိုင်နှင့် လက်လီဆိုင်များသည် သက်တမ်းရက် ချန်ထားနိုင်ပါသည်။" }
+        },
+        {
+            id: "sales", icon: "receipt", who: ALL,
+            title: { en: "Sales history", mm: "အရောင်းမှတ်တမ်း" },
+            sub: { en: "Every invoice by day or by month.", mm: "နေ့အလိုက် / လအလိုက် ဘောက်ချာအားလုံး။" },
+            parts: [
+                { en: "<b>Daily / Monthly switch</b> with a date or month picker.", mm: "<b>နေ့စဉ် / လစဉ်</b> ရွေးချယ်ခလုတ်နှင့် ရက်စွဲရွေးစနစ်။" },
+                { en: "<b>Summary strip</b> — invoices, items sold, revenue and profit for the period.", mm: "<b>အကျဉ်းဘား</b> — ဘောက်ချာ၊ ရောင်းခဲ့သည့်ပစ္စည်း၊ ဝင်ငွေနှင့် အမြတ်။" },
+                { en: "<b>Invoice table</b> — open any invoice to view lines or reprint the receipt.", mm: "<b>ဘောက်ချာဇယား</b> — ဘောက်ချာဖွင့်ကြည့်ခြင်း / ပြန်ပရင့်ခြင်း။" }
+            ],
+            steps: [
+                { en: "Choose <b>Daily</b> and a date to close the day and count the cash drawer.", mm: "ငွေအံဆွဲ စစ်ရန် <b>Daily</b> နှင့် ရက်စွဲကို ရွေးပါ။" },
+                { en: "Choose <b>Monthly</b> to see the month's revenue and profit.", mm: "လအလိုက် ဝင်ငွေနှင့် အမြတ်အတွက် <b>Monthly</b> ကိုရွေးပါ။" },
+                { en: "Press <b>PDF Report</b> to print or save the period.", mm: "<b>PDF Report</b> ဖြင့် ပရင့်ထုတ် / သိမ်းပါ။" }
+            ],
+            tip: { en: "Cashiers see sales totals but not cost or profit columns.", mm: "Cashier သည် အဝယ်ဈေးနှင့် အမြတ်ကော်လံကို မမြင်ရပါ။" }
+        },
+        {
+            id: "alerts", icon: "bell-ring", who: ALL,
+            title: { en: "Alerts", mm: "သတိပေးချက်များ" },
+            sub: { en: "What needs action today.", mm: "ယနေ့ ဆောင်ရွက်ရမည့်အရာများ။" },
+            parts: [
+                { en: "<b>Low stock</b> — items at or below their low-stock level.", mm: "<b>ပစ္စည်းနည်း</b> — သတ်မှတ်အဆင့်နှင့်အောက် ရောက်နေသောပစ္စည်း။" },
+                { en: "<b>Expiring soon</b> — items that expire within the next 90 days.", mm: "<b>မကြာမီ သက်တမ်းကုန်မည်</b> — ရက် ၉၀ အတွင်း သက်တမ်းကုန်မည့်ပစ္စည်း။" },
+                { en: "<b>Expired</b> — remove from the shelf; they cannot be sold.", mm: "<b>သက်တမ်းကုန်ပြီး</b> — စင်ပေါ်မှ ဖယ်ပါ၊ ရောင်း၍ မရပါ။" }
+            ],
+            steps: [
+                { en: "Use the search box to find an item in a long list.", mm: "စာရင်းရှည်တွင် ရှာဖွေရေးကွက်ကို သုံးပါ။" },
+                { en: "Reorder low items from the supplier, then receive them with Stock in.", mm: "ပစ္စည်းနည်းများကို မှာယူပြီး Stock in ဖြင့် လက်ခံပါ။" },
+                { en: "Discount items that expire soon so they sell first.", mm: "သက်တမ်းနီးပစ္စည်းများကို အရင်ရောင်းရန် လျှော့ဈေးပေးပါ။" }
+            ],
+            tip: { en: "Set a sensible low-stock level per product so alerts are useful, not noisy.", mm: "သတိပေးချက် အသုံးဝင်စေရန် ပစ္စည်းတစ်ခုချင်း ပစ္စည်းနည်းအဆင့်ကို သင့်တော်အောင် သတ်မှတ်ပါ။" }
+        },
+        {
+            id: "history", icon: "history", who: ADMIN,
+            title: { en: "Stock history", mm: "ပစ္စည်းမှတ်တမ်း" },
+            sub: { en: "Every movement of every product.", mm: "ပစ္စည်းတိုင်း၏ အဝင်အထွက်တိုင်း။" },
+            parts: [
+                { en: "<b>Type filter</b> — Inbound, Sale, Adjustment or Archived.", mm: "<b>အမျိုးအစား စစ်ထုတ်</b> — အဝင်၊ အရောင်း၊ ပြင်ဆင်မှု၊ ပိတ်သိမ်း။" },
+                { en: "<b>Movement table</b> — date, product, change (+/−), balance after, note and who did it.", mm: "<b>မှတ်တမ်းဇယား</b> — ရက်စွဲ၊ ပစ္စည်း၊ ပြောင်းလဲမှု၊ လက်ကျန်၊ မှတ်ချက်နှင့် ပြုလုပ်သူ။" }
+            ],
+            steps: [
+                { en: "If a count doesn't match the shelf, search the product here.", mm: "စင်ပေါ်ရှိအရေအတွက် မကိုက်ပါက ဤနေရာတွင် ပစ္စည်းကို ရှာပါ။" },
+                { en: "Read the movements from newest to oldest to find the difference.", mm: "ကွာခြားချက်ရှာရန် နောက်ဆုံးမှ စ၍ ဖတ်ပါ။" }
+            ]
+        },
+        {
+            id: "suppliers", icon: "truck", who: ADMIN,
+            title: { en: "Suppliers", mm: "ပေးသွင်းသူများ" },
+            sub: { en: "Who you buy from and how much you owe.", mm: "မည်သူ့ထံ ဝယ်ယူပြီး မည်မျှ ပေးရန်ကျန်သည်။" },
+            parts: [
+                { en: "<b>Supplier list</b> — name, phone and current balance owed.", mm: "<b>ပေးသွင်းသူစာရင်း</b> — အမည်၊ ဖုန်းနှင့် ပေးရန်ကျန်ငွေ။" },
+                { en: "<b>Ledger</b> — purchases add to the balance, payments reduce it.", mm: "<b>စာရင်းဇယား</b> — အဝယ်သည် လက်ကျန်ကို တိုး၍ ငွေပေးချေမှုသည် လျော့စေသည်။" }
+            ],
+            steps: [
+                { en: "Add a supplier once; it then appears in the stock-in sheet.", mm: "ပေးသွင်းသူကို တစ်ကြိမ်ထည့်ပြီးပါက ပစ္စည်းအဝင်စာရွက်တွင် ပေါ်လာပါမည်။" },
+                { en: "When you pay, record the payment so the balance stays correct.", mm: "ငွေပေးချေသည့်အခါ လက်ကျန်မှန်ကန်စေရန် မှတ်တမ်းတင်ပါ။" }
+            ]
+        },
+        {
+            id: "customers", icon: "contact-round", who: ALL,
+            title: { en: "Customers", mm: "ဖောက်သည်များ" },
+            sub: { en: "Regular customers and credit (အကြွေး).", mm: "ပုံမှန်ဖောက်သည်များနှင့် အကြွေးစာရင်း။" },
+            parts: [
+                { en: "<b>Customer list</b> — name, phone and outstanding credit.", mm: "<b>ဖောက်သည်စာရင်း</b> — အမည်၊ ဖုန်းနှင့် ရရန်ကျန်ငွေ။" },
+                { en: "<b>Ledger</b> — credit sales and repayments with dates.", mm: "<b>စာရင်းဇယား</b> — အကြွေးရောင်းခြင်းနှင့် ပြန်ဆပ်ခြင်း။" }
+            ],
+            steps: [
+                { en: "Add the customer with a phone number.", mm: "ဖောက်သည်ကို ဖုန်းနံပါတ်နှင့်တကွ ထည့်ပါ။" },
+                { en: "Record credit given and every repayment.", mm: "ပေးထားသောအကြွေးနှင့် ပြန်ဆပ်မှုတိုင်းကို မှတ်တမ်းတင်ပါ။" },
+                { en: "Check balances weekly and remind customers who owe.", mm: "အပတ်စဉ် လက်ကျန်ကို စစ်ပြီး အကြွေးရှိသူများကို သတိပေးပါ။" }
+            ]
+        },
+        {
+            id: "expenses", icon: "wallet", who: ADMIN,
+            title: { en: "Expenses", mm: "အသုံးစရိတ်" },
+            sub: { en: "Shop costs with proof, feeding the monthly net profit.", mm: "အထောက်အထားပါ ဆိုင်ကုန်ကျစရိတ်များ — လစဉ်အသားတင်အမြတ်တွက်ရာတွင် ပါဝင်။" },
+            parts: [
+                { en: "<b>Summary cards</b> — this month, last month, number of records and the biggest category.", mm: "<b>အကျဉ်းကတ်များ</b> — ယခုလ၊ ပြီးခဲ့သောလ၊ မှတ်တမ်းအရေအတွက်နှင့် အများဆုံးအမျိုးအစား။" },
+                { en: "<b>Add expense form</b> — category, amount, date, payment method (Cash, KBZPay, WavePay, bank, card), paid to, voucher number and an optional <b>voucher photo</b>.", mm: "<b>အသုံးစရိတ်ထည့်ရန်</b> — အမျိုးအစား၊ ပမာဏ၊ ရက်စွဲ၊ ငွေပေးချေမှုနည်းလမ်း၊ ပေးသူ၊ ဘောက်ချာနံပါတ်နှင့် <b>ဘောက်ချာဓာတ်ပုံ</b> (မထည့်လည်းရ)။" },
+                { en: "<b>Expense table</b> — filter by month or category; the photo button opens the voucher.", mm: "<b>အသုံးစရိတ်ဇယား</b> — လ / အမျိုးအစားဖြင့် စစ်ထုတ်ပါ။ ဓာတ်ပုံခလုတ်ဖြင့် ဘောက်ချာကြည့်ပါ။" }
+            ],
+            steps: [
+                { en: "Pick a category such as Rent, Utilities or Salaries.", mm: "ဆိုင်ခ၊ မီတာခ၊ လစာ ကဲ့သို့ အမျိုးအစားကို ရွေးပါ။" },
+                { en: "Enter the amount, date and how it was paid.", mm: "ပမာဏ၊ ရက်စွဲနှင့် ပေးချေပုံကို ထည့်ပါ။" },
+                { en: "Tap <b>Voucher photo</b> to take a picture of the bill (optional), then save.", mm: "<b>ဘောက်ချာဓာတ်ပုံ</b> ကိုနှိပ်ပြီး ပြေစာကို ဓာတ်ပုံရိုက်ပါ (မထည့်လည်းရ)၊ ထို့နောက် သိမ်းပါ။" }
+            ],
+            tip: { en: "Photos are resized on the device before upload, so even phone pictures save quickly.", mm: "ဓာတ်ပုံများကို မတင်မီ ချုံ့ပေးသဖြင့် ဖုန်းဓာတ်ပုံများပင် မြန်မြန်သိမ်းနိုင်ပါသည်။" }
+        },
+        {
+            id: "users", icon: "users-round", who: ADMIN,
+            title: { en: "Users", mm: "အသုံးပြုသူများ" },
+            sub: { en: "Staff logins and what they can do.", mm: "ဝန်ထမ်းအကောင့်များနှင့် ၎င်းတို့၏ ခွင့်ပြုချက်။" },
+            parts: [
+                { en: "<b>Admin</b> — everything, including costs, profit, expenses, suppliers and users.", mm: "<b>Admin</b> — အဝယ်ဈေး၊ အမြတ်၊ အသုံးစရိတ်၊ ပေးသွင်းသူ၊ အသုံးပြုသူ အပါအဝင် အားလုံး။" },
+                { en: "<b>Cashier</b> — POS, inventory view, sales, alerts and customers.", mm: "<b>Cashier</b> — POS၊ ပစ္စည်းကြည့်ခြင်း၊ အရောင်း၊ သတိပေးချက်နှင့် ဖောက်သည်။" }
+            ],
+            steps: [
+                { en: "Create one login per person — never share accounts.", mm: "လူတစ်ဦးလျှင် အကောင့်တစ်ခု ဖွင့်ပါ — အကောင့်မျှမသုံးပါနှင့်။" },
+                { en: "Give counter staff the <b>Cashier</b> role so costs and profit stay private.", mm: "ကောင်တာဝန်ထမ်းများကို <b>Cashier</b> အခန်းကဏ္ဍပေးပါ — အဝယ်ဈေးနှင့် အမြတ်ကို မမြင်ရပါ။" }
+            ]
+        },
+        {
+            id: "account", icon: "settings-2", who: ALL,
+            title: { en: "Account & devices", mm: "အကောင့်နှင့် ကိရိယာများ" },
+            sub: { en: "Password, printer, scanner and backups.", mm: "စကားဝှက်၊ ပရင်တာ၊ စကင်နာနှင့် အရန်သိမ်းခြင်း။" },
+            parts: [
+                { en: "<b>Change password</b> for your own login.", mm: "ကိုယ်ပိုင်အကောင့်၏ <b>စကားဝှက်ပြောင်းရန်</b>။" },
+                { en: "<b>Device settings</b> — barcode scanner, camera scanner and receipt printer (see the device guide below).", mm: "<b>ကိရိယာဆက်တင်</b> — ဘားကုဒ်စကင်နာ၊ ကင်မရာစကင်နာနှင့် ပရင်တာ (အောက်ပါလမ်းညွှန်ကို ကြည့်ပါ)။" },
+                { en: "<b>System tools</b> (admin) — Excel export, JSON backup and PDF report.", mm: "<b>စနစ်ကိရိယာများ</b> (Admin) — Excel၊ JSON အရန်နှင့် PDF အစီရင်ခံစာ။" }
+            ],
+            steps: [
+                { en: "Set up the printer and scanner once on each device you sell from.", mm: "ရောင်းချသည့် ကိရိယာတစ်ခုစီတွင် ပရင်တာနှင့် စကင်နာကို တစ်ကြိမ် သတ်မှတ်ပါ။" },
+                { en: "Download an Excel or JSON backup every month for your records.", mm: "လစဉ် Excel သို့ JSON အရန်ဖိုင်ကို ဒေါင်းလုဒ်လုပ်ထားပါ။" }
+            ],
+            tip: { en: "Device settings are saved per browser, so a counter PC and a phone can use different printers.", mm: "ကိရိယာဆက်တင်များကို Browser တစ်ခုချင်းစီတွင် သိမ်းသဖြင့် ကောင်တာ PC နှင့် ဖုန်းတွင် ပရင်တာမတူ သုံးနိုင်ပါသည်။" }
+        }
+    ];
+
+    // Fill these in to show contact links in the "Contact" section. Empty values are hidden.
+    const CONTACT = {
+        phone: "",      // e.g. "09 123 456 789"
+        viber: "",      // e.g. "09123456789"
+        email: "",      // e.g. "sales@exabytedigitalstore.com"
+        facebook: ""    // e.g. "https://facebook.com/exabytedigitalstore"
+    };
+
+    const LANG_KEY = "pharmacy_lang"; // shared with the POS app so the choice carries over
+    const pair = (t) => `<span data-l="en">${t.en}</span><span data-l="mm">${t.mm}</span>`;
+
+    function setLang(code) {
+        const mm = code === "mm" || code === "my";
+        document.documentElement.lang = mm ? "my" : "en";
+        document.querySelectorAll("[data-set-lang]").forEach((b) => b.classList.toggle("on", (b.dataset.setLang === "my") === mm));
+        try { localStorage.setItem(LANG_KEY, mm ? "mm" : "en"); } catch (_) { /* storage blocked */ }
+    }
+
+    function renderGuides() {
+        const tabs = document.getElementById("guide-tabs");
+        const panels = document.getElementById("guide-panels");
+        tabs.innerHTML = GUIDES.map((g, i) => `
+            <button type="button" class="guide-tab${i ? "" : " on"}" role="tab" data-guide="${g.id}" aria-selected="${!i}">
+                <i data-lucide="${g.icon}"></i>${pair(g.title)}
+            </button>`).join("");
+        panels.innerHTML = GUIDES.map((g, i) => `
+            <article class="guide-panel${i ? "" : " on"}" id="guide-${g.id}" role="tabpanel">
+                <div class="guide-head">
+                    <span class="icon-tile"><i data-lucide="${g.icon}"></i></span>
+                    <div><h3>${pair(g.title)}</h3><p>${pair(g.sub)}</p></div>
+                    <span class="who">${pair(g.who)}</span>
+                </div>
+                <div class="guide-body">
+                    <div>
+                        <h4>${pair({ en: "On this screen", mm: "ဤစာမျက်နှာတွင်" })}</h4>
+                        <ul class="screen-parts">${g.parts.map((p) => `<li>${pair(p)}</li>`).join("")}</ul>
+                    </div>
+                    <div>
+                        <h4>${pair({ en: "How to use it", mm: "အသုံးပြုပုံ" })}</h4>
+                        <ol class="guide-steps">${g.steps.map((s) => `<li><span>${pair(s)}</span></li>`).join("")}</ol>
+                        ${g.tip ? `<div class="tip"><i data-lucide="lightbulb"></i><span>${pair(g.tip)}</span></div>` : ""}
+                    </div>
+                </div>
+            </article>`).join("");
+        tabs.addEventListener("click", (event) => {
+            const tab = event.target.closest("[data-guide]");
+            if (!tab) return;
+            tabs.querySelectorAll(".guide-tab").forEach((t) => {
+                const on = t === tab;
+                t.classList.toggle("on", on);
+                t.setAttribute("aria-selected", String(on));
+            });
+            panels.querySelectorAll(".guide-panel").forEach((p) => p.classList.toggle("on", p.id === `guide-${tab.dataset.guide}`));
+            tab.scrollIntoView({ block: "nearest", inline: "nearest" });
+        });
+    }
+
+    function renderContact() {
+        const items = [];
+        if (CONTACT.phone) items.push(`<a href="tel:${CONTACT.phone.replace(/\s+/g, "")}"><i data-lucide="phone"></i>${CONTACT.phone}</a>`);
+        if (CONTACT.viber) items.push(`<a href="viber://chat?number=${encodeURIComponent(CONTACT.viber)}"><i data-lucide="message-circle"></i>Viber</a>`);
+        if (CONTACT.email) items.push(`<a href="mailto:${CONTACT.email}"><i data-lucide="mail"></i>${CONTACT.email}</a>`);
+        if (CONTACT.facebook) items.push(`<a href="${CONTACT.facebook}" target="_blank" rel="noopener"><i data-lucide="facebook"></i>Facebook</a>`);
+        document.getElementById("contact-row").innerHTML = items.join("");
+    }
+
+    function setupFinder() {
+        const form = document.getElementById("signin");
+        const input = document.getElementById("shop-slug");
+        const msg = document.getElementById("finder-msg");
+        document.getElementById("host-prefix").textContent = `${location.host}/`;
+        const say = (en, mm) => { msg.innerHTML = en ? pair({ en, mm }) : ""; };
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const slug = input.value.trim().toLowerCase().replace(/^.*\//, "");
+            if (!/^[a-z0-9][a-z0-9-]{1,39}$/.test(slug)) {
+                say("Enter your shop address, e.g. kksortho.", "ဆိုင်လိပ်စာကို ထည့်ပါ (ဥပမာ kksortho)။");
+                return;
+            }
+            say("");
+            try {
+                const res = await fetch(`/api/public/shops/${encodeURIComponent(slug)}`);
+                if (res.ok) {
+                    location.href = `/${slug}`;
+                    return;
+                }
+                say(`No shop found at /${slug}. Check the spelling with your shop owner.`, `/${slug} တွင် ဆိုင်မတွေ့ပါ။ စာလုံးပေါင်းကို ပြန်စစ်ပါ။`);
+            } catch (_) {
+                say("Can't reach the server. Check your internet connection.", "Server သို့ မချိတ်မိပါ။ အင်တာနက်ကို စစ်ပါ။");
+            }
+        });
+    }
+
+    let saved = null;
+    try { saved = localStorage.getItem(LANG_KEY); } catch (_) { /* storage blocked */ }
+    setLang(saved || ((navigator.language || "").startsWith("my") ? "mm" : "en"));
+    document.querySelectorAll("[data-set-lang]").forEach((b) => b.addEventListener("click", () => setLang(b.dataset.setLang)));
+
+    // Before shop addresses existed everyone signed in at "/". A browser still holding that old
+    // session is sent to its shop's new address, carrying the session along.
+    (async () => {
+        let legacy = null;
+        try { legacy = localStorage.getItem("pharmacy_token"); } catch (_) { return; }
+        if (!legacy || location.pathname !== "/") return;
+        try {
+            const res = await fetch("/api/auth/me", { headers: { Authorization: `Bearer ${legacy}` } });
+            const data = res.ok ? await res.json() : null;
+            localStorage.removeItem("pharmacy_token");
+            if (data && data.shop && data.shop.slug && data.user.role !== "super_admin") {
+                localStorage.setItem(`pharmacy_token_${data.shop.slug}`, legacy);
+                localStorage.setItem("exabyte_last_shop", data.shop.slug);
+                location.replace(`/${data.shop.slug}`);
+            }
+        } catch (_) { /* offline: stay on the home page */ }
+    })();
+
+    // Prefill the last shop this browser used.
+    try {
+        const last = localStorage.getItem("exabyte_last_shop");
+        if (last && last !== "demo" && location.pathname === "/") document.getElementById("shop-slug").value = last;
+    } catch (_) { /* storage blocked */ }
+
+    // Unknown shop addresses are served this page with a 404; say so.
+    if (location.pathname !== "/" && location.pathname !== "") {
+        const path = decodeURIComponent(location.pathname);
+        document.getElementById("nf-path-en").textContent = path;
+        document.getElementById("nf-path-mm").textContent = path;
+        document.getElementById("notfound").classList.add("show");
+        document.getElementById("shop-slug").value = path.replace(/^\/+|\/+$/g, "").toLowerCase();
+    }
+
+    const topbar = document.getElementById("topbar");
+    const onScroll = () => topbar.classList.toggle("scrolled", window.scrollY > 8);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+
+    const menuBtn = document.getElementById("menu-btn");
+    const mobileNav = document.getElementById("mobile-nav");
+    menuBtn.addEventListener("click", () => {
+        const open = mobileNav.classList.toggle("open");
+        menuBtn.setAttribute("aria-expanded", String(open));
+    });
+    mobileNav.addEventListener("click", (event) => {
+        if (event.target.closest("a")) mobileNav.classList.remove("open");
+    });
+
+    document.getElementById("year").textContent = new Date().getFullYear();
+    renderGuides();
+    renderContact();
+    setupFinder();
+    if (window.lucide) lucide.createIcons();
+    </script>
+</body>
+</html>

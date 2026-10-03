@@ -1,12 +1,80 @@
-const VENDOR_NAME = "KKS ortho clinic";
+// Each shop lives at /<slug>. The slug picks the shop for sign-in, branding and its saved session.
+const SHOP_SLUG = (window.location.pathname.split("/")[1] || "").toLowerCase();
+const TOKEN_KEY = `pharmacy_token_${SHOP_SLUG || "default"}`;
+const TAB_KEY = `pharmacy_active_tab_${SHOP_SLUG || "default"}`;
+const NO_EXPIRY = "9999-12-31";
+let VENDOR_NAME = "Exabyte POS";
+const shopProfile = { name: "", slug: SHOP_SLUG, businessType: "retail", logoUrl: null, isDemo: SHOP_SLUG === "demo", demoAccounts: [] };
+
+// Categories, icons and expiry rules for each business type a shop can be created with.
+const BUSINESS_PROFILES = {
+    clinic: {
+        expiryRequired: true,
+        categories: [
+            { id: "tablets", label: "Tablets & Capsules", mm: "ဆေးပြား / ဆေးတောင့်", icon: "pill", terms: ["tablet", "capsule", "pill", "oral", "analgesic", "antibiotic", "vitamin", "supplement", "pain relief"] },
+            { id: "liquids", label: "Syrups & Liquids", mm: "ဆေးရည်", icon: "flask-conical", terms: ["syrup", "liquid", "suspension", "solution", "drops", "cold relief", "cough", "flu"] },
+            { id: "injections", label: "Injections", mm: "ထိုးဆေး", icon: "syringe", terms: ["injection", "injectable", "ampoule", "vial", "vaccine"] },
+            { id: "supplies", label: "Syringes & Supplies", mm: "ဆေးထိုးအပ် / ပစ္စည်း", icon: "briefcase-medical", terms: ["syringe", "needle", "cannula", "glove", "mask", "medical supply"] },
+            { id: "electronics", label: "Medical Electronics", mm: "ဆေးဘက်သုံး စက်ပစ္စည်း", icon: "activity", terms: ["electronic", "device", "machine", "monitor", "nebulizer", "thermometer", "oximeter", "glucometer"] },
+            { id: "first-aid", label: "First Aid", mm: "ရှေးဦးသူနာပြု", icon: "cross", terms: ["first aid", "bandage", "gauze", "plaster", "antiseptic", "dressing"] },
+            { id: "personal-care", label: "Personal Care", mm: "ကိုယ်ရေးသန့်ရှင်း", icon: "heart-pulse", terms: ["personal care", "hygiene", "skin", "cream", "ointment", "lotion", "soap"] }
+        ]
+    },
+    convenience: {
+        expiryRequired: false,
+        categories: [
+            { id: "beverages", label: "Beverages", mm: "အချိုရည် / သောက်စရာ", icon: "cup-soda", terms: ["beverage", "drink", "water", "juice", "soda", "coffee", "tea", "cola", "energy"] },
+            { id: "snacks", label: "Snacks", mm: "မုန့်", icon: "cookie", terms: ["snack", "chips", "cookie", "biscuit", "candy", "chocolate", "nuts"] },
+            { id: "instant", label: "Instant food", mm: "အသင့်စား", icon: "soup", terms: ["instant", "noodle", "ramen", "canned", "ready meal"] },
+            { id: "dairy", label: "Dairy & bakery", mm: "နို့ထွက် / ပေါင်မုန့်", icon: "milk", terms: ["dairy", "milk", "yogurt", "bread", "bakery", "cheese", "egg"] },
+            { id: "personal-care", label: "Personal care", mm: "ကိုယ်ရေးသန့်ရှင်း", icon: "sparkles", terms: ["personal care", "shampoo", "soap", "toothpaste", "lotion", "tissue"] },
+            { id: "household", label: "Household", mm: "အိမ်သုံးပစ္စည်း", icon: "spray-can", terms: ["household", "detergent", "cleaner", "battery", "batteries", "kitchen"] }
+        ]
+    },
+    online: {
+        expiryRequired: false,
+        categories: [
+            { id: "fashion", label: "Fashion", mm: "အဝတ်အထည်", icon: "shirt", terms: ["fashion", "clothing", "shirt", "dress", "longyi", "shoe", "bag"] },
+            { id: "beauty", label: "Beauty", mm: "အလှကုန်", icon: "sparkles", terms: ["beauty", "cosmetic", "makeup", "skincare", "serum", "perfume"] },
+            { id: "electronics", label: "Electronics", mm: "အီလက်ထရောနစ်", icon: "smartphone", terms: ["electronic", "phone", "charger", "cable", "earphone", "gadget"] },
+            { id: "accessories", label: "Accessories", mm: "အသုံးအဆောင်", icon: "watch", terms: ["accessor", "watch", "jewelry", "jewellery", "case", "wallet"] },
+            { id: "home", label: "Home & living", mm: "အိမ်နှင့် နေထိုင်မှု", icon: "sofa", terms: ["home", "living", "decor", "kitchen", "bedding"] },
+            { id: "kids", label: "Kids & toys", mm: "ကလေး / ကစားစရာ", icon: "baby", terms: ["kid", "baby", "toy", "children"] }
+        ]
+    },
+    retail: {
+        expiryRequired: false,
+        categories: [
+            { id: "grocery", label: "Groceries", mm: "စားသောက်ကုန်", icon: "shopping-basket", terms: ["grocery", "groceries", "food", "rice", "oil", "drink", "snack"] },
+            { id: "electronics", label: "Electronics", mm: "အီလက်ထရောနစ်", icon: "plug", terms: ["electronic", "phone", "charger", "cable", "battery", "light"] },
+            { id: "stationery", label: "Stationery", mm: "စာရေးကိရိယာ", icon: "pencil", terms: ["stationery", "pen", "pencil", "book", "paper", "notebook"] },
+            { id: "hardware", label: "Hardware", mm: "စက်ပစ္စည်း / ကိရိယာ", icon: "wrench", terms: ["hardware", "tool", "paint", "screw", "pipe"] },
+            { id: "clothing", label: "Clothing", mm: "အဝတ်အထည်", icon: "shirt", terms: ["clothing", "fashion", "shirt", "shoe", "bag"] },
+            { id: "gifts", label: "Gifts & others", mm: "လက်ဆောင် / အခြား", icon: "gift", terms: ["gift", "toy", "decor", "other"] }
+        ]
+    }
+};
+
+function currentBusinessProfile() {
+    return BUSINESS_PROFILES[shopProfile.businessType] || BUSINESS_PROFILES.retail;
+}
+
+function buildPOSCategories(businessType) {
+    const profile = BUSINESS_PROFILES[businessType] || BUSINESS_PROFILES.retail;
+    return [{ id: "all", label: "All items", mm: "ပစ္စည်းအားလုံး", icon: "layout-grid", terms: [] }, ...profile.categories];
+}
+
+function formatExpiry(value) {
+    return !value || value === NO_EXPIRY ? "—" : value;
+}
 
 function getInitialActiveTab() {
     const fromHash = window.location.hash.replace(/^#/, "").trim();
-    return fromHash || localStorage.getItem("pharmacy_active_tab") || "dashboard";
+    return fromHash || localStorage.getItem(TAB_KEY) || "dashboard";
 }
 
 const state = {
-    token: localStorage.getItem("pharmacy_token") || "",
+    token: localStorage.getItem(TOKEN_KEY) || "",
     language: localStorage.getItem("pharmacy_lang") || "en",
     user: null,
     summary: {},
@@ -20,7 +88,9 @@ const state = {
     suppliers: [],
     customers: [],
     expenses: [],
-    chart: { weeklySales: [], bestSellers: [] },
+    expenseFilters: { search: "", month: "", category: "" },
+    expensePhoto: null,
+    chart: { weeklySales: [], monthly: [], bestSellers: [] },
     cart: [],
     posCategory: "all",
     posCategoryOpen: false,
@@ -48,16 +118,7 @@ const state = {
 
 const adminTabs = new Set(["history", "users", "suppliers", "expenses"]);
 const availableTabs = new Set(["dashboard", "pos", "inventory", "sales", "alerts", "history", "suppliers", "customers", "expenses", "users", "account"]);
-const POS_CATEGORIES = [
-    { id: "all", label: "All items", icon: "layout-grid", terms: [] },
-    { id: "tablets", label: "Tablets & Capsules", icon: "pill", terms: ["tablet", "capsule", "pill", "oral", "analgesic", "antibiotic", "vitamin", "supplement", "pain relief"] },
-    { id: "liquids", label: "Syrups & Liquids", icon: "flask-conical", terms: ["syrup", "liquid", "suspension", "solution", "drops", "cold relief", "cough", "flu"] },
-    { id: "injections", label: "Injections", icon: "syringe", terms: ["injection", "injectable", "ampoule", "vial", "vaccine"] },
-    { id: "supplies", label: "Syringes & Supplies", icon: "briefcase-medical", terms: ["syringe", "needle", "cannula", "glove", "mask", "medical supply"] },
-    { id: "electronics", label: "Medical Electronics", icon: "activity", terms: ["electronic", "device", "machine", "monitor", "nebulizer", "thermometer", "oximeter", "glucometer"] },
-    { id: "first-aid", label: "First Aid", icon: "cross", terms: ["first aid", "bandage", "gauze", "plaster", "antiseptic", "dressing"] },
-    { id: "personal-care", label: "Personal Care", icon: "heart-pulse", terms: ["personal care", "hygiene", "skin", "cream", "ointment", "lotion", "soap"] }
-];
+let POS_CATEGORIES = buildPOSCategories(shopProfile.businessType);
 const PAGE_SIZES = {
     inventory: 8,
     sales: 8,
@@ -213,6 +274,54 @@ const translations = {
         edit: "Edit",
         role_label_admin: "ADMIN",
         role_label_cashier: "CASHIER",
+        nav_main: "Main",
+        nav_manage: "Manage",
+        nav_settings: "Settings",
+        login_tagline: "Sell faster. Track everything.",
+        login_sub: "Point of sale, inventory and reports for clinics and convenience stores.",
+        login_point_1: "Fast checkout with barcode scanning and receipt printing",
+        login_point_2: "Live stock, expiry and low-stock alerts",
+        login_point_3: "Daily sales and profit reports",
+        login_home_link: "Exabyte POS home",
+        product_photo: "Product photo (optional)",
+        product_photo_title: "Shown on the POS product card",
+        choose_photo: "Choose",
+        remove: "Remove",
+        monthly_profit: "Monthly profit",
+        monthly_profit_hint: "Gross profit from sales minus recorded expenses.",
+        month_sales: "Sales",
+        month_gross_profit: "Gross profit",
+        month_expenses: "Expenses",
+        month_net_profit: "Net profit",
+        legend_profit: "Gross profit",
+        legend_expenses: "Expenses",
+        expense_form_hint: "Record every shop cost so monthly net profit stays accurate.",
+        expense_category_placeholder: "Choose above or type a category",
+        payment_method: "Payment method",
+        reference_no: "Voucher / ref no.",
+        paid_to: "Paid to",
+        paid_to_placeholder: "Landlord, YESB, staff name…",
+        optional: "Optional",
+        voucher_photo: "Voucher photo (optional)",
+        add_photo: "Add a photo of the bill or receipt",
+        voucher_hint: "JPG or PNG. Large photos are compressed automatically.",
+        search_expenses: "Search description, paid to, ref no.",
+        all_categories: "All categories",
+        exp_this_month: "This month",
+        exp_last_month: "Last month",
+        exp_records: "Records this month",
+        exp_top_category: "Top category",
+        view_voucher: "Voucher",
+        no_expenses: "No expenses match these filters.",
+        confirm_delete_expense: "Delete this expense? Its voucher photo is deleted too.",
+        biz_clinic: "Clinic & pharmacy",
+        biz_convenience: "Convenience store",
+        biz_online: "Online shop",
+        biz_retail: "Retail shop",
+        demo_banner: "You are using the demo shop. Try anything — data resets every few hours.",
+        demo_banner_cta: "See pricing",
+        shop_unavailable: "This shop address is not active. Check the link, or contact your provider.",
+        demo_credentials: "Demo accounts — tap one to fill in, then Sign In",
         msg_signed_in: "Signed in successfully.",
         msg_signed_out: "Signed out successfully.",
         msg_sale_complete: "Sale completed successfully.",
@@ -373,6 +482,54 @@ const translations = {
         edit: "ပြင်မည်",
         role_label_admin: "အက်ဒမင်",
         role_label_cashier: "ငွေကောက်သူ",
+        nav_main: "ပင်မ",
+        nav_manage: "စီမံခန့်ခွဲမှု",
+        nav_settings: "ဆက်တင်",
+        login_tagline: "ပိုမြန်စွာ ရောင်းချပါ။ အားလုံးကို စောင့်ကြည့်ပါ။",
+        login_sub: "ဆေးခန်းများနှင့် စတိုးဆိုင်များအတွက် အရောင်း၊ ကုန်ပစ္စည်းစာရင်းနှင့် အစီရင်ခံစာ စနစ်။",
+        login_point_1: "ဘားကုဒ်ဖတ်ခြင်း၊ ဘောက်ချာထုတ်ခြင်းဖြင့် မြန်ဆန်သော ငွေရှင်းခြင်း",
+        login_point_2: "ကုန်လက်ကျန်၊ သက်တမ်းကုန်ခြင်းနှင့် လက်ကျန်နည်းခြင်း သတိပေးချက်များ",
+        login_point_3: "နေ့စဉ် အရောင်းနှင့် အမြတ် အစီရင်ခံစာများ",
+        login_home_link: "Exabyte POS ပင်မစာမျက်နှာ",
+        product_photo: "ပစ္စည်းဓာတ်ပုံ (မထည့်လည်းရ)",
+        product_photo_title: "POS ပစ္စည်းကတ်တွင် ပြပါမည်",
+        choose_photo: "ရွေးရန်",
+        remove: "ဖယ်ရန်",
+        monthly_profit: "လစဉ် အမြတ်",
+        monthly_profit_hint: "ရောင်းအားအမြတ်မှ မှတ်တမ်းတင်ထားသော အသုံးစရိတ်ကို နုတ်ထားသည်။",
+        month_sales: "ရောင်းအား",
+        month_gross_profit: "အမြတ်",
+        month_expenses: "အသုံးစရိတ်",
+        month_net_profit: "အသားတင်အမြတ်",
+        legend_profit: "အမြတ်",
+        legend_expenses: "အသုံးစရိတ်",
+        expense_form_hint: "လစဉ်အသားတင်အမြတ် မှန်ကန်စေရန် ဆိုင်ကုန်ကျစရိတ်တိုင်းကို မှတ်တမ်းတင်ပါ။",
+        expense_category_placeholder: "အပေါ်မှရွေးပါ သို့ ရိုက်ထည့်ပါ",
+        payment_method: "ငွေပေးချေမှု",
+        reference_no: "ဘောက်ချာ / ref နံပါတ်",
+        paid_to: "ပေးသူ / လက်ခံသူ",
+        paid_to_placeholder: "အိမ်ရှင်၊ လျှပ်စစ်၊ ဝန်ထမ်းအမည်…",
+        optional: "မထည့်လည်းရ",
+        voucher_photo: "ဘောက်ချာ ဓာတ်ပုံ (မထည့်လည်းရ)",
+        add_photo: "ပြေစာ / ဘောက်ချာ ဓာတ်ပုံထည့်ရန်",
+        voucher_hint: "JPG / PNG။ ဓာတ်ပုံကြီးများကို အလိုအလျောက် ချုံ့ပေးပါသည်။",
+        search_expenses: "အကြောင်းအရာ၊ ပေးသူ၊ ref နံပါတ် ရှာရန်",
+        all_categories: "အမျိုးအစားအားလုံး",
+        exp_this_month: "ယခုလ",
+        exp_last_month: "ပြီးခဲ့သောလ",
+        exp_records: "ယခုလ မှတ်တမ်း",
+        exp_top_category: "အများဆုံး အမျိုးအစား",
+        view_voucher: "ဘောက်ချာ",
+        no_expenses: "ကိုက်ညီသော အသုံးစရိတ် မရှိပါ။",
+        confirm_delete_expense: "ဤအသုံးစရိတ်ကို ဖျက်မလား? ဘောက်ချာဓာတ်ပုံပါ ဖျက်ပါမည်။",
+        biz_clinic: "ဆေးခန်း / ဆေးဆိုင်",
+        biz_convenience: "ကုန်စုံဆိုင်",
+        biz_online: "အွန်လိုင်းဆိုင်",
+        biz_retail: "လက်လီဆိုင်",
+        demo_banner: "Demo ဆိုင်ကို အသုံးပြုနေပါသည်။ လွတ်လပ်စွာ စမ်းနိုင်ပြီး အချက်အလက်များ နာရီအနည်းငယ်တိုင်း ပြန်စပါသည်။",
+        demo_banner_cta: "ဈေးနှုန်းကြည့်ရန်",
+        shop_unavailable: "ဤဆိုင်လိပ်စာ အသုံးမပြုနိုင်ပါ။ လင့်ခ်ကို စစ်ပါ သို့မဟုတ် ဝန်ဆောင်မှုပေးသူကို ဆက်သွယ်ပါ။",
+        demo_credentials: "Demo အကောင့်များ — တစ်ခုကိုနှိပ်ပြီး Sign In နှိပ်ပါ",
         msg_signed_in: "အောင်မြင်စွာ ဝင်ရောက်ပြီးပါပြီ။",
         msg_signed_out: "အောင်မြင်စွာ ထွက်ပြီးပါပြီ။",
         msg_sale_complete: "အရောင်းအောင်မြင်စွာ ပြီးမြောက်ပါပြီ။",
@@ -450,10 +607,15 @@ function setDefaultDates() {
 
 function bindEvents() {
     $("login-form").addEventListener("submit", handleLogin);
+    $("login-shop-note").addEventListener("click", (event) => {
+        const account = event.target.closest("[data-demo-account]");
+        if (account) fillDemoAccount(account.dataset.demoAccount);
+    });
     document.querySelectorAll("[data-login-role]").forEach((button) => {
         button.addEventListener("click", () => setLoginRole(button.dataset.loginRole));
     });
     $("logout-button").addEventListener("click", handleLogout);
+    $("sidebar-logout-button").addEventListener("click", handleLogout);
     $("topbar-account-button").addEventListener("click", () => switchTab("account"));
     $("mobile-menu-button").addEventListener("click", openSidebar);
     $("mobile-more-button").addEventListener("click", openSidebar);
@@ -501,6 +663,8 @@ function bindEvents() {
     $("account-backup-json").addEventListener("click", () => downloadAuthenticatedFile("/api/export/backup"));
     $("user-form").addEventListener("submit", handleCreateUser);
     $("product-form").addEventListener("submit", handleSaveProduct);
+    $("product-photo").addEventListener("change", handleProductPhoto);
+    $("product-photo-remove").addEventListener("click", removeProductPhoto);
     $("close-product-modal").addEventListener("click", closeProductModal);
     $("cancel-product-modal").addEventListener("click", closeProductModal);
     $("receipt-close-button").addEventListener("click", closeReceiptModal);
@@ -607,7 +771,24 @@ function bindEvents() {
     $("expenses-table-body").addEventListener("click", (event) => {
         const deleteButton = event.target.closest("[data-delete-expense]");
         if (deleteButton) handleDeleteExpense(Number(deleteButton.dataset.deleteExpense));
+        const voucherButton = event.target.closest("[data-view-voucher]");
+        if (voucherButton) openVoucher(Number(voucherButton.dataset.viewVoucher));
     });
+    $("expense-category-chips").addEventListener("click", (event) => {
+        const chip = event.target.closest("[data-expense-category]");
+        if (!chip) return;
+        $("expense-category").value = chip.dataset.expenseCategory;
+        document.querySelectorAll("[data-expense-category]").forEach((button) => button.classList.toggle("active", button === chip));
+    });
+    $("expense-category").addEventListener("input", () => {
+        const value = $("expense-category").value.trim();
+        document.querySelectorAll("[data-expense-category]").forEach((button) => button.classList.toggle("active", button.dataset.expenseCategory === value));
+    });
+    $("expense-photo").addEventListener("change", handleExpensePhoto);
+    $("expense-photo-remove").addEventListener("click", clearExpensePhoto);
+    $("expense-search").addEventListener("input", (event) => { state.expenseFilters.search = event.target.value; state.pagination.expenses = 1; renderExpenses(); });
+    $("expense-filter-month").addEventListener("change", (event) => { state.expenseFilters.month = event.target.value; state.pagination.expenses = 1; renderExpenses(); });
+    $("expense-filter-category").addEventListener("change", (event) => { state.expenseFilters.category = event.target.value; state.pagination.expenses = 1; renderExpenses(); });
     $("history-search").addEventListener("input", () => { state.pagination.history = 1; renderMovements(); lucide.createIcons(); });
     $("history-type").addEventListener("change", () => { state.pagination.history = 1; renderMovements(); });
     $("alert-search").addEventListener("input", () => { state.pagination.alertLow = 1; state.pagination.alertExpired = 1; state.pagination.alertExpiring = 1; renderAlerts(); });
@@ -663,7 +844,7 @@ function setLanguage(language) {
 
 function applyTranslations() {
     document.documentElement.lang = state.language === "mm" ? "my" : "en";
-    document.title = `${VENDOR_NAME} POS`;
+    renderShopIdentity();
 
     document.querySelectorAll("[data-i18n]").forEach((element) => {
         element.textContent = t(element.dataset.i18n);
@@ -811,7 +992,7 @@ function clearSession() {
     state.token = "";
     state.user = null;
     state.cart = [];
-    localStorage.removeItem("pharmacy_token");
+    localStorage.removeItem(TOKEN_KEY);
     showLogin();
 }
 
@@ -819,11 +1000,102 @@ function redirectToSuperAdmin(token) {
     if (token) {
         localStorage.setItem("super_token", token);
     }
-    localStorage.removeItem("pharmacy_token");
+    localStorage.removeItem(TOKEN_KEY);
     window.location.assign("/super");
 }
 
+function shopInitials(name) {
+    const words = String(name || "").trim().split(/\s+/).filter(Boolean);
+    const letters = words.length > 1 ? words[0].charAt(0) + words[1].charAt(0) : (words[0] || "?").slice(0, 2);
+    return letters.toUpperCase();
+}
+
+function applyShop(shop) {
+    if (!shop) return;
+    shopProfile.name = shop.name;
+    shopProfile.slug = shop.slug;
+    shopProfile.businessType = BUSINESS_PROFILES[shop.businessType] ? shop.businessType : "retail";
+    shopProfile.isDemo = shop.isDemo ?? shop.slug === "demo";
+    if (shop.logoUrl !== undefined) shopProfile.logoUrl = shop.logoUrl;
+    if (shop.demoAccounts) shopProfile.demoAccounts = shop.demoAccounts;
+    VENDOR_NAME = shop.name || VENDOR_NAME;
+    POS_CATEGORIES = buildPOSCategories(shopProfile.businessType);
+    renderShopIdentity();
+}
+
+function renderShopIdentity() {
+    const profile = currentBusinessProfile();
+    const name = shopProfile.name || VENDOR_NAME;
+    document.title = shopProfile.name ? `${name} · POS` : VENDOR_NAME;
+    document.querySelectorAll("[data-shop-name]").forEach((element) => { element.textContent = name; });
+    document.querySelectorAll("[data-shop-initials]").forEach((element) => {
+        element.classList.toggle("has-logo", Boolean(shopProfile.logoUrl));
+        element.innerHTML = shopProfile.logoUrl
+            ? `<img src="${escapeHtml(shopProfile.logoUrl)}" alt="">`
+            : escapeHtml(shopInitials(name));
+    });
+    const favicon = document.querySelector('link[rel="icon"]');
+    if (favicon && shopProfile.logoUrl) favicon.href = shopProfile.logoUrl;
+    const address = $("login-shop-address");
+    if (address) address.textContent = SHOP_SLUG ? `${window.location.host}/${SHOP_SLUG}` : "";
+    const storeType = $("store-type");
+    if (storeType) storeType.textContent = shopProfile.name ? t(`biz_${shopProfile.businessType}`) : "";
+    $("demo-banner")?.classList.toggle("hidden", !shopProfile.isDemo);
+    const categoryOptions = $("product-category-options");
+    if (categoryOptions) {
+        categoryOptions.innerHTML = profile.categories.map((category) => `<option value="${escapeHtml(category.label)}"></option>`).join("");
+    }
+    const productExpiry = $("product-expiry");
+    if (productExpiry) productExpiry.required = profile.expiryRequired;
+    const printerHeader = $("printer-header");
+    if (printerHeader) printerHeader.placeholder = name;
+}
+
+async function loadShopProfile() {
+    if (!SHOP_SLUG) return false;
+    try {
+        const response = await api(`/api/public/shops/${encodeURIComponent(SHOP_SLUG)}`, { ignoreUnauthorized: true });
+        applyShop(response.shop);
+        return true;
+    } catch (_error) {
+        return false;
+    }
+}
+
+async function completeSignIn(response) {
+    if (response.user?.role === "super_admin") {
+        redirectToSuperAdmin(response.token);
+        return false;
+    }
+    state.token = response.token;
+    state.user = response.user;
+    localStorage.setItem(TOKEN_KEY, state.token);
+    localStorage.setItem("exabyte_last_shop", SHOP_SLUG);
+    applyShop(response.shop);
+    // A fresh sign-in opens the dashboard unless the address asks for a page.
+    state.activeTab = normalizeTab(window.location.hash.replace(/^#/, "").trim() || "dashboard");
+    localStorage.setItem(TAB_KEY, state.activeTab);
+    showApp();
+    switchTab(state.activeTab);
+    await loadInitialData();
+    return true;
+}
+
+function fillDemoAccount(username) {
+    const account = shopProfile.demoAccounts.find((item) => item.username === username);
+    if (!account) return;
+    $("login-username").value = account.username;
+    $("login-password").value = account.password;
+    document.querySelectorAll("[data-demo-account]").forEach((button) => {
+        button.classList.toggle("active", button.dataset.demoAccount === username);
+    });
+}
+
 async function bootstrapAuth() {
+    if (!(await loadShopProfile())) {
+        showLogin({ unavailable: true });
+        return;
+    }
     if (!state.token) {
         showLogin();
         return;
@@ -835,6 +1107,12 @@ async function bootstrapAuth() {
             redirectToSuperAdmin(state.token);
             return;
         }
+        // A saved session only opens the shop it was created for.
+        if (response.shop?.slug !== SHOP_SLUG) {
+            clearSession();
+            return;
+        }
+        applyShop(response.shop);
         state.user = response.user;
         showApp();
         await loadInitialData();
@@ -843,13 +1121,40 @@ async function bootstrapAuth() {
     }
 }
 
-function showLogin() {
+function showLogin({ unavailable = false } = {}) {
     const splash = $("boot-splash");
     if (splash) {
         splash.classList.add("hidden");
     }
     $("login-screen").classList.remove("hidden");
     $("app-shell").classList.add("hidden");
+
+    const note = $("login-shop-note");
+    const form = $("login-form");
+    form.querySelectorAll("input, button[type=submit]").forEach((field) => { field.disabled = unavailable; });
+    if (unavailable) {
+        note.textContent = t("shop_unavailable");
+        note.classList.remove("hidden");
+        if (!shopProfile.name) {
+            document.querySelectorAll("[data-shop-name]").forEach((element) => { element.textContent = SHOP_SLUG || "Exabyte POS"; });
+        }
+    } else if (shopProfile.isDemo && shopProfile.demoAccounts.length) {
+        // The demo publishes its default credentials; pick one and sign in.
+        note.innerHTML = `
+            <strong>${escapeHtml(t("demo_credentials"))}</strong>
+            <span class="demo-accounts">${shopProfile.demoAccounts.map((account) => `
+                <button type="button" class="demo-account" data-demo-account="${escapeHtml(account.username)}">
+                    <span class="demo-account-role">${escapeHtml(account.role === "admin" ? t("role_label_admin") : t("role_label_cashier"))}</span>
+                    <span><b>${escapeHtml(t("username"))}:</b> <code>${escapeHtml(account.username)}</code></span>
+                    <span><b>${escapeHtml(t("password"))}:</b> <code>${escapeHtml(account.password)}</code></span>
+                </button>`).join("")}
+            </span>`;
+        note.classList.remove("hidden");
+        note.classList.add("is-demo");
+        fillDemoAccount($("login-username").value || shopProfile.demoAccounts[0].username);
+    } else {
+        note.classList.add("hidden");
+    }
 }
 
 function showApp() {
@@ -873,7 +1178,7 @@ function updateAdminVisibility() {
 
     if (!isAdmin && adminTabs.has(state.activeTab)) {
         state.activeTab = "dashboard";
-        localStorage.setItem("pharmacy_active_tab", state.activeTab);
+        localStorage.setItem(TAB_KEY, state.activeTab);
     }
 }
 
@@ -885,6 +1190,9 @@ function renderUserPanels() {
     const roleLabel = state.user.role === "admin" ? t("role_label_admin") : t("role_label_cashier");
     $("current-user-name").textContent = state.user.fullName;
     $("current-user-role").textContent = roleLabel;
+    const initials = String(state.user.fullName || state.user.username || "?")
+        .trim().split(/\s+/).slice(0, 2).map((part) => part.charAt(0)).join("").toUpperCase();
+    $("current-user-avatar").textContent = initials || "?";
     $("account-name").textContent = state.user.fullName;
     $("account-username").textContent = state.user.username;
     $("account-role").textContent = roleLabel;
@@ -895,6 +1203,20 @@ function updatePageTitle() {
     if (pageTitle) {
         pageTitle.textContent = t(`page_${state.activeTab}`);
     }
+    const pageDate = $("page-date");
+    if (pageDate) {
+        pageDate.textContent = state.language === "mm"
+            ? formatBurmeseDate(new Date())
+            : new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    }
+}
+
+// Browsers often fall back to English for my-MM, so the header date is spelled out here.
+function formatBurmeseDate(date) {
+    const days = ["တနင်္ဂနွေ", "တနင်္လာ", "အင်္ဂါ", "ဗုဒ္ဓဟူး", "ကြာသပတေး", "သောကြာ", "စနေ"];
+    const months = ["ဇန်နဝါရီ", "ဖေဖော်ဝါရီ", "မတ်", "ဧပြီ", "မေ", "ဇွန်", "ဇူလိုင်", "ဩဂုတ်", "စက်တင်ဘာ", "အောက်တိုဘာ", "နိုဝင်ဘာ", "ဒီဇင်ဘာ"];
+    const digits = (n) => String(n).replace(/\d/g, (d) => "၀၁၂၃၄၅၆၇၈၉"[d]);
+    return `${days[date.getDay()]}နေ့၊ ${digits(date.getDate())} ${months[date.getMonth()]} ${digits(date.getFullYear())}`;
 }
 
 function handleNavigationClick(event) {
@@ -921,7 +1243,7 @@ function normalizeTab(tab) {
 function switchTab(tab) {
     closeInboundModal();
     state.activeTab = normalizeTab(tab);
-    localStorage.setItem("pharmacy_active_tab", state.activeTab);
+    localStorage.setItem(TAB_KEY, state.activeTab);
     const nextUrl = `${window.location.pathname}${window.location.search}#${state.activeTab}`;
     if (`#${state.activeTab}` !== window.location.hash) {
         window.history.replaceState(null, "", nextUrl);
@@ -939,6 +1261,7 @@ function switchTab(tab) {
 
     updatePageTitle();
     closeSidebar();
+    document.querySelector(".content-scroll")?.scrollTo(0, 0);
 }
 
 function openSidebar() {
@@ -962,21 +1285,15 @@ async function handleLogin(event) {
             method: "POST",
             body: {
                 username: $("login-username").value.trim(),
-                password: $("login-password").value
-            }
+                password: $("login-password").value,
+                shop: SHOP_SLUG
+            },
+            ignoreUnauthorized: true
         });
 
-        if (response.user?.role === "super_admin") {
-            redirectToSuperAdmin(response.token);
-            return;
+        if (await completeSignIn(response)) {
+            showNotification(t("msg_signed_in"));
         }
-
-        state.token = response.token;
-        state.user = response.user;
-        localStorage.setItem("pharmacy_token", state.token);
-        showApp();
-        await loadInitialData();
-        showNotification(t("msg_signed_in"));
     } catch (error) {
         showNotification(error.message, "error");
     }
@@ -1124,6 +1441,7 @@ function renderAll() {
     renderCustomers();
     renderExpenses();
     renderSalesChart();
+    renderMonthlyProfit();
     renderBestSellers();
     switchTab(state.activeTab);
     lucide.createIcons();
@@ -1225,18 +1543,18 @@ function handlePagerClick(event) {
 
 function renderSummary() {
     const cards = [
-        { key: "metric_total_products", value: state.summary.totalProducts || 0, icon: "boxes", target: "inventory" },
-        { key: "metric_inventory_value", value: formatCurrency(state.summary.inventoryValue || 0), icon: "wallet", target: "inventory" },
-        { key: "metric_low_stock", value: state.summary.lowStockCount || 0, icon: "triangle-alert", target: "low" },
-        { key: "metric_expired", value: state.summary.expiredCount || 0, icon: "shield-alert", target: "expired" },
-        { key: "metric_today_sales", value: formatCurrency(state.summary.todaySales || 0), icon: "banknote", target: "sales" }
+        { key: "metric_total_products", value: state.summary.totalProducts || 0, icon: "boxes", target: "inventory", tone: "teal" },
+        { key: "metric_inventory_value", value: formatCurrency(state.summary.inventoryValue || 0), icon: "wallet", target: "inventory", tone: "indigo" },
+        { key: "metric_low_stock", value: state.summary.lowStockCount || 0, icon: "triangle-alert", target: "low", tone: "amber" },
+        { key: "metric_expired", value: state.summary.expiredCount || 0, icon: "shield-alert", target: "expired", tone: "rose" },
+        { key: "metric_today_sales", value: formatCurrency(state.summary.todaySales || 0), icon: "banknote", target: "sales", tone: "green" }
     ];
     if (canSeeProfit()) {
-        cards.push({ key: "metric_today_profit", value: formatCurrency(state.summary.todayProfit || 0), icon: "trending-up", target: "sales" });
+        cards.push({ key: "metric_today_profit", value: formatCurrency(state.summary.todayProfit || 0), icon: "trending-up", target: "sales", tone: "violet" });
     }
 
     $("summary-cards").innerHTML = cards.map((card) => `
-        <button type="button" class="metric-card metric-card-button" data-summary-target="${card.target}" aria-label="View ${escapeHtml(t(card.key))} details">
+        <button type="button" class="metric-card metric-card-button" data-tone="${card.tone}" data-summary-target="${card.target}" aria-label="View ${escapeHtml(t(card.key))} details">
             <div>
                 <div class="metric-label">${escapeHtml(t(card.key))}</div>
                 <div class="metric-value">${escapeHtml(card.value)}</div>
@@ -1316,7 +1634,7 @@ function renderPOSCategories() {
             <button type="button" class="pos-category-card ${active ? "active" : ""}" data-pos-category="${escapeHtml(category.id)}" aria-pressed="${active}">
                 <span class="pos-category-icon"><i data-lucide="${category.icon}" class="h-5 w-5" aria-hidden="true"></i></span>
                 <span class="pos-category-copy">
-                    <span class="pos-category-name">${escapeHtml(category.label)}</span>
+                    <span class="pos-category-name">${escapeHtml(state.language === "mm" && category.mm ? category.mm : category.label)}</span>
                     <span class="pos-category-count">${count} items</span>
                 </span>
             </button>
@@ -1377,18 +1695,21 @@ function buildPOSProductCards(products) {
         const disabled = product.quantity <= 0 || product.status === "expired";
         const category = getPOSCategory(product);
         return `
-            <article class="pos-product-card ${disabled ? "disabled" : ""}">
-                <div class="pos-product-visual" aria-hidden="true">
-                    <i data-lucide="${category?.icon || "package"}" class="h-6 w-6"></i>
+            <article class="pos-product-card ${disabled ? "disabled" : ""}" ${disabled ? "" : `data-add-id="${product.id}"`} title="${escapeHtml(product.name)}">
+                <div class="pos-product-visual ${product.imageUrl ? "has-photo" : ""}" aria-hidden="true">
+                    ${product.imageUrl
+                        ? `<img src="${escapeHtml(product.imageUrl)}" alt="" loading="lazy">`
+                        : `<i data-lucide="${category?.icon || "package"}" class="h-5 w-5"></i>`}
                 </div>
                 <div class="pos-product-info">
                     <h3>${escapeHtml(product.name)}</h3>
-                    <p>${escapeHtml(product.category || t("general"))}</p>
-                    <div class="pos-product-price">${escapeHtml(formatCurrency(product.sellPrice))}</div>
+                    <div class="pos-product-meta">
+                        <span class="pos-product-price">${escapeHtml(formatCurrency(product.sellPrice))}</span>
+                        <span class="pos-product-stock ${product.quantity <= (product.lowStockThreshold || 0) ? "low" : ""}">${escapeHtml(product.quantity)} ${escapeHtml(t("stock"))}</span>
+                    </div>
                 </div>
-                <span class="pos-product-stock">${escapeHtml(product.quantity)} ${escapeHtml(t("stock"))}</span>
                 <button type="button" class="pos-product-add" data-add-id="${product.id}" ${disabled ? "disabled" : ""} aria-label="Add ${escapeHtml(product.name)}">
-                    <i data-lucide="plus" class="h-5 w-5"></i>
+                    <i data-lucide="plus" class="h-4 w-4"></i>
                 </button>
             </article>
         `;
@@ -1690,7 +2011,7 @@ function renderInventory() {
                 <td data-label="${escapeHtml(t("brand"))}">${escapeHtml(product.brand || "-")}</td>
                 <td data-label="${escapeHtml(t("product_name"))}">${escapeHtml(product.name)}<div class="table-sub inv-sub">${escapeHtml([product.brand, product.category].filter((v) => v && v !== "-").join(" · "))}</div></td>
                 <td data-label="${escapeHtml(t("category"))}">${escapeHtml(product.category || "-")}</td>
-                <td data-label="${escapeHtml(t("expiry_date"))}" class="expiry-cell">${escapeHtml(product.expiryDate)}</td>
+                <td data-label="${escapeHtml(t("expiry_date"))}" class="expiry-cell">${escapeHtml(formatExpiry(product.expiryDate))}</td>
                 <td data-label="${escapeHtml(t("sell_price"))}" class="text-right">${escapeHtml(formatCurrency(product.sellPrice))}</td>
                 <td data-label="${escapeHtml(t("quantity"))}" class="text-right">${escapeHtml(product.quantity)}</td>
                 <td data-label="${escapeHtml(t("status"))}">${renderStatusBadge(product.status)}</td>
@@ -1720,17 +2041,49 @@ function openProductModal(productId) {
     $("product-brand").value = product.brand || "";
     $("product-name").value = product.name;
     $("product-category").value = product.category || "";
-    $("product-expiry").value = product.expiryDate;
+    $("product-expiry").value = product.expiryDate === NO_EXPIRY ? "" : product.expiryDate;
     $("product-quantity").value = product.quantity;
     $("product-cost").value = product.costPrice;
     $("product-price").value = product.sellPrice;
     $("product-threshold").value = product.lowStockThreshold;
+    productPhoto.pending = null;
+    productPhoto.remove = false;
+    renderProductPhoto(product.imageUrl);
     $("product-modal").classList.remove("hidden");
+}
+
+const productPhoto = { pending: null, remove: false };
+
+function renderProductPhoto(url) {
+    const thumb = $("product-photo-thumb");
+    thumb.innerHTML = url ? `<img src="${escapeHtml(url)}" alt="">` : `<i data-lucide="image" class="h-5 w-5"></i>`;
+    thumb.classList.toggle("has-photo", Boolean(url));
+    $("product-photo-remove").classList.toggle("hidden", !url);
+    lucide.createIcons();
+}
+
+async function handleProductPhoto(event) {
+    try {
+        productPhoto.pending = await compressImage(event.target.files[0], 600, 0.82);
+        productPhoto.remove = false;
+        renderProductPhoto(productPhoto.pending);
+    } catch (error) {
+        showNotification(error.message, "error");
+    }
+}
+
+function removeProductPhoto() {
+    productPhoto.pending = null;
+    productPhoto.remove = true;
+    $("product-photo").value = "";
+    renderProductPhoto(null);
 }
 
 function closeProductModal() {
     $("product-modal").classList.add("hidden");
     $("product-form").reset();
+    productPhoto.pending = null;
+    productPhoto.remove = false;
 }
 
 async function handleSaveProduct(event) {
@@ -1751,6 +2104,12 @@ async function handleSaveProduct(event) {
                 lowStockThreshold: Number($("product-threshold").value)
             }
         });
+        const productId = $("product-id").value;
+        if (productPhoto.pending) {
+            await api(`/api/products/${productId}/image`, { method: "POST", body: { image: productPhoto.pending } });
+        } else if (productPhoto.remove) {
+            await api(`/api/products/${productId}/image`, { method: "DELETE" });
+        }
         closeProductModal();
         await loadInitialData();
         showNotification(t("msg_product_updated"));
@@ -1819,7 +2178,7 @@ function bulkLineFromProduct(product) {
         brand: product.brand || "",
         name: product.name,
         category: product.category || "",
-        expiryDate: product.expiryDate || "",
+        expiryDate: product.expiryDate && product.expiryDate !== NO_EXPIRY ? product.expiryDate : "",
         costPrice: product.costPrice,
         sellPrice: product.sellPrice,
         threshold: product.lowStockThreshold || 10
@@ -1927,7 +2286,8 @@ function renderBulkLines() {
         renderBulkTotals();
         return;
     }
-    const categories = ["", "Tablets & Capsules", "Syrups & Liquids", "Injections", "Syringes & Supplies", "Medical Electronics", "First Aid", "Personal Care"];
+    const profile = currentBusinessProfile();
+    const categories = ["", ...profile.categories.map((category) => category.label)];
     box.innerHTML = bulkState.lines.map((line, index) => `
         <article class="bulk-line ${line.error ? "has-error" : ""}" data-line="${line.id}">
             <header class="bulk-line-head">
@@ -1939,7 +2299,7 @@ function renderBulkLines() {
                 ${bulkField(line, "name", "Product name", "text")}
                 ${bulkField(line, "code", "Code", "text", 'placeholder="auto"')}
                 ${bulkField(line, "barcode", "Barcode", "text", 'data-scan-field placeholder="scan"')}
-                ${bulkField(line, "expiryDate", "Expiry", "date")}
+                ${bulkField(line, "expiryDate", profile.expiryRequired ? "Expiry" : "Expiry (optional)", "date")}
                 ${bulkField(line, "quantity", "Qty in", "number", 'min="1" inputmode="numeric"')}
                 ${bulkField(line, "costPrice", "Cost", "number", 'min="0" inputmode="decimal"')}
                 ${bulkField(line, "sellPrice", "Sell", "number", 'min="0" inputmode="decimal"')}
@@ -2074,7 +2434,7 @@ async function handleInboundSubmit(event) {
         }
         if (!String(line.name).trim()) line.error = "Enter a product name.";
         else if (!String(line.code).trim()) line.error = "Enter a product code.";
-        else if (!line.expiryDate) line.error = "Choose an expiry date.";
+        else if (!line.expiryDate && currentBusinessProfile().expiryRequired) line.error = "Choose an expiry date.";
         else if (!(Number(line.quantity) > 0)) line.error = "Quantity must be at least 1.";
         else if (line.costPrice === "" || Number(line.costPrice) < 0) line.error = "Enter the cost price.";
         else if (line.sellPrice === "" || Number(line.sellPrice) < 0) line.error = "Enter the sell price.";
@@ -2193,7 +2553,7 @@ function renderAlertRows(items) {
                     <strong>${escapeHtml(item.name)}</strong>
                     <div class="table-sub">${escapeHtml(item.code)}</div>
                 </td>
-                <td data-label="${escapeHtml(t("expiry_date"))}" class="expiry-cell">${escapeHtml(item.expiryDate)}</td>
+                <td data-label="${escapeHtml(t("expiry_date"))}" class="expiry-cell">${escapeHtml(formatExpiry(item.expiryDate))}</td>
                 <td data-label="${escapeHtml(t("quantity"))}" class="text-right">${escapeHtml(item.quantity)}</td>
             </tr>
         `).join("")
@@ -2415,27 +2775,182 @@ async function handleDeleteCustomer(id) {
     }
 }
 
+const EXPENSE_CATEGORIES = [
+    { value: "Rent", mm: "ဆိုင်ခန်းငှားခ", icon: "building-2" },
+    { value: "Utilities", mm: "မီတာ / ရေ / အင်တာနက်", icon: "zap" },
+    { value: "Salaries", mm: "လစာ", icon: "users-round" },
+    { value: "Transport", mm: "သယ်ယူပို့ဆောင်ခ", icon: "truck" },
+    { value: "Supplies", mm: "သုံးကုန်ပစ္စည်း", icon: "package" },
+    { value: "Maintenance", mm: "ပြုပြင်ထိန်းသိမ်း", icon: "wrench" },
+    { value: "Marketing", mm: "ကြော်ငြာ", icon: "megaphone" },
+    { value: "Tax & fees", mm: "အခွန် / အခကြေး", icon: "landmark" },
+    { value: "Other", mm: "အခြား", icon: "ellipsis" }
+];
+
+function expenseCategoryLabel(value) {
+    const preset = EXPENSE_CATEGORIES.find((item) => item.value === value);
+    return state.language === "mm" && preset ? preset.mm : value;
+}
+
+function localMonth(offset = 0) {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + offset);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function filteredExpenses() {
+    const { search, month, category } = state.expenseFilters;
+    const term = search.trim().toLowerCase();
+    return state.expenses.filter((expense) => {
+        if (month && !String(expense.expenseDate).startsWith(month)) return false;
+        if (category && expense.category !== category) return false;
+        if (!term) return true;
+        return [expense.description, expense.paidTo, expense.referenceNo, expense.category, expense.paymentMethod]
+            .some((value) => String(value || "").toLowerCase().includes(term));
+    });
+}
+
+function renderExpenseSummary() {
+    const thisMonth = localMonth(0);
+    const lastMonth = localMonth(-1);
+    const inMonth = (month) => state.expenses.filter((expense) => String(expense.expenseDate).startsWith(month));
+    const sum = (rows) => rows.reduce((total, expense) => total + Number(expense.amount || 0), 0);
+    const current = inMonth(thisMonth);
+    const byCategory = new Map();
+    current.forEach((expense) => byCategory.set(expense.category, (byCategory.get(expense.category) || 0) + Number(expense.amount || 0)));
+    const top = [...byCategory.entries()].sort((a, b) => b[1] - a[1])[0];
+    const cards = [
+        { key: "exp_this_month", value: formatCurrency(sum(current)), icon: "wallet", tone: "rose" },
+        { key: "exp_last_month", value: formatCurrency(sum(inMonth(lastMonth))), icon: "calendar-clock", tone: "indigo" },
+        { key: "exp_records", value: String(current.length), icon: "receipt-text", tone: "teal" },
+        { key: "exp_top_category", value: top ? expenseCategoryLabel(top[0]) : "—", icon: "chart-pie", tone: "amber" }
+    ];
+    $("expense-summary").innerHTML = cards.map((card) => `
+        <div class="metric-card" data-tone="${card.tone}">
+            <div>
+                <div class="metric-label">${escapeHtml(t(card.key))}</div>
+                <div class="metric-value">${escapeHtml(card.value)}</div>
+            </div>
+            <div class="metric-icon"><i data-lucide="${card.icon}" class="h-6 w-6"></i></div>
+        </div>`).join("");
+}
+
+function renderExpenseFormOptions() {
+    const current = $("expense-category").value.trim();
+    $("expense-category-chips").innerHTML = EXPENSE_CATEGORIES.map((item) => `
+        <button type="button" class="chip-option ${item.value === current ? "active" : ""}" data-expense-category="${escapeHtml(item.value)}">
+            <i data-lucide="${item.icon}" class="h-4 w-4"></i><span>${escapeHtml(expenseCategoryLabel(item.value))}</span>
+        </button>`).join("");
+    const used = [...new Set([...EXPENSE_CATEGORIES.map((item) => item.value), ...state.expenses.map((expense) => expense.category)])];
+    $("expense-category-options").innerHTML = used.map((value) => `<option value="${escapeHtml(value)}"></option>`).join("");
+    const filter = $("expense-filter-category");
+    filter.innerHTML = `<option value="">${escapeHtml(t("all_categories"))}</option>` +
+        used.map((value) => `<option value="${escapeHtml(value)}" ${value === state.expenseFilters.category ? "selected" : ""}>${escapeHtml(expenseCategoryLabel(value))}</option>`).join("");
+    if (!$("expense-date").value) $("expense-date").value = todayIsoLocal();
+}
+
+function todayIsoLocal() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function renderExpenses() {
-    const page = getPageSlice(state.expenses, "expenses");
-    $("expenses-table-body").innerHTML = state.expenses.length
+    renderExpenseSummary();
+    renderExpenseFormOptions();
+    const rows = filteredExpenses();
+    const total = rows.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
+    $("expense-filter-total").textContent = `${rows.length} · ${formatCurrency(total)}`;
+    const page = getPageSlice(rows, "expenses");
+    $("expenses-table-body").innerHTML = rows.length
         ? page.rows.map((expense) => `
             <tr>
-                <td data-label="Date">${escapeHtml(formatDate(expense.expenseDate))}</td>
-                <td data-label="Category"><strong>${escapeHtml(expense.category)}</strong></td>
-                <td data-label="Description">${escapeHtml(expense.description || "-")}</td>
-                <td data-label="Amount" class="text-right">${escapeHtml(formatCurrency(expense.amount))}</td>
-                <td data-label="Actor">${escapeHtml(expense.actorName)}</td>
-                <td data-label="Actions" class="text-center">
-                    <button type="button" class="danger-btn" data-delete-expense="${expense.id}">Delete</button>
+                <td data-label="${escapeHtml(t("date"))}">${escapeHtml(formatDate(expense.expenseDate))}</td>
+                <td data-label="${escapeHtml(t("category"))}">
+                    <strong>${escapeHtml(expenseCategoryLabel(expense.category))}</strong>
+                    ${expense.description ? `<div class="table-sub">${escapeHtml(expense.description)}</div>` : ""}
+                </td>
+                <td data-label="${escapeHtml(t("paid_to"))}">
+                    ${escapeHtml(expense.paidTo || "—")}
+                    ${expense.referenceNo ? `<div class="table-sub">#${escapeHtml(expense.referenceNo)}</div>` : ""}
+                </td>
+                <td data-label="${escapeHtml(t("payment_method"))}">${expense.paymentMethod ? `<span class="method-pill">${escapeHtml(expense.paymentMethod)}</span>` : "—"}</td>
+                <td data-label="${escapeHtml(t("amount"))}" class="text-right"><strong>${escapeHtml(formatCurrency(expense.amount))}</strong></td>
+                <td data-label="${escapeHtml(t("actions"))}" class="text-center">
+                    <div class="table-actions-inline">
+                        ${expense.hasAttachment ? `<button type="button" class="mini-btn" data-view-voucher="${expense.id}"><i data-lucide="image" class="h-3 w-3"></i><span>${escapeHtml(t("view_voucher"))}</span></button>` : ""}
+                        <button type="button" class="mini-btn delete-action" data-delete-expense="${expense.id}" aria-label="Delete"><i data-lucide="trash-2" class="h-3 w-3"></i></button>
+                    </div>
                 </td>
             </tr>
         `).join("")
-        : `<tr><td colspan="6" class="empty-state">No expenses recorded yet.</td></tr>`;
+        : `<tr><td colspan="6" class="empty-state">${escapeHtml(t("no_expenses"))}</td></tr>`;
     renderPager("expenses-pager", "expenses", page.totalPages);
+    lucide.createIcons();
+}
+
+// Resizes a photo in the browser before upload so phone pictures stay small (≈200–400 KB).
+function compressImage(file, maxSize = 1600, quality = 0.8) {
+    return new Promise((resolve, reject) => {
+        if (!file || !/^image\//.test(file.type)) {
+            reject(new Error("Choose an image file."));
+            return;
+        }
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+            const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round(img.width * scale));
+            canvas.height = Math.max(1, Math.round(img.height * scale));
+            const context = canvas.getContext("2d");
+            context.fillStyle = "#ffffff";
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(img, 0, 0, canvas.width, canvas.height);
+            URL.revokeObjectURL(url);
+            resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error("This image could not be read."));
+        };
+        img.src = url;
+    });
+}
+
+function formatBytes(bytes) {
+    return bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+async function handleExpensePhoto(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+        const dataUrl = await compressImage(file);
+        state.expensePhoto = dataUrl;
+        const compressedBytes = Math.round((dataUrl.length - dataUrl.indexOf(",") - 1) * 0.75);
+        $("expense-photo-img").src = dataUrl;
+        $("expense-photo-name").textContent = file.name;
+        $("expense-photo-size").textContent = `${formatBytes(file.size)} → ${formatBytes(compressedBytes)}`;
+        $("expense-photo-preview").classList.remove("hidden");
+        $("expense-photo-drop").classList.add("hidden");
+    } catch (error) {
+        showNotification(error.message, "error");
+    }
+}
+
+function clearExpensePhoto() {
+    state.expensePhoto = null;
+    $("expense-photo").value = "";
+    $("expense-photo-img").removeAttribute("src");
+    $("expense-photo-preview").classList.add("hidden");
+    $("expense-photo-drop").classList.remove("hidden");
 }
 
 async function handleCreateExpense(event) {
     event.preventDefault();
+    const submit = $("expense-submit");
+    submit.disabled = true;
     try {
         await api("/api/expenses", {
             method: "POST",
@@ -2443,20 +2958,77 @@ async function handleCreateExpense(event) {
                 category: $("expense-category").value.trim(),
                 description: $("expense-description").value.trim(),
                 amount: Number($("expense-amount").value) || 0,
-                expenseDate: $("expense-date").value
+                expenseDate: $("expense-date").value,
+                paymentMethod: $("expense-method").value,
+                paidTo: $("expense-paid-to").value.trim(),
+                referenceNo: $("expense-reference").value.trim(),
+                attachment: state.expensePhoto || undefined
             }
         });
         $("expense-form").reset();
+        clearExpensePhoto();
         const response = await api("/api/expenses");
         state.expenses = response.expenses;
         renderExpenses();
+        refreshDashboardFigures();
         showNotification("Expense recorded.");
+    } catch (error) {
+        showNotification(error.message, "error");
+    } finally {
+        submit.disabled = false;
+    }
+}
+
+// Expenses change net profit, so refresh the dashboard numbers in the background.
+async function refreshDashboardFigures() {
+    try {
+        const [summary, chart] = await Promise.all([api("/api/dashboard/summary"), api("/api/dashboard/chart")]);
+        state.summary = summary;
+        state.chart = chart;
+        renderSummary();
+        renderMonthlyProfit();
+    } catch (_error) {
+        // The dashboard reloads on the next visit anyway.
+    }
+}
+
+async function openVoucher(id) {
+    try {
+        const response = await fetch(`/api/expenses/${id}/attachment`, { headers: { Authorization: `Bearer ${state.token}` } });
+        if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(payload.message || "Could not open the voucher photo.");
+        }
+        const url = URL.createObjectURL(await response.blob());
+        const viewer = document.createElement("div");
+        viewer.className = "voucher-viewer";
+        viewer.innerHTML = `
+            <div class="voucher-viewer-card" role="dialog" aria-modal="true" aria-label="Voucher photo">
+                <img src="${url}" alt="Voucher photo">
+                <div class="voucher-viewer-actions">
+                    <a class="secondary-btn" href="${url}" download="voucher-${id}.jpg"><i data-lucide="download" class="h-4 w-4"></i><span>Download</span></a>
+                    <button type="button" class="primary-btn" data-close-voucher>Close</button>
+                </div>
+            </div>`;
+        const close = () => {
+            viewer.remove();
+            URL.revokeObjectURL(url);
+            document.removeEventListener("keydown", onKey);
+        };
+        const onKey = (event) => { if (event.key === "Escape") close(); };
+        viewer.addEventListener("click", (event) => {
+            if (event.target === viewer || event.target.closest("[data-close-voucher]")) close();
+        });
+        document.addEventListener("keydown", onKey);
+        document.body.appendChild(viewer);
+        lucide.createIcons();
     } catch (error) {
         showNotification(error.message, "error");
     }
 }
 
 async function handleDeleteExpense(id) {
+    if (!window.confirm(t("confirm_delete_expense"))) return;
     try {
         await api(`/api/expenses/${id}`, { method: "DELETE" });
         const response = await api("/api/expenses");
@@ -2571,6 +3143,66 @@ function renderSalesChart() {
         `;
     }).join("");
     container.innerHTML = `<div class="chart-bars">${bars}</div>`;
+}
+
+function monthLabel(month, style = "short") {
+    const [year, mon] = String(month).split("-").map(Number);
+    if (state.language === "mm") {
+        const names = ["ဇန်", "ဖေ", "မတ်", "ဧပြီ", "မေ", "ဇွန်", "ဇူလိုင်", "ဩဂုတ်", "စက်", "အောက်", "နို", "ဒီ"];
+        return names[mon - 1] || month;
+    }
+    return new Date(year, mon - 1, 1).toLocaleDateString("en-GB", style === "long" ? { month: "long", year: "numeric" } : { month: "short" });
+}
+
+function renderMonthlyProfit() {
+    const panel = $("monthly-profit-panel");
+    if (!panel || !canSeeProfit()) return;
+    const summary = state.summary || {};
+    const months = state.chart.monthly || [];
+    const current = months[months.length - 1];
+    $("monthly-profit-month").textContent = current ? monthLabel(current.month, "long") : "";
+    const net = Number(summary.monthNetProfit || 0);
+    const figures = [
+        { key: "month_sales", value: summary.monthSales, tone: "" },
+        { key: "month_gross_profit", value: summary.monthProfit, tone: "" },
+        { key: "month_expenses", value: summary.monthExpenses, tone: "neg" },
+        { key: "month_net_profit", value: net, tone: net < 0 ? "loss" : "net" }
+    ];
+    $("monthly-profit-figures").innerHTML = figures.map((item) => `
+        <div class="monthly-figure ${item.tone}">
+            <span>${escapeHtml(t(item.key))}</span>
+            <strong>${escapeHtml(formatCurrency(item.value || 0))}</strong>
+        </div>`).join("");
+
+    if (!months.length) {
+        $("monthly-profit-chart").innerHTML = "";
+        return;
+    }
+    const max = Math.max(1, ...months.map((m) => Math.max(m.profit, m.expenses)));
+    $("monthly-profit-chart").innerHTML = `
+        <div class="monthly-bars">
+            ${months.map((m) => `
+                <div class="monthly-col" title="${escapeHtml(`${monthLabel(m.month, "long")} · ${t("month_net_profit")}: ${formatCurrency(m.net)}`)}">
+                    <div class="monthly-pair">
+                        <span class="bar profit" style="height:${Math.max(2, Math.round((m.profit / max) * 100))}%"></span>
+                        <span class="bar expense" style="height:${Math.max(2, Math.round((m.expenses / max) * 100))}%"></span>
+                    </div>
+                    <span class="monthly-net ${m.net < 0 ? "loss" : ""}">${escapeHtml(compactNumber(m.net))}</span>
+                    <span class="monthly-label">${escapeHtml(monthLabel(m.month))}</span>
+                </div>`).join("")}
+        </div>
+        <div class="monthly-legend">
+            <span><i class="profit"></i>${escapeHtml(t("legend_profit"))}</span>
+            <span><i class="expense"></i>${escapeHtml(t("legend_expenses"))}</span>
+            <span><i class="net"></i>${escapeHtml(t("month_net_profit"))}</span>
+        </div>`;
+}
+
+function compactNumber(value) {
+    const n = Number(value) || 0;
+    const abs = Math.abs(n);
+    const text = abs >= 1e6 ? `${(abs / 1e6).toFixed(abs >= 1e7 ? 0 : 1)}M` : abs >= 1e3 ? `${Math.round(abs / 1e3)}K` : String(Math.round(abs));
+    return `${n < 0 ? "−" : ""}${text}`;
 }
 
 function renderBestSellers() {
@@ -3209,7 +3841,7 @@ const voucherPrinter = {
     copies: Number(localStorage.getItem("pharmacy_printer_copies")) || 1,
     headerText: (() => {
         const saved = localStorage.getItem("pharmacy_printer_header");
-        return saved === null || saved === "Shine Digital Store" ? VENDOR_NAME : saved;
+        return saved === null || saved === "Shine Digital Store" || saved === "KKS ortho clinic" ? "" : saved;
     })(),
     footerText: localStorage.getItem("pharmacy_printer_footer") ?? "Thank you for shopping!",
     // "dialog" uses the browser print dialog (any OS-driven printer).

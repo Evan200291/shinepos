@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 72" role="img" aria-label="Exabyte Digital Store">
+  <g fill="#0f4c5c">
+    <rect x="4" y="10" width="13" height="52"/>
+    <polygon points="21,10 58,10 53.5,22 21,22"/>
+    <polygon points="21,30 48,30 43.5,42 21,42"/>
+    <polygon points="21,50 53.5,50 58,62 21,62"/>
+  </g>
+  <rect x="74" y="12" width="1.5" height="48" fill="#cbd5e1"/>
+  <text x="92" y="44" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="38" font-weight="800" letter-spacing="-0.5" fill="#0f4c5c">EXABYTE</text>
+  <text x="93" y="63" font-family="Inter, 'Segoe UI', Arial, sans-serif" font-size="12.5" font-weight="600" letter-spacing="7.6" fill="#0f4c5c">DIGITAL STORE</text>
+</svg>

@@ -1,18 +1,22 @@
 const crypto = require("crypto");
 const path = require("path");
+const fs = require("fs");
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const XLSX = require("xlsx");
 const db = require("./db");
 const logger = require("./logger");
+const { BUSINESS_TYPES, validateSlug, uniqueSlug, normalizeBusinessType, shopLogoUrl, shopInfo } = require("./shops");
+const demo = require("./demo");
+const { encryptPassword, decryptPassword } = require("./vault");
 
 const app = express();
 const nestedApiRouter = express.Router();
 const PORT = process.env.PORT || 45451;
 const JWT_SECRET = process.env.JWT_SECRET || "pharmacy-pos-local-secret";
 
-app.use(express.json());
+app.use(express.json({ limit: "8mb" }));
 
 // Log failures and slow requests so problems can be traced after the fact (no request bodies are logged).
 app.use((req, res, next) => {
@@ -27,29 +31,6 @@ app.use((req, res, next) => {
     });
     next();
 });
-
-// Reversible (AES-256-GCM) copy of each account password so the super admin can look it up.
-// Set PASSWORD_VAULT_KEY in the environment; without it the key is derived from JWT_SECRET.
-const VAULT_KEY = crypto.scryptSync(process.env.PASSWORD_VAULT_KEY || JWT_SECRET, "shine-password-vault", 32);
-
-function encryptPassword(plain) {
-    const iv = crypto.randomBytes(12);
-    const cipher = crypto.createCipheriv("aes-256-gcm", VAULT_KEY, iv);
-    const data = Buffer.concat([cipher.update(String(plain), "utf8"), cipher.final()]);
-    return [iv, cipher.getAuthTag(), data].map((part) => part.toString("base64")).join(".");
-}
-
-function decryptPassword(stored) {
-    if (!stored) return null;
-    try {
-        const [iv, tag, data] = stored.split(".").map((part) => Buffer.from(part, "base64"));
-        const decipher = crypto.createDecipheriv("aes-256-gcm", VAULT_KEY, iv);
-        decipher.setAuthTag(tag);
-        return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
-    } catch (error) {
-        return null;
-    }
-}
 
 // Keep the active UI fresh during local POS updates. The desktop theme is served
 // from static CSS, so HTML/CSS/JS should not be held by the browser cache.
@@ -67,8 +48,11 @@ app.get("/super.html", (_req, res) => {
     res.redirect(301, "/super");
 });
 
-// 2. Static files
-app.use(express.static(path.join(__dirname, "..", "public")));
+// 2. Public landing page, then static files (no implicit index.html at "/")
+app.get("/", (_req, res) => {
+    res.sendFile(path.join(__dirname, "..", "public", "landing.html"));
+});
+app.use(express.static(path.join(__dirname, "..", "public"), { index: false }));
 app.use("/fonts", express.static(path.join(__dirname, "..", "A Ka 06")));
 
 function toNumber(value, fallback = 0) {
@@ -183,6 +167,21 @@ function requireSuperAdmin(req, res, next) {
     next();
 }
 
+// Items that never expire are stored with this date so expiry checks stay simple.
+const NO_EXPIRY = "9999-12-31";
+
+function isDemoUser(req) {
+    const demoShop = db.prepare("SELECT id FROM shops WHERE slug = ?").get(demo.DEMO_SLUG);
+    return Boolean(demoShop && req.user && req.user.shopId === demoShop.id);
+}
+
+function blockInDemo(req, res, next) {
+    if (isDemoUser(req)) {
+        return res.status(403).json({ message: "This action is turned off in the demo." });
+    }
+    next();
+}
+
 function getShopId(req) {
     return req.user.role === "super_admin" ? (req.query.shopId || req.body.shopId) : req.user.shopId;
 }
@@ -202,6 +201,8 @@ function mapProduct(row) {
         sellPrice: row.sell_price,
         quantity: row.quantity,
         lowStockThreshold: row.low_stock_threshold,
+        // Product photos live under /media/products/<shop>/<random>.jpg (unguessable, served statically).
+        imageUrl: row.image_path ? `/media/${row.image_path}` : null,
         status,
         createdAt: row.created_at,
         updatedAt: row.updated_at
@@ -460,9 +461,13 @@ app.post("/api/auth/login", (req, res) => {
         return res.status(400).json({ message: "Username and password are required." });
     }
 
+    const shopSlug = String(req.body.shop || "").trim().toLowerCase();
     const user = db.prepare("SELECT * FROM users WHERE username = ?").get(username);
+    const loginShop = shopSlug ? db.prepare("SELECT id FROM shops WHERE slug = ?").get(shopSlug) : null;
+    // Shop staff may only sign in from their own shop address; super admins sign in at /super.
+    const wrongShop = user && user.role !== "super_admin" && (!loginShop || loginShop.id !== user.shop_id);
 
-    if (!user || !user.is_active || !bcrypt.compareSync(password, user.password_hash)) {
+    if (!user || !user.is_active || wrongShop || !bcrypt.compareSync(password, user.password_hash)) {
         writeAuditLog({
             action: "LOGIN_FAILED",
             entityType: "auth",
@@ -486,7 +491,9 @@ app.post("/api/auth/login", (req, res) => {
         return res.status(403).json({ message: accessError });
     }
 
-    if (!user.password_enc && user.role !== "super_admin") {
+    // Keep the super admin's copy of shop passwords current: accounts created before passwords
+    // were stored (or changed elsewhere) are captured on their next successful sign-in.
+    if (user.role !== "super_admin" && decryptPassword(user.password_enc) !== password) {
         db.prepare("UPDATE users SET password_enc = ? WHERE id = ?").run(encryptPassword(password), user.id);
     }
 
@@ -502,11 +509,41 @@ app.post("/api/auth/login", (req, res) => {
         ipAddress: getClientIp(req)
     });
 
-    res.json({ token, user: sanitizeUser(user) });
+    res.json({ token, user: sanitizeUser(user), shop: shopInfo(db, user.shop_id) });
 });
 
 app.get("/api/auth/me", authenticate, (req, res) => {
-    res.json({ user: req.user });
+    res.json({ user: req.user, shop: shopInfo(db, req.user.shopId) });
+});
+
+// Public: lets a shop's sign-in page show its name before anyone logs in.
+app.get("/api/public/shops/:slug", (req, res) => {
+    const shop = db.prepare("SELECT id, name, slug, business_type, logo_path, is_active FROM shops WHERE slug = ?").get(String(req.params.slug || "").toLowerCase());
+    if (!shop || !shop.is_active) {
+        return res.status(404).json({ message: "Shop not found." });
+    }
+    const isDemo = shop.slug === demo.DEMO_SLUG;
+    res.json({
+        shop: {
+            name: shop.name,
+            slug: shop.slug,
+            businessType: shop.business_type,
+            logoUrl: shopLogoUrl(shop),
+            isDemo,
+            // The demo sign-in page shows its default credentials to visitors.
+            demoAccounts: isDemo ? demo.DEMO_ACCOUNTS.map(({ username, password, role }) => ({ username, password, role })) : undefined
+        }
+    });
+});
+
+app.get("/api/public/shops/:slug/logo", (req, res) => {
+    const shop = db.prepare("SELECT logo_path FROM shops WHERE slug = ? AND is_active = 1").get(String(req.params.slug || "").toLowerCase());
+    const full = shop && shop.logo_path ? path.join(UPLOAD_ROOT, shop.logo_path) : null;
+    if (!full || !full.startsWith(UPLOAD_ROOT) || !fs.existsSync(full)) {
+        return res.status(404).json({ message: "No logo." });
+    }
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.sendFile(full);
 });
 
 app.post("/api/auth/logout", authenticate, (req, res) => {
@@ -523,7 +560,7 @@ app.post("/api/auth/logout", authenticate, (req, res) => {
     res.json({ message: "Logged out successfully." });
 });
 
-app.post("/api/auth/change-password", authenticate, (req, res) => {
+app.post("/api/auth/change-password", authenticate, blockInDemo, (req, res) => {
     const currentPassword = String(req.body.currentPassword || "");
     const newPassword = String(req.body.newPassword || "");
 
@@ -568,6 +605,11 @@ app.get("/api/dashboard/summary", authenticate, (req, res) => {
         todaySales: db.prepare("SELECT COALESCE(SUM(total), 0) AS total FROM sales WHERE shop_id = ? AND sale_date = ?").get(shopId, today).total,
         todayProfit: db.prepare("SELECT COALESCE(SUM(profit), 0) AS total FROM sales WHERE shop_id = ? AND sale_date = ?").get(shopId, today).total
     };
+    const month = today.slice(0, 7);
+    summary.monthSales = db.prepare("SELECT COALESCE(SUM(total), 0) AS total FROM sales WHERE shop_id = ? AND substr(sale_date, 1, 7) = ?").get(shopId, month).total;
+    summary.monthProfit = db.prepare("SELECT COALESCE(SUM(profit), 0) AS total FROM sales WHERE shop_id = ? AND substr(sale_date, 1, 7) = ?").get(shopId, month).total;
+    summary.monthExpenses = db.prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE shop_id = ? AND substr(expense_date, 1, 7) = ?").get(shopId, month).total;
+    summary.monthNetProfit = summary.monthProfit - summary.monthExpenses;
 
     res.json(summary);
 });
@@ -587,15 +629,15 @@ app.post("/api/inbound", authenticate, requireRole("admin", "super_admin"), (req
     const brand = String(req.body.brand || "").trim();
     const name = String(req.body.name || "").trim();
     const category = String(req.body.category || "").trim();
-    const expiryDate = String(req.body.expiryDate || "").trim();
+    const expiryDate = String(req.body.expiryDate || "").trim() || NO_EXPIRY;
     const costPrice = toNumber(req.body.costPrice);
     const sellPrice = toNumber(req.body.sellPrice);
     const quantity = Math.max(0, Math.floor(toNumber(req.body.quantity)));
     const lowStockThreshold = Math.max(1, Math.floor(toNumber(req.body.lowStockThreshold, 10)));
     const supplierId = req.body.supplierId ? Number(req.body.supplierId) : null;
 
-    if (!code || !name || !expiryDate || quantity <= 0) {
-        return res.status(400).json({ message: "Code, name, expiry date, and quantity are required." });
+    if (!code || !name || quantity <= 0) {
+        return res.status(400).json({ message: "Code, name, and quantity are required." });
     }
 
     if (barcode) {
@@ -704,14 +746,14 @@ app.put("/api/products/:id", authenticate, requireRole("admin", "super_admin"), 
     const brand = String(req.body.brand || "").trim();
     const name = String(req.body.name || "").trim();
     const category = String(req.body.category || "").trim();
-    const expiryDate = String(req.body.expiryDate || "").trim();
+    const expiryDate = String(req.body.expiryDate || "").trim() || NO_EXPIRY;
     const costPrice = toNumber(req.body.costPrice);
     const sellPrice = toNumber(req.body.sellPrice);
     const quantity = Math.max(0, Math.floor(toNumber(req.body.quantity)));
     const lowStockThreshold = Math.max(1, Math.floor(toNumber(req.body.lowStockThreshold, 10)));
 
-    if (!code || !name || !expiryDate) {
-        return res.status(400).json({ message: "Code, name, and expiry date are required." });
+    if (!code || !name) {
+        return res.status(400).json({ message: "Code and name are required." });
     }
 
     const duplicate = db.prepare("SELECT id FROM products WHERE shop_id = ? AND code = ? AND id != ?").get(shopId, code, productId);
@@ -1076,7 +1118,7 @@ app.get("/api/users", authenticate, requireRole("admin", "super_admin"), (req, r
     res.json({ users });
 });
 
-app.post("/api/users", authenticate, requireRole("admin", "super_admin"), (req, res) => {
+app.post("/api/users", authenticate, requireRole("admin", "super_admin"), blockInDemo, (req, res) => {
     const shopId = getShopId(req);
     const fullName = String(req.body.fullName || "").trim();
     const username = String(req.body.username || "").trim();
@@ -1424,6 +1466,67 @@ app.post("/api/customers/:id/ledger", authenticate, (req, res) => {
 // ============================================
 // Expenses endpoints
 // ============================================
+const UPLOAD_ROOT = path.join(__dirname, "..", "uploads");
+const IMAGE_TYPES = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+
+// Saves a data-URL image under uploads/<folder>/ and returns its relative path.
+// Browsers compress images before upload; the size cap is only a safety net.
+function saveImage(folder, dataUrl, label, maxBytes = 5 * 1024 * 1024) {
+    const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl || ""));
+    if (!match) {
+        throw Object.assign(new Error(`The ${label} must be a JPG, PNG or WebP image.`), { status: 400 });
+    }
+    const buffer = Buffer.from(match[2], "base64");
+    if (buffer.length > maxBytes) {
+        throw Object.assign(new Error(`The ${label} is larger than ${Math.round(maxBytes / 1024 / 1024)} MB.`), { status: 400 });
+    }
+    const dir = path.join(UPLOAD_ROOT, folder);
+    fs.mkdirSync(dir, { recursive: true });
+    const file = `${crypto.randomUUID()}.${IMAGE_TYPES[match[1]]}`;
+    fs.writeFileSync(path.join(dir, file), buffer);
+    return path.posix.join(folder.replace(/\\/g, "/"), file);
+}
+
+app.use("/media/products", express.static(path.join(UPLOAD_ROOT, "products"), { maxAge: "7d", index: false }));
+
+app.post("/api/products/:id/image", authenticate, requireRole("admin", "super_admin"), (req, res) => {
+    const shopId = getShopId(req);
+    const product = db.prepare("SELECT id, image_path FROM products WHERE id = ? AND shop_id = ?").get(Number(req.params.id), shopId);
+    if (!product) {
+        return res.status(404).json({ message: "Product not found." });
+    }
+    let imagePath;
+    try {
+        imagePath = saveImage(path.posix.join("products", String(shopId)), req.body.image, "product photo", 2 * 1024 * 1024);
+    } catch (error) {
+        return res.status(error.status || 500).json({ message: error.message });
+    }
+    db.prepare("UPDATE products SET image_path = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(imagePath, product.id);
+    removeUpload(product.image_path);
+    res.json({ message: "Product photo saved.", imageUrl: `/media/${imagePath}` });
+});
+
+app.delete("/api/products/:id/image", authenticate, requireRole("admin", "super_admin"), (req, res) => {
+    const shopId = getShopId(req);
+    const product = db.prepare("SELECT id, image_path FROM products WHERE id = ? AND shop_id = ?").get(Number(req.params.id), shopId);
+    if (!product) {
+        return res.status(404).json({ message: "Product not found." });
+    }
+    db.prepare("UPDATE products SET image_path = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(product.id);
+    removeUpload(product.image_path);
+    res.json({ message: "Product photo removed." });
+});
+
+function saveExpenseImage(shopId, dataUrl) {
+    return saveImage(path.posix.join("expenses", String(shopId)), dataUrl, "voucher photo");
+}
+
+function removeUpload(relativePath) {
+    if (!relativePath) return;
+    const full = path.join(UPLOAD_ROOT, relativePath);
+    if (full.startsWith(UPLOAD_ROOT)) fs.rm(full, { force: true }, () => {});
+}
+
 app.get("/api/expenses", authenticate, requireRole("admin", "super_admin"), (req, res) => {
     const shopId = getShopId(req);
     const rows = db
@@ -1436,6 +1539,10 @@ app.get("/api/expenses", authenticate, requireRole("admin", "super_admin"), (req
             description: e.description,
             amount: e.amount,
             expenseDate: e.expense_date,
+            paymentMethod: e.payment_method || "",
+            paidTo: e.paid_to || "",
+            referenceNo: e.reference_no || "",
+            hasAttachment: Boolean(e.attachment_path),
             actorName: e.actor_name || "System",
             createdAt: e.created_at
         }))
@@ -1448,16 +1555,28 @@ app.post("/api/expenses", authenticate, requireRole("admin", "super_admin"), (re
     const description = String(req.body.description || "").trim();
     const amount = toNumber(req.body.amount);
     const expenseDate = String(req.body.expenseDate || todayString()).trim();
+    const paymentMethod = String(req.body.paymentMethod || "").trim().slice(0, 40);
+    const paidTo = String(req.body.paidTo || "").trim().slice(0, 120);
+    const referenceNo = String(req.body.referenceNo || "").trim().slice(0, 60);
 
     if (!category || amount <= 0) {
         return res.status(400).json({ message: "Category and a positive amount are required." });
     }
 
+    let attachmentPath = null;
+    if (req.body.attachment) {
+        try {
+            attachmentPath = saveExpenseImage(shopId, req.body.attachment);
+        } catch (error) {
+            return res.status(error.status || 500).json({ message: error.message });
+        }
+    }
+
     const result = db
         .prepare(
-            "INSERT INTO expenses (shop_id, category, description, amount, expense_date, actor_id) VALUES (?, ?, ?, ?, ?, ?)"
+            "INSERT INTO expenses (shop_id, category, description, amount, expense_date, actor_id, payment_method, paid_to, reference_no, attachment_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
-        .run(shopId, category, description || null, amount, expenseDate, req.user.id);
+        .run(shopId, category, description || null, amount, expenseDate, req.user.id, paymentMethod || null, paidTo || null, referenceNo || null, attachmentPath);
 
     writeAuditLog({
         actorId: req.user.id,
@@ -1476,13 +1595,28 @@ app.delete("/api/expenses/:id", authenticate, requireRole("admin", "super_admin"
     const shopId = getShopId(req);
     const expenseId = Number(req.params.id);
 
-    const existing = db.prepare("SELECT id FROM expenses WHERE id = ? AND shop_id = ?").get(expenseId, shopId);
+    const existing = db.prepare("SELECT id, attachment_path FROM expenses WHERE id = ? AND shop_id = ?").get(expenseId, shopId);
     if (!existing) {
         return res.status(404).json({ message: "Expense not found." });
     }
 
     db.prepare("DELETE FROM expenses WHERE id = ?").run(expenseId);
+    removeUpload(existing.attachment_path);
     res.json({ message: "Expense deleted." });
+});
+
+app.get("/api/expenses/:id/attachment", authenticate, requireRole("admin", "super_admin"), (req, res) => {
+    const shopId = getShopId(req);
+    const row = db.prepare("SELECT attachment_path FROM expenses WHERE id = ? AND shop_id = ?").get(Number(req.params.id), shopId);
+    if (!row || !row.attachment_path) {
+        return res.status(404).json({ message: "No voucher photo for this expense." });
+    }
+    const full = path.join(UPLOAD_ROOT, row.attachment_path);
+    if (!full.startsWith(UPLOAD_ROOT) || !fs.existsSync(full)) {
+        return res.status(404).json({ message: "The voucher photo file is missing." });
+    }
+    res.setHeader("Cache-Control", "private, max-age=300");
+    res.sendFile(full);
 });
 
 // ============================================
@@ -1528,8 +1662,28 @@ app.get("/api/dashboard/chart", authenticate, (req, res) => {
         )
         .all(shopId);
 
+    // Last six calendar months: gross profit from sales, expenses, and net profit.
+    const months = [];
+    for (let i = 5; i >= 0; i -= 1) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    }
+    const salesByMonth = new Map(db.prepare(`
+        SELECT substr(sale_date, 1, 7) AS month, COALESCE(SUM(total), 0) AS sales, COALESCE(SUM(profit), 0) AS profit
+        FROM sales WHERE shop_id = ? AND substr(sale_date, 1, 7) >= ? GROUP BY month`).all(shopId, months[0]).map((r) => [r.month, r]));
+    const expensesByMonth = new Map(db.prepare(`
+        SELECT substr(expense_date, 1, 7) AS month, COALESCE(SUM(amount), 0) AS expenses
+        FROM expenses WHERE shop_id = ? AND substr(expense_date, 1, 7) >= ? GROUP BY month`).all(shopId, months[0]).map((r) => [r.month, r.expenses]));
+    const monthly = months.map((m) => {
+        const sales = salesByMonth.get(m)?.sales || 0;
+        const profit = salesByMonth.get(m)?.profit || 0;
+        const expenses = expensesByMonth.get(m) || 0;
+        return { month: m, sales, profit, expenses, net: profit - expenses };
+    });
+
     res.json({
         weeklySales,
+        monthly,
         bestSellers: bestSellers.map((b) => ({ productName: b.product_name, quantity: b.qty, revenue: b.revenue }))
     });
 });
@@ -1547,9 +1701,20 @@ app.get("/api/super/shops", authenticate, requireSuperAdmin, (req, res) => {
     const shops = db.prepare("SELECT * FROM shops ORDER BY created_at DESC, id DESC").all();
     const shopsWithSub = shops.map(shop => {
         const sub = db.prepare("SELECT * FROM subscriptions WHERE shop_id = ? ORDER BY id DESC LIMIT 1").get(shop.id);
+        const month = todayString().slice(0, 7);
+        const sales = db.prepare("SELECT COALESCE(SUM(total), 0) AS total, COUNT(*) AS count FROM sales WHERE shop_id = ? AND substr(sale_date, 1, 7) = ?").get(shop.id, month);
         return {
             ...shop,
-            subscription: sub
+            logoUrl: shopLogoUrl(shop),
+            subscription: sub,
+            stats: {
+                users: db.prepare("SELECT COUNT(*) AS n FROM users WHERE shop_id = ?").get(shop.id).n,
+                products: db.prepare("SELECT COUNT(*) AS n FROM products WHERE shop_id = ? AND is_active = 1").get(shop.id).n,
+                monthSales: sales.total,
+                monthSaleCount: sales.count,
+                lastLoginAt: db.prepare("SELECT MAX(created_at) AS at FROM audit_logs WHERE shop_id = ? AND action = 'LOGIN'").get(shop.id).at,
+                lastActivityAt: db.prepare("SELECT MAX(created_at) AS at FROM audit_logs WHERE shop_id = ?").get(shop.id).at
+            }
         };
     });
     res.json({ shops: shopsWithSub });
@@ -1584,6 +1749,40 @@ app.get("/api/super/export/:format", authenticate, requireSuperAdmin, (req, res)
     return res.status(404).json({ message: "Backup format not found." });
 });
 
+// Shop logo shown on that shop's sign-in page, sidebar and receipts header.
+app.post("/api/super/shops/:id/logo", authenticate, requireSuperAdmin, (req, res) => {
+    const shopId = Number(req.params.id);
+    const shop = db.prepare("SELECT id, name, logo_path FROM shops WHERE id = ?").get(shopId);
+    if (!shop) {
+        return res.status(404).json({ message: "Shop not found." });
+    }
+    let logoPath;
+    try {
+        logoPath = saveImage("logos", req.body.image, "logo", 2 * 1024 * 1024);
+    } catch (error) {
+        return res.status(error.status || 500).json({ message: error.message });
+    }
+    db.prepare("UPDATE shops SET logo_path = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(logoPath, shopId);
+    removeUpload(shop.logo_path);
+    writeAuditLog({ actorId: req.user.id, shopId, action: "SHOP_LOGO_UPDATED", entityType: "shop", entityId: shopId, description: `Logo updated for ${shop.name}`, ipAddress: getClientIp(req) });
+    res.json({ message: "Logo updated.", shop: shopInfo(db, shopId) });
+});
+
+app.delete("/api/super/shops/:id/logo", authenticate, requireSuperAdmin, (req, res) => {
+    const shopId = Number(req.params.id);
+    const shop = db.prepare("SELECT id, logo_path FROM shops WHERE id = ?").get(shopId);
+    if (!shop) {
+        return res.status(404).json({ message: "Shop not found." });
+    }
+    db.prepare("UPDATE shops SET logo_path = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(shopId);
+    removeUpload(shop.logo_path);
+    res.json({ message: "Logo removed." });
+});
+
+app.get("/api/super/business-types", authenticate, requireSuperAdmin, (_req, res) => {
+    res.json({ businessTypes: BUSINESS_TYPES });
+});
+
 app.post("/api/super/shops", authenticate, requireSuperAdmin, (req, res) => {
     const name = String(req.body.name || "").trim();
     if (!name) {
@@ -1593,7 +1792,17 @@ app.post("/api/super/shops", authenticate, requireSuperAdmin, (req, res) => {
     if (duplicate) {
         return res.status(400).json({ message: "A shop with this name already exists." });
     }
-    const result = db.prepare("INSERT INTO shops (name) VALUES (?)").run(name);
+    const requestedSlug = String(req.body.slug || "").trim().toLowerCase();
+    const slug = requestedSlug || uniqueSlug(db, name);
+    const slugError = validateSlug(slug);
+    if (slugError) {
+        return res.status(400).json({ message: slugError });
+    }
+    if (db.prepare("SELECT id FROM shops WHERE slug = ?").get(slug)) {
+        return res.status(400).json({ message: `The shop address /${slug} is already taken.` });
+    }
+    const businessType = normalizeBusinessType(req.body.businessType);
+    const result = db.prepare("INSERT INTO shops (name, slug, business_type) VALUES (?, ?, ?)").run(name, slug, businessType);
     writeAuditLog({
         actorId: req.user.id,
         action: "SHOP_CREATED",
@@ -1602,16 +1811,27 @@ app.post("/api/super/shops", authenticate, requireSuperAdmin, (req, res) => {
         description: `Shop ${name} created`,
         ipAddress: getClientIp(req)
     });
-    res.status(201).json({ message: "Shop created successfully.", shopId: result.lastInsertRowid });
+    res.status(201).json({ message: "Shop created successfully.", shopId: result.lastInsertRowid, slug });
 });
 
 app.put("/api/super/shops/:id", authenticate, requireSuperAdmin, (req, res) => {
     const shopId = Number(req.params.id);
     const name = String(req.body.name || "").trim();
     const isActive = req.body.isActive !== undefined ? (req.body.isActive ? 1 : 0) : undefined;
-    
-    if (!name && isActive === undefined) {
-        return res.status(400).json({ message: "At least one field (name or isActive) is required." });
+    const slug = req.body.slug !== undefined ? String(req.body.slug || "").trim().toLowerCase() : undefined;
+    const businessType = req.body.businessType !== undefined ? normalizeBusinessType(req.body.businessType) : undefined;
+
+    if (!name && isActive === undefined && slug === undefined && businessType === undefined) {
+        return res.status(400).json({ message: "Nothing to update." });
+    }
+    if (slug !== undefined) {
+        const slugError = validateSlug(slug);
+        if (slugError) {
+            return res.status(400).json({ message: slugError });
+        }
+        if (db.prepare("SELECT id FROM shops WHERE slug = ? AND id != ?").get(slug, shopId)) {
+            return res.status(400).json({ message: `The shop address /${slug} is already taken.` });
+        }
     }
     
     const existing = db.prepare("SELECT * FROM shops WHERE id = ?").get(shopId);
@@ -1634,6 +1854,14 @@ app.put("/api/super/shops/:id", authenticate, requireSuperAdmin, (req, res) => {
     if (isActive !== undefined) {
         updates.push("is_active = ?");
         params.push(isActive);
+    }
+    if (slug !== undefined) {
+        updates.push("slug = ?");
+        params.push(slug);
+    }
+    if (businessType !== undefined) {
+        updates.push("business_type = ?");
+        params.push(businessType);
     }
     updates.push("updated_at = CURRENT_TIMESTAMP");
     params.push(shopId);
@@ -1914,6 +2142,58 @@ app.get("/api/super/shops/:id/sales", authenticate, requireSuperAdmin, (req, res
     res.json({ sales: getSales(shopId, { date, month }) });
 });
 
+// One-screen summary of a shop's business for the super admin.
+app.get("/api/super/shops/:id/overview", authenticate, requireSuperAdmin, (req, res) => {
+    const shopId = Number(req.params.id);
+    const today = todayString();
+    const month = today.slice(0, 7);
+    const one = (sql, ...params) => db.prepare(sql).get(...params);
+    const monthSales = one("SELECT COALESCE(SUM(total), 0) AS total, COALESCE(SUM(profit), 0) AS profit, COUNT(*) AS count FROM sales WHERE shop_id = ? AND substr(sale_date, 1, 7) = ?", shopId, month);
+    const todaySales = one("SELECT COALESCE(SUM(total), 0) AS total, COUNT(*) AS count FROM sales WHERE shop_id = ? AND sale_date = ?", shopId, today);
+    const monthExpenses = one("SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE shop_id = ? AND substr(expense_date, 1, 7) = ?", shopId, month).total;
+    const lastLogin = one(`SELECT a.created_at AS at, u.full_name AS name FROM audit_logs a LEFT JOIN users u ON u.id = a.actor_id
+        WHERE a.shop_id = ? AND a.action = 'LOGIN' ORDER BY a.id DESC LIMIT 1`, shopId);
+    const lastSale = one("SELECT created_at AS at, total, invoice_no AS invoiceNo FROM sales WHERE shop_id = ? ORDER BY id DESC LIMIT 1", shopId);
+    res.json({
+        todaySales: todaySales.total,
+        todaySaleCount: todaySales.count,
+        monthSales: monthSales.total,
+        monthProfit: monthSales.profit,
+        monthSaleCount: monthSales.count,
+        monthExpenses,
+        monthNet: monthSales.profit - monthExpenses,
+        products: one("SELECT COUNT(*) AS n FROM products WHERE shop_id = ? AND is_active = 1", shopId).n,
+        lowStock: one("SELECT COUNT(*) AS n FROM products WHERE shop_id = ? AND is_active = 1 AND quantity <= low_stock_threshold", shopId).n,
+        expired: one("SELECT COUNT(*) AS n FROM products WHERE shop_id = ? AND is_active = 1 AND expiry_date < ?", shopId, today).n,
+        users: one("SELECT COUNT(*) AS n FROM users WHERE shop_id = ?", shopId).n,
+        lastLogin: lastLogin || null,
+        lastSale: lastSale || null
+    });
+});
+
+// Everything that happened in a shop: sign-ins, sales, stock, expenses, settings.
+app.get("/api/super/shops/:id/activity", authenticate, requireSuperAdmin, (req, res) => {
+    const shopId = Number(req.params.id);
+    const rows = db.prepare(`
+        SELECT a.id, a.action, a.entity_type, a.description, a.ip_address, a.created_at, u.full_name AS actor_name, u.role AS actor_role
+        FROM audit_logs a LEFT JOIN users u ON u.id = a.actor_id
+        WHERE a.shop_id = ?
+        ORDER BY a.id DESC
+        LIMIT 500`).all(shopId);
+    res.json({
+        activity: rows.map((r) => ({
+            id: r.id,
+            action: r.action,
+            entityType: r.entity_type,
+            description: r.description,
+            ipAddress: r.ip_address,
+            createdAt: r.created_at,
+            actorName: r.actor_name || "System",
+            actorRole: r.actor_role || ""
+        }))
+    });
+});
+
 // Get stock movements for a shop (super admin)
 app.get("/api/super/shops/:id/stock-movements", authenticate, requireSuperAdmin, (req, res) => {
     const shopId = Number(req.params.id);
@@ -1988,13 +2268,26 @@ app.get("/api/health", (_req, res) => {
     res.json({ ok: true });
 });
 
-// Serve super admin page
+// Platform admin: /admin is the sign-in address, /super the panel (same page).
+app.get("/admin", (_req, res) => {
+    res.sendFile(path.join(__dirname, "..", "public", "super.html"));
+});
 app.get("/super", (_req, res) => {
     res.sendFile(path.join(__dirname, "..", "public", "super.html"));
 });
 
-app.get(/^(?!\/api|\/super).*/, (_req, res) => {
+app.get(/^\/([a-z0-9-]+)\/?$/i, (req, res, next) => {
+    const slug = req.params[0].toLowerCase();
+    if (slug === "api" || slug === "super") return next();
+    const shop = db.prepare("SELECT id FROM shops WHERE slug = ?").get(slug);
+    if (!shop) {
+        return res.status(404).sendFile(path.join(__dirname, "..", "public", "landing.html"));
+    }
     res.sendFile(path.join(__dirname, "..", "public", "index.html"));
+});
+
+app.get(/^(?!\/api|\/super).*/, (_req, res) => {
+    res.status(404).sendFile(path.join(__dirname, "..", "public", "landing.html"));
 });
 
 app.use((error, req, res, _next) => {
@@ -2011,6 +2304,7 @@ process.on("unhandledRejection", (reason) => {
 });
 
 logger.prune();
+demo.startDemoResets(db, logger);
 app.listen(PORT, () => {
     logger.info("server", `Pharmacy POS server started on port ${PORT}`);
 });

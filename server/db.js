@@ -35,6 +35,14 @@ function runMigrations() {
     ensureColumn("sale_items", "shop_id", "INTEGER");
     ensureColumn("products", "barcode", "TEXT");
     ensureColumn("users", "password_enc", "TEXT");
+    ensureColumn("shops", "slug", "TEXT");
+    ensureColumn("shops", "business_type", "TEXT NOT NULL DEFAULT 'clinic'");
+    ensureColumn("shops", "logo_path", "TEXT");
+    ensureColumn("products", "image_path", "TEXT");
+    ensureColumn("expenses", "payment_method", "TEXT");
+    ensureColumn("expenses", "paid_to", "TEXT");
+    ensureColumn("expenses", "reference_no", "TEXT");
+    ensureColumn("expenses", "attachment_path", "TEXT");
     db.exec("CREATE INDEX IF NOT EXISTS idx_products_shop_barcode ON products(shop_id, barcode)");
 }
 
@@ -138,13 +146,14 @@ function seedAdminUser() {
             `
         ).run(defaultShopId, existingAdmin.id);
     } else {
+        const { encryptPassword } = require("./vault");
         const passwordHash = bcrypt.hashSync("Admin@123", 10);
         db.prepare(
             `
-            INSERT INTO users (full_name, username, password_hash, role, shop_id)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO users (full_name, username, password_hash, password_enc, role, shop_id)
+            VALUES (?, ?, ?, ?, ?, ?)
             `
-        ).run("System Administrator", "admin", passwordHash, "admin", defaultShopId);
+        ).run("System Administrator", "admin", passwordHash, encryptPassword("Admin@123"), "admin", defaultShopId);
     }
 }
 
@@ -194,10 +203,20 @@ function seedProducts() {
     tx();
 }
 
+function assignShopSlugs() {
+    const { uniqueSlug } = require("./shops");
+    const rows = db.prepare("SELECT id, name FROM shops WHERE slug IS NULL OR slug = ''").all();
+    for (const row of rows) {
+        db.prepare("UPDATE shops SET slug = ? WHERE id = ?").run(uniqueSlug(db, row.name, row.id), row.id);
+    }
+    db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_shops_slug ON shops(slug)");
+}
+
 runMigrations();
 seedSuperAdmins();
 seedAdminUser();
 normalizeExistingData(ensureDefaultShop());
 seedProducts();
+assignShopSlugs();
 
 module.exports = db;

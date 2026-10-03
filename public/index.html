@@ -3,10 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KKS ortho clinic</title>
+    <title>Exabyte POS</title>
     <link rel="icon" type="image/svg+xml" href="/logo.svg">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="/application.css?v=20260718"><link rel="stylesheet" href="/pos-theme.css?v=20260718-operations">
+    <link rel="stylesheet" href="/theme.css?v=20261003g">
 </head>
 <body class="theme-body">
     <div id="notification" class="notification hidden" role="status" aria-live="polite"></div>
@@ -19,12 +23,30 @@
     </div>
 
     <section id="login-screen" class="login-screen hidden">
+        <div class="login-frame">
+        <aside class="login-brand" aria-hidden="true">
+            <div class="login-brand-top">
+                <span class="shop-initials" data-shop-initials>·</span>
+                <span data-shop-name></span>
+            </div>
+            <div class="login-brand-copy">
+                <h2 data-i18n="login_tagline">Sell faster. Track everything.</h2>
+                <p data-i18n="login_sub">Point of sale, inventory and reports for clinics and convenience stores.</p>
+            </div>
+            <ul class="login-brand-points">
+                <li><i data-lucide="scan-barcode"></i><span data-i18n="login_point_1">Fast checkout with barcode scanning and receipt printing</span></li>
+                <li><i data-lucide="boxes"></i><span data-i18n="login_point_2">Live stock, expiry and low-stock alerts</span></li>
+                <li><i data-lucide="chart-column"></i><span data-i18n="login_point_3">Daily sales and profit reports</span></li>
+            </ul>
+            <p class="login-brand-foot">Powered by <a href="/">Exabyte POS</a></p>
+        </aside>
         <div class="login-shell">
             <div class="login-head">
                 <div class="brand-lockup">
-                    <img class="brand-mark" src="/logo.svg" alt="KKS ortho clinic logo">
+                    <span class="shop-initials brand-mark" data-shop-initials aria-hidden="true">·</span>
                     <div>
-                        <h1 class="brand-name">KKS ortho clinic</h1>
+                        <h1 class="brand-name" data-shop-name></h1>
+                        <p class="login-shop-address" id="login-shop-address"></p>
                     </div>
                 </div>
                 <div class="lang-switch">
@@ -42,6 +64,7 @@
                         </div>
                     </div>
                     <p id="login-role-description" class="login-role-description">Sign in with your assigned account to access the correct workspace.</p>
+                    <p id="login-shop-note" class="login-shop-note hidden" role="alert"></p>
 
                     <div class="form-group">
                         <label class="field-label" for="login-username" data-i18n="username">Username</label>
@@ -61,8 +84,10 @@
                     <div class="form-group">
                         <button type="submit" class="primary-btn full-width" data-i18n="sign_in">Sign In</button>
                     </div>
+                    <p class="login-home-link"><a href="/"><i data-lucide="arrow-left" class="h-4 w-4"></i><span data-i18n="login_home_link">Exabyte POS home</span></a></p>
                 </form>
             </div>
+        </div>
         </div>
     </section>
 
@@ -73,9 +98,10 @@
             <input type="checkbox" id="sidebar-toggle" class="sidebar-toggle-input">
             <div class="sidebar-head">
                 <div class="brand-lockup store-lockup">
-                    <span class="store-mark" aria-hidden="true"><img src="/logo.svg" alt=""></span>
+                    <span class="store-mark shop-initials" data-shop-initials aria-hidden="true">·</span>
                     <div class="store-copy">
-                        <h2 class="brand-name small store-title">KKS ortho clinic</h2>
+                        <h2 class="brand-name small store-title" data-shop-name></h2>
+                        <p class="store-type" id="store-type"></p>
                     </div>
                 </div>
                 <label for="sidebar-toggle" class="sidebar-toggle-btn desktop-only-inline" title="Collapse or expand sidebar" aria-label="Collapse or expand sidebar" role="button" tabindex="0">
@@ -87,6 +113,7 @@
             </div>
 
             <nav id="sidebar-nav" class="nav-stack">
+                <p class="nav-section-label" data-i18n="nav_main">Main</p>
                 <button type="button" data-tab="dashboard" class="nav-button nav-button-active">
                     <i data-lucide="layout-dashboard" class="h-5 w-5"></i>
                     <span data-i18n="dashboard">Dashboard</span>
@@ -107,6 +134,7 @@
                     <i data-lucide="shield-alert" class="h-5 w-5"></i>
                     <span data-i18n="alerts">Alerts</span>
                 </button>
+                <p class="nav-section-label" data-i18n="nav_manage">Manage</p>
                 <button type="button" data-tab="history" class="nav-button admin-only">
                     <i data-lucide="history" class="h-5 w-5"></i>
                     <span data-i18n="history">Stock History</span>
@@ -127,6 +155,7 @@
                     <i data-lucide="users" class="h-5 w-5"></i>
                     <span data-i18n="users">Users</span>
                 </button>
+                <p class="nav-section-label" data-i18n="nav_settings">Settings</p>
                 <button type="button" data-tab="account" class="nav-button">
                     <i data-lucide="settings-2" class="h-5 w-5"></i>
                     <span data-i18n="account">Account</span>
@@ -134,12 +163,23 @@
             </nav>
 
             <div class="sidebar-user surface-card">
-                <p id="current-user-name" class="sidebar-user-name">-</p>
-                <p id="current-user-role" class="sidebar-user-role">-</p>
+                <div id="current-user-avatar" class="sidebar-user-avatar" aria-hidden="true">-</div>
+                <div class="sidebar-user-meta">
+                    <p id="current-user-name" class="sidebar-user-name">-</p>
+                    <p id="current-user-role" class="sidebar-user-role">-</p>
+                </div>
+                <button id="sidebar-logout-button" type="button" class="sidebar-user-logout" title="Logout" aria-label="Logout">
+                    <i data-lucide="log-out" class="h-4 w-4"></i>
+                </button>
             </div>
         </aside>
 
         <div class="app-main">
+            <div id="demo-banner" class="demo-banner hidden" role="note">
+                <i data-lucide="flask-conical" class="h-4 w-4"></i>
+                <span data-i18n="demo_banner">You are using the demo shop. Data resets every few hours.</span>
+                <a href="/#pricing" data-i18n="demo_banner_cta">See pricing</a>
+            </div>
             <header class="app-header">
                 <div class="app-header-left">
                     <button id="mobile-menu-button" class="icon-btn mobile-nav-trigger mobile-only-inline" type="button" aria-label="Open navigation menu">
@@ -147,6 +187,7 @@
                     </button>
                     <div class="app-title-block">
                         <h1 id="page-title" class="app-header-title">Dashboard</h1>
+                        <p id="page-date" class="app-header-date"></p>
                     </div>
                 </div>
                 <div class="app-header-actions">
@@ -167,6 +208,17 @@
             <main class="content-scroll">
                 <section data-view="dashboard" class="view-section section-stack">
                     <div id="summary-cards" class="metric-grid"></div>
+                    <div id="monthly-profit-panel" class="surface-panel monthly-panel admin-only">
+                        <div class="section-heading row">
+                            <div>
+                                <h3 data-i18n="monthly_profit">Monthly profit</h3>
+                                <p class="section-sub" data-i18n="monthly_profit_hint">Gross profit from sales minus recorded expenses.</p>
+                            </div>
+                            <span id="monthly-profit-month" class="section-total"></span>
+                        </div>
+                        <div id="monthly-profit-figures" class="monthly-figures"></div>
+                        <div id="monthly-profit-chart" class="monthly-chart"></div>
+                    </div>
 
                     <div class="dashboard-widgets-grid">
                         <div class="surface-panel">
@@ -575,53 +627,106 @@
                 </section>
 
                 <section data-view="expenses" class="view-section section-stack hidden">
-                    <div class="user-grid">
-                        <div class="surface-panel">
+                    <div id="expense-summary" class="metric-grid expense-summary"></div>
+                    <div class="expense-layout">
+                        <div class="surface-panel expense-form-panel">
                             <div class="section-heading">
-                                <h3 data-i18n="add_expense">Add Expense</h3>
+                                <div>
+                                    <h3 data-i18n="add_expense">Add Expense</h3>
+                                    <p class="section-sub" data-i18n="expense_form_hint">Record every shop cost so monthly net profit stays accurate.</p>
+                                </div>
                             </div>
                             <form id="expense-form" class="stack-form">
                                 <div>
                                     <label class="field-label" for="expense-category" data-i18n="category">Category</label>
-                                    <input id="expense-category" type="text" class="field-input" list="expense-category-options" required>
-                                    <datalist id="expense-category-options">
-                                        <option value="Rent"></option>
-                                        <option value="Utilities"></option>
-                                        <option value="Salaries"></option>
-                                        <option value="Transport"></option>
-                                        <option value="Maintenance"></option>
-                                        <option value="Other"></option>
-                                    </datalist>
+                                    <div id="expense-category-chips" class="chip-picker" role="group" aria-label="Category presets"></div>
+                                    <input id="expense-category" type="text" class="field-input" list="expense-category-options" required data-i18n-placeholder="expense_category_placeholder" placeholder="Choose above or type a category">
+                                    <datalist id="expense-category-options"></datalist>
+                                </div>
+                                <div class="form-row-2">
+                                    <div>
+                                        <label class="field-label" for="expense-amount" data-i18n="amount">Amount</label>
+                                        <input id="expense-amount" type="number" min="1" step="any" inputmode="decimal" class="field-input" required>
+                                    </div>
+                                    <div>
+                                        <label class="field-label" for="expense-date" data-i18n="date">Date</label>
+                                        <input id="expense-date" type="date" class="field-input" required>
+                                    </div>
+                                </div>
+                                <div class="form-row-2">
+                                    <div>
+                                        <label class="field-label" for="expense-method" data-i18n="payment_method">Payment method</label>
+                                        <select id="expense-method" class="field-input">
+                                            <option value="Cash">Cash</option>
+                                            <option value="KBZPay">KBZPay</option>
+                                            <option value="WavePay">WavePay</option>
+                                            <option value="AYA Pay">AYA Pay</option>
+                                            <option value="CB Pay">CB Pay</option>
+                                            <option value="Bank transfer">Bank transfer</option>
+                                            <option value="Card">Card</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="field-label" for="expense-reference" data-i18n="reference_no">Voucher / ref no.</label>
+                                        <input id="expense-reference" type="text" maxlength="60" class="field-input" data-i18n-placeholder="optional" placeholder="Optional">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="field-label" for="expense-paid-to" data-i18n="paid_to">Paid to</label>
+                                    <input id="expense-paid-to" type="text" maxlength="120" class="field-input" data-i18n-placeholder="paid_to_placeholder" placeholder="Landlord, YESB, staff name…">
                                 </div>
                                 <div>
                                     <label class="field-label" for="expense-description" data-i18n="description">Description</label>
-                                    <input id="expense-description" type="text" class="field-input">
+                                    <textarea id="expense-description" rows="2" class="field-input" data-i18n-placeholder="optional" placeholder="Optional"></textarea>
                                 </div>
                                 <div>
-                                    <label class="field-label" for="expense-amount" data-i18n="amount">Amount</label>
-                                    <input id="expense-amount" type="number" min="0" class="field-input" required>
+                                    <span class="field-label" data-i18n="voucher_photo">Voucher photo (optional)</span>
+                                    <label id="expense-photo-drop" class="photo-drop" for="expense-photo">
+                                        <i data-lucide="camera" class="h-5 w-5"></i>
+                                        <span>
+                                            <strong data-i18n="add_photo">Add a photo of the bill or receipt</strong>
+                                            <small data-i18n="voucher_hint">JPG or PNG. Large photos are compressed automatically.</small>
+                                        </span>
+                                    </label>
+                                    <input id="expense-photo" type="file" accept="image/*" capture="environment" class="hidden">
+                                    <div id="expense-photo-preview" class="photo-preview hidden">
+                                        <img id="expense-photo-img" alt="">
+                                        <div class="photo-preview-meta">
+                                            <strong id="expense-photo-name"></strong>
+                                            <small id="expense-photo-size"></small>
+                                        </div>
+                                        <button id="expense-photo-remove" type="button" class="icon-btn" aria-label="Remove photo"><i data-lucide="x" class="h-4 w-4"></i></button>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label class="field-label" for="expense-date" data-i18n="date">Date</label>
-                                    <input id="expense-date" type="date" class="field-input" required>
-                                </div>
-                                <button type="submit" class="primary-btn full-width" data-i18n="add_expense">Add Expense</button>
+                                <button id="expense-submit" type="submit" class="primary-btn full-width">
+                                    <i data-lucide="plus" class="h-4 w-4"></i>
+                                    <span data-i18n="add_expense">Add Expense</span>
+                                </button>
                             </form>
                         </div>
 
                         <div class="surface-panel">
-                            <div class="section-heading">
+                            <div class="section-heading row">
                                 <h3 data-i18n="expenses">Expenses</h3>
+                                <span id="expense-filter-total" class="section-total"></span>
+                            </div>
+                            <div class="list-toolbar expense-filters">
+                                <label class="pos-search-bar list-search-bar">
+                                    <i data-lucide="search" class="h-4 w-4" aria-hidden="true"></i>
+                                    <input id="expense-search" type="text" class="pos-search-input" data-i18n-placeholder="search_expenses" placeholder="Search description, paid to, ref no." autocomplete="off">
+                                </label>
+                                <input id="expense-filter-month" type="month" class="field-input list-filter-select" aria-label="Month">
+                                <select id="expense-filter-category" class="field-input list-filter-select" aria-label="Category"></select>
                             </div>
                             <div class="table-wrap">
-                                <table class="data-table responsive-table">
+                                <table class="data-table responsive-table expense-table">
                                     <thead>
                                         <tr>
                                             <th data-i18n="date">Date</th>
                                             <th data-i18n="category">Category</th>
-                                            <th data-i18n="description">Description</th>
+                                            <th data-i18n="paid_to">Paid to</th>
+                                            <th data-i18n="payment_method">Payment method</th>
                                             <th class="text-right" data-i18n="amount">Amount</th>
-                                            <th data-i18n="actor">Actor</th>
                                             <th class="text-center" data-i18n="actions">Actions</th>
                                         </tr>
                                     </thead>
@@ -844,7 +949,7 @@
                                         </div>
                                         <div class="form-group">
                                             <label class="field-label" for="printer-header">Receipt Header Text</label>
-                                            <input id="printer-header" type="text" class="field-input" placeholder="KKS ortho clinic" value="KKS ortho clinic">
+                                            <input id="printer-header" type="text" class="field-input" placeholder="Shop name">
                                         </div>
                                         <div class="form-group">
                                             <label class="field-label" for="printer-footer">Receipt Footer Text</label>
@@ -1000,6 +1105,19 @@
                     <label class="field-label" for="product-threshold" data-i18n="low_stock_threshold">Low Stock Threshold</label>
                     <input id="product-threshold" type="number" min="1" class="field-input" required>
                 </div>
+                <div class="span-2">
+                    <span class="field-label" data-i18n="product_photo">Product photo (optional)</span>
+                    <div class="product-photo-field">
+                        <span id="product-photo-thumb" class="product-photo-thumb"><i data-lucide="image" class="h-5 w-5"></i></span>
+                        <div class="product-photo-copy">
+                            <strong data-i18n="product_photo_title">Shown on the POS product card</strong>
+                            <small data-i18n="voucher_hint">JPG or PNG. Large photos are compressed automatically.</small>
+                        </div>
+                        <label class="secondary-btn" for="product-photo"><i data-lucide="image-plus" class="h-4 w-4"></i><span data-i18n="choose_photo">Choose</span></label>
+                        <button id="product-photo-remove" type="button" class="ghost-btn hidden" data-i18n="remove">Remove</button>
+                        <input id="product-photo" type="file" accept="image/*" class="hidden">
+                    </div>
+                </div>
                 <div class="span-2 button-pair">
                     <button id="cancel-product-modal" type="button" class="ghost-btn" data-i18n="cancel">Cancel</button>
                     <button type="submit" class="primary-btn" data-i18n="save_changes">Save Changes</button>
@@ -1079,6 +1197,6 @@
         </div>
     </div>
 
-    <script src="/app.js?v=20260718-operations"></script>
+    <script src="/app.js?v=20261003f"></script>
 </body>
 </html>

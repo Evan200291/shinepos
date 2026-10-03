@@ -3,10 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Super Admin - Shine Digital</title>
+    <title>Exabyte POS — Platform Admin</title>
+    <link rel="icon" type="image/svg+xml" href="/logo.svg">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
     <link rel="stylesheet" href="/application.css?v=20260718">
     <link rel="stylesheet" href="/pos-theme.css?v=20260718-operations">
+    <link rel="stylesheet" href="/theme.css?v=20261003g">
     <style>
         .hidden { display: none !important; }
         .h-3, .w-3 { width: 0.75rem; height: 0.75rem; }
@@ -17,16 +22,16 @@
         /* Super Admin Design Tokens */
         :root {
             --sa-white: #ffffff;
-            --sa-red: #db0202;
-            --sa-gray: #b2aeae;
-            --sa-blue: #0d47a1;
+            --sa-red: #0d9488;
+            --sa-gray: #e2e8f0;
+            --sa-blue: #0f766e;
             --sa-green: #22c55e;
             --sa-green-soft: #d4f4dd;
             --sa-amber: #f59e0b;
             --sa-amber-soft: #fff4de;
             --sa-red-soft: #ffecec;
             --sa-border: #e0e0e0;
-            --sa-muted: #4a6797;
+            --sa-muted: #64748b;
         }
 
         /* Detail tabs */
@@ -129,7 +134,7 @@
             /* Row 1: shop name + status */
             .super-admin-page .shops-table td:nth-child(1) {
                 grid-column: 1; grid-row: 1;
-                font-size: 15px; font-weight: 800; color: #0b2f75;
+                font-size: 15px; font-weight: 800; color: #1e293b;
             }
             .super-admin-page .shops-table td:nth-child(2) {
                 grid-column: 2; grid-row: 1;
@@ -138,7 +143,7 @@
             /* Row 2: subscription + actions */
             .super-admin-page .shops-table td:nth-child(3) {
                 grid-column: 1; grid-row: 2;
-                font-size: 12px; color: #4a6797; align-self: center;
+                font-size: 12px; color: #64748b; align-self: center;
             }
             .super-admin-page .shops-table td:nth-child(4) {
                 grid-column: 2; grid-row: 2;
@@ -186,7 +191,7 @@
             .super-admin-page .sa-detail-table td:first-child {
                 font-size: 14px;
                 font-weight: 800;
-                color: #0b2f75;
+                color: #1e293b;
             }
             .super-admin-page .sa-detail-table td[data-label="Actions"] {
                 margin-top: 6px;
@@ -224,10 +229,150 @@
             .super-admin-page .table-actions-inline .delete-action { border-color: var(--red); color: var(--red); }
             .super-admin-page .table-actions-inline .delete-action:hover { background: var(--red); color: var(--white); }
         }
+        /* ---- Exabyte platform admin ---- */
+        .exa-lockup { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; }
+        .exa-lockup img { width: 44px; height: 44px; border-radius: 10px; }
+        .exa-lockup .exa-divider { width: 1px; height: 34px; background: currentColor; opacity: .35; }
+        .exa-word { font-weight: 800; font-size: 22px; letter-spacing: -0.01em; line-height: 1; }
+        .exa-word small { display: block; font-size: 9.5px; font-weight: 600; letter-spacing: .42em; margin-top: 5px; }
+        .sa-login .login-brand { background: radial-gradient(520px 300px at 100% 0%, rgba(255,255,255,.12), transparent 60%), linear-gradient(155deg, #0f4c5c, #0b3440) !important; }
+        .sa-login .login-brand .exa-lockup img { background: #fff; padding: 0; }
+        .sa-stats { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .sa-stats li { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); border-radius: 12px; padding: 12px 14px; font-size: 13px; color: rgba(255,255,255,.85); display: flex; gap: 10px; align-items: flex-start; }
+        .sa-stats li svg { width: 18px; height: 18px; flex: none; color: #99f6e4; margin-top: 1px; }
+        .sa-login .login-head .exa-lockup { color: #0f4c5c; }
+        .sa-login .login-head .exa-lockup img { width: 40px; height: 40px; }
+        .sa-login .login-head .exa-word { font-size: 19px; }
+        .sa-login .login-head .exa-word small { font-size: 8.5px; }
+        .sa-chip { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #0f4c5c; background: #e6f0f2; border-radius: 6px; padding: 3px 8px; }
+        .sa-sidebar-logo { width: 38px; height: 38px; border-radius: 9px; flex: none; }
+        .shop-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .shop-cell .shop-initials { width: 36px; height: 36px; font-size: 13px; border-radius: 10px; }
+        .shop-cell-meta { min-width: 0; display: grid; gap: 2px; }
+        .shop-cell-meta a { font-size: 12.5px; color: var(--brand-700); text-decoration: none; }
+        .shop-cell-meta a:hover { text-decoration: underline; }
+        .biz-badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--brand-50); color: var(--brand-800); border: 1px solid var(--brand-200); white-space: nowrap; }
+        .biz-badge[data-type="convenience"] { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+        .biz-badge[data-type="online"] { background: #eef2ff; color: #3730a3; border-color: #c7d2fe; }
+        .biz-badge[data-type="retail"] { background: #ffe4e6; color: #9f1239; border-color: #fecdd3; }
+        .slug-input { display: flex; align-items: stretch; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; background: var(--surface-2); }
+        .slug-input:focus-within { border-color: var(--brand-600); box-shadow: var(--ring); }
+        .slug-input span { display: flex; align-items: center; padding: 0 4px 0 12px; color: var(--muted); font-size: 13.5px; white-space: nowrap; }
+        .slug-input input { flex: 1; min-width: 0; border: 0 !important; box-shadow: none !important; background: transparent !important; padding-left: 0 !important; font-weight: 600; }
+        .logo-picker { display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px dashed var(--border-strong); border-radius: var(--radius); background: var(--surface-2); }
+        .logo-picker .shop-initials { width: 52px; height: 52px; font-size: 18px; }
+        .logo-picker-copy { flex: 1; min-width: 0; font-size: 12.5px; color: var(--muted); }
+        .logo-picker-copy strong { display: block; color: var(--text); font-size: 13.5px; }
+        .logo-picker-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        .field-hint { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+        .shops-table td { padding-top: 10px !important; padding-bottom: 10px !important; vertical-align: middle; }
+        .sa-kpis { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)) !important; }
+        .url-line { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+        .url-line a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .copy-btn { border: 0; background: transparent; color: var(--faint); padding: 2px; border-radius: 6px; cursor: pointer; display: inline-grid; place-items: center; }
+        .copy-btn:hover { color: var(--brand-700); background: var(--brand-50); }
+        .copy-btn svg { width: 14px; height: 14px; }
+        .days-cell { display: grid; gap: 5px; min-width: 120px; }
+        .days-cell strong { font-size: 13px; }
+        .days-bar { height: 6px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
+        .days-bar span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #14b8a6, #0d9488); }
+        .days-bar.warn span { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+        .days-bar.bad span { background: linear-gradient(90deg, #fb7185, #e11d48); }
+        .cell-sub { display: block; font-size: 11.5px; color: var(--muted); }
+        .sa-hero { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 18px; border-radius: var(--radius-lg);
+            background: radial-gradient(500px 220px at 100% 0%, rgba(255,255,255,.14), transparent 60%), linear-gradient(135deg, #0f4c5c, #0f766e); color: #fff; box-shadow: var(--e2); }
+        .sa-hero .shop-initials { width: 58px; height: 58px; font-size: 20px; border-radius: 14px; background: rgba(255,255,255,.16) !important; border: 1px solid rgba(255,255,255,.3); }
+        .sa-hero .shop-initials.has-logo { background: #fff !important; }
+        .sa-hero-main { flex: 1; min-width: 220px; display: grid; gap: 6px; }
+        .sa-hero-main h2 { color: #fff; margin: 0; font-size: 22px; }
+        .sa-hero-url { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13.5px; }
+        .sa-hero-url code { background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.25); padding: 3px 8px; border-radius: 8px; color: #fff; font-family: ui-monospace, Consolas, monospace; }
+        .sa-hero-url button, .sa-hero-url a { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; color: #fff; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25); border-radius: 8px; padding: 4px 9px; cursor: pointer; text-decoration: none; }
+        .sa-hero-url button:hover, .sa-hero-url a:hover { background: rgba(255,255,255,.22); }
+        .sa-hero-url svg { width: 14px; height: 14px; }
+        .sa-hero-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+        .sa-hero-tags span { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.22); }
+        .sa-hero-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+        .sa-hero-actions .secondary-btn { background: #fff !important; }
+        .activity-tools { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+        .activity-tools .list-search-bar { flex: 1 1 220px; }
+        .activity-feed { list-style: none; margin: 0; padding: 0; display: grid; }
+        .activity-item { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 4px; border-bottom: 1px solid var(--border); }
+        .activity-item:last-child { border-bottom: 0; }
+        .activity-icon { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--surface-2); color: var(--muted); }
+        .activity-icon svg { width: 17px; height: 17px; }
+        .activity-icon[data-kind="login"] { background: #e0f2fe; color: #0369a1; }
+        .activity-icon[data-kind="sale"] { background: #dcfce7; color: #15803d; }
+        .activity-icon[data-kind="stock"] { background: #eef2ff; color: #4f46e5; }
+        .activity-icon[data-kind="expense"] { background: #ffe4e6; color: #e11d48; }
+        .activity-icon[data-kind="settings"] { background: #fef3c7; color: #b45309; }
+        .activity-icon[data-kind="alert"] { background: #fee2e2; color: #dc2626; }
+        .activity-text { min-width: 0; }
+        .activity-text strong { display: block; font-size: 13.5px; font-weight: 600; }
+        .activity-text span { display: block; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .activity-time { font-size: 12px; color: var(--muted); text-align: right; white-space: nowrap; }
+        .activity-time b { display: block; color: var(--text-2); font-weight: 600; }
+        #shop-details-view .back-row #shop-name { display: none !important; }
+        .pw-code { font-family: ui-monospace, Consolas, monospace; font-weight: 600; background: var(--brand-50); border: 1px solid var(--brand-200); color: var(--brand-800); padding: 2px 8px; border-radius: 6px; }
     </style>
 </head>
 <body class="theme-body super-admin-page">
     <div id="notification" class="notification hidden" role="status" aria-live="polite"></div>
+
+    <section id="login-screen" class="login-screen sa-login hidden">
+        <div class="login-frame">
+            <aside class="login-brand">
+                <a class="exa-lockup" href="/">
+                    <img src="/logo.svg" alt="">
+                    <span class="exa-divider" aria-hidden="true"></span>
+                    <span class="exa-word">EXABYTE<small>DIGITAL STORE</small></span>
+                </a>
+                <div class="login-brand-copy">
+                    <h2>Platform administration</h2>
+                    <p>Open shops, choose their business type and address, manage subscriptions and keep every shop's data backed up.</p>
+                </div>
+                <ul class="sa-stats">
+                    <li><i data-lucide="store"></i><span>Shops at their own address, e.g. /kksortho</span></li>
+                    <li><i data-lucide="calendar-check"></i><span>Subscriptions from 3 months</span></li>
+                    <li><i data-lucide="database-backup"></i><span>Full system backups</span></li>
+                    <li><i data-lucide="activity"></i><span>Audit &amp; system logs</span></li>
+                </ul>
+                <p class="login-brand-foot">Exabyte POS · Restricted to platform staff</p>
+            </aside>
+            <div class="login-shell">
+                <div class="login-head">
+                    <a class="exa-lockup" href="/">
+                        <img src="/logo.svg" alt="">
+                        <span class="exa-word">EXABYTE<small>DIGITAL STORE</small></span>
+                    </a>
+                    <span class="sa-chip">Admin</span>
+                </div>
+                <div class="login-grid login-grid-single">
+                    <form id="sa-login-form" class="surface-panel form-panel">
+                        <div class="section-heading">
+                            <div>
+                                <p class="login-role-kicker">Secure area</p>
+                                <h2>Platform admin sign in</h2>
+                            </div>
+                        </div>
+                        <p class="login-role-description">For Exabyte staff only. Shop owners and cashiers sign in at their shop address.</p>
+                        <div class="form-group">
+                            <label class="field-label" for="sa-login-username">Username</label>
+                            <input id="sa-login-username" type="text" class="field-input" autocomplete="username" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="field-label" for="sa-login-password">Password</label>
+                            <input id="sa-login-password" type="password" class="field-input" autocomplete="current-password" required>
+                        </div>
+                        <div class="form-group">
+                            <button type="submit" class="primary-btn full-width">Sign In</button>
+                        </div>
+                        <p class="login-home-link"><a href="/"><i data-lucide="arrow-left" class="h-4 w-4"></i><span>Exabyte POS home</span></a></p>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
 
     <!-- App Shell -->
     <section id="app-shell" class="app-shell hidden">
@@ -237,10 +382,10 @@
             <input type="checkbox" id="sidebar-toggle" class="sidebar-toggle-input">
             <div class="sidebar-head">
                 <div class="brand-lockup store-lockup">
-                    <span class="store-mark" aria-hidden="true"><i data-lucide="shield-check" class="h-5 w-5"></i></span>
+                    <img class="sa-sidebar-logo" src="/logo.svg" alt="">
                     <div class="store-copy">
-                        <span>Administration</span>
-                        <h2 class="brand-name small store-title">Shine Digital Store</h2>
+                        <h2 class="brand-name small store-title">Exabyte POS</h2>
+                        <p class="store-type">Platform admin</p>
                     </div>
                 </div>
                 <label for="sidebar-toggle" class="sidebar-toggle-btn desktop-only-inline" title="Collapse or expand sidebar" aria-label="Collapse or expand sidebar" role="button" tabindex="0">
@@ -294,6 +439,7 @@
             <main class="content-scroll">
                 <!-- ===== SHOPS VIEW ===== -->
                 <section id="shops-view" data-view="shops" class="view-section section-stack">
+                    <div id="sa-kpis" class="metric-grid sa-kpis"></div>
                     <div class="surface-panel">
                         <div class="section-heading row">
                             <h3>All Shops</h3>
@@ -311,6 +457,32 @@
                                         <div class="span-2">
                                             <label class="field-label" for="new-shop-name">Shop Name</label>
                                             <input type="text" id="new-shop-name" class="field-input" required placeholder="Enter shop name">
+                                        </div>
+                                        <div>
+                                            <label class="field-label" for="new-shop-slug">Shop Address</label>
+                                            <div class="slug-input"><span class="host-prefix">/</span><input type="text" id="new-shop-slug" class="field-input" placeholder="kksortho" spellcheck="false" autocapitalize="off"></div>
+                                            <p class="field-hint">Staff sign in at this address. Letters, numbers and dashes.</p>
+                                        </div>
+                                        <div>
+                                            <label class="field-label" for="new-shop-type">Business Type</label>
+                                            <select id="new-shop-type" class="field-input">
+                                                <option value="clinic">Clinic / pharmacy</option>
+                                                <option value="convenience">Convenience store</option>
+                                                <option value="online">Online shop</option>
+                                                <option value="retail" selected>Retail shop</option>
+                                            </select>
+                                            <p class="field-hint">Sets product categories and whether expiry dates are required.</p>
+                                        </div>
+                                        <div class="span-2">
+                                            <label class="field-label" for="new-shop-logo">Shop Logo (optional)</label>
+                                            <div class="logo-picker">
+                                                <span class="shop-initials" id="new-shop-logo-preview">?</span>
+                                                <div class="logo-picker-copy"><strong>Shown on the shop's sign-in page and sidebar</strong>Images are resized and compressed automatically.</div>
+                                                <div class="logo-picker-actions">
+                                                    <label class="secondary-btn" for="new-shop-logo"><i data-lucide="image-plus" class="h-4 w-4"></i><span>Choose</span></label>
+                                                    <input type="file" id="new-shop-logo" accept="image/*" class="hidden">
+                                                </div>
+                                            </div>
                                         </div>
 
                                         <hr class="span-2" style="margin: 0.25rem 0; border: none; border-top: 1px solid var(--border);">
@@ -358,9 +530,12 @@
                             <table class="data-table responsive-table shops-table">
                                 <thead>
                                     <tr>
-                                        <th>Shop Name</th>
+                                        <th>Shop</th>
+                                        <th>Type</th>
                                         <th>Status</th>
-                                        <th>Days Left</th>
+                                        <th>Subscription</th>
+                                        <th class="text-right">Sales this month</th>
+                                        <th>Last active</th>
                                         <th class="text-center">Actions</th>
                                     </tr>
                                 </thead>
@@ -438,6 +613,8 @@
                         <h2 id="shop-name" style="color: var(--navy); margin: 0;">Shop Details</h2>
                     </div>
 
+                    <div id="sa-shop-hero" class="sa-hero"></div>
+                    <div id="sa-shop-kpis" class="metric-grid sa-kpis"></div>
                     <div class="surface-panel">
                         <div class="section-heading row">
                             <h3 id="shop-detail-title">Shop Details</h3>
@@ -459,14 +636,55 @@
 
                         <!-- Detail Tabs -->
                         <div class="detail-tabs">
-                            <button class="detail-tab active" data-detail-tab="users">Users</button>
+                            <button class="detail-tab active" data-detail-tab="activity">Activity</button>
+                            <button class="detail-tab" data-detail-tab="sales">Sales</button>
+                            <button class="detail-tab" data-detail-tab="users">Users &amp; Passwords</button>
                             <button class="detail-tab" data-detail-tab="products">Products</button>
                             <button class="detail-tab" data-detail-tab="movements">Stock Movements</button>
                             <button class="detail-tab" data-detail-tab="subscriptions">Subscriptions</button>
                         </div>
 
+                        <!-- Activity Panel -->
+                        <div id="detail-activity" class="detail-panel active">
+                            <div class="activity-tools">
+                                <label class="pos-search-bar list-search-bar">
+                                    <i data-lucide="search" class="h-4 w-4" aria-hidden="true"></i>
+                                    <input id="activity-search" type="text" class="pos-search-input" placeholder="Search activity, staff, IP" autocomplete="off">
+                                </label>
+                                <select id="activity-kind" class="field-input list-filter-select">
+                                    <option value="">All activity</option>
+                                    <option value="login">Sign-ins</option>
+                                    <option value="alert">Failed / blocked sign-ins</option>
+                                    <option value="sale">Sales</option>
+                                    <option value="stock">Stock &amp; products</option>
+                                    <option value="expense">Expenses</option>
+                                    <option value="settings">Settings &amp; users</option>
+                                </select>
+                            </div>
+                            <ul id="activity-feed" class="activity-feed"></ul>
+                        </div>
+
+                        <!-- Sales Panel -->
+                        <div id="detail-sales" class="detail-panel">
+                            <div class="table-wrap">
+                                <table class="data-table responsive-table sa-detail-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Invoice</th>
+                                            <th>Date</th>
+                                            <th>Cashier</th>
+                                            <th>Items</th>
+                                            <th class="text-right">Total</th>
+                                            <th class="text-right">Profit</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sales-table"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
                         <!-- Users Panel -->
-                        <div id="detail-users" class="detail-panel active">
+                        <div id="detail-users" class="detail-panel">
                             <div style="margin-bottom: 1rem;">
                                 <button class="secondary-btn" id="add-user-btn">
                                     <i data-lucide="user-plus" class="h-4 w-4"></i>
@@ -577,6 +795,124 @@
             shops: [],
             selectedShop: null
         };
+
+        const BUSINESS_LABELS = { clinic: 'Clinic / pharmacy', convenience: 'Convenience store', online: 'Online shop', retail: 'Retail shop' };
+
+        function initialsOf(name) {
+            const words = String(name || '').trim().split(/\s+/).filter(Boolean);
+            return (words.length > 1 ? words[0][0] + words[1][0] : (words[0] || '?').slice(0, 2)).toUpperCase();
+        }
+
+        function shopMark(shop) {
+            return shop.logoUrl
+                ? `<span class="shop-initials has-logo"><img src="${escapeHtml(shop.logoUrl)}" alt=""></span>`
+                : `<span class="shop-initials">${escapeHtml(initialsOf(shop.name))}</span>`;
+        }
+
+        // The public address of a shop: this host + "/" + slug.
+        function shopUrl(shop, withProtocol = false) {
+            return (withProtocol ? location.protocol + '//' : '') + location.host + '/' + shop.slug;
+        }
+
+        function formatKs(value) {
+            return Number(value || 0).toLocaleString('en-US') + ' Ks';
+        }
+
+        function timeAgo(value) {
+            const then = new Date(String(value).replace(' ', 'T') + (String(value).includes('Z') ? '' : 'Z'));
+            const mins = Math.round((Date.now() - then.getTime()) / 60000);
+            if (!Number.isFinite(mins)) return '-';
+            if (mins < 1) return 'just now';
+            if (mins < 60) return mins + ' min ago';
+            if (mins < 1440) return Math.round(mins / 60) + ' h ago';
+            if (mins < 43200) return Math.round(mins / 1440) + ' days ago';
+            return then.toLocaleDateString('en-GB');
+        }
+
+        function subscriptionCell(shop) {
+            if (!shop.subscription) return '<span class="muted">No subscription</span>';
+            const end = shop.subscription.end_date;
+            const days = Math.ceil((new Date(end + 'T23:59:59') - Date.now()) / 86400000);
+            const start = shop.subscription.start_date ? new Date(shop.subscription.start_date + 'T00:00:00') : null;
+            const total = start ? Math.max(1, Math.ceil((new Date(end + 'T23:59:59') - start) / 86400000)) : 90;
+            const pct = days <= 0 ? 0 : Math.min(100, Math.round((days / total) * 100));
+            const tone = days <= 0 ? 'bad' : days <= 14 ? 'warn' : '';
+            return `<div class="days-cell"><strong>${days <= 0 ? 'Expired' : days + ' days left'}</strong>
+                <div class="days-bar ${tone}"><span style="width:${pct}%"></span></div>
+                <span class="cell-sub">until ${formatDate(end)}</span></div>`;
+        }
+
+        async function copyText(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                notify('Link copied: ' + text);
+            } catch (_) {
+                window.prompt('Copy this link:', text);
+            }
+        }
+
+        const ACTIVITY_KINDS = {
+            login: { icon: 'log-in', match: /^(LOGIN|LOGOUT|DEMO_LOGIN)$/ },
+            alert: { icon: 'shield-alert', match: /^(LOGIN_FAILED|LOGIN_BLOCKED)$/ },
+            sale: { icon: 'receipt', match: /^SALE/ },
+            stock: { icon: 'boxes', match: /^(PRODUCT|STOCK|INBOUND|INVENTORY)/ },
+            expense: { icon: 'wallet', match: /^EXPENSE/ },
+            settings: { icon: 'settings-2', match: /./ }
+        };
+
+        function activityKind(action) {
+            return Object.keys(ACTIVITY_KINDS).find(kind => ACTIVITY_KINDS[kind].match.test(action)) || 'settings';
+        }
+
+        function renderActivity() {
+            const list = document.getElementById('activity-feed');
+            if (!list) return;
+            const kind = document.getElementById('activity-kind').value;
+            const term = document.getElementById('activity-search').value.trim().toLowerCase();
+            const rows = (state.activity || []).filter(item =>
+                (!kind || activityKind(item.action) === kind) &&
+                (!term || [item.description, item.actorName, item.action, item.ipAddress].some(v => String(v || '').toLowerCase().includes(term))));
+            list.innerHTML = rows.slice(0, 200).map(item => {
+                const k = activityKind(item.action);
+                return `<li class="activity-item">
+                    <span class="activity-icon" data-kind="${k}"><i data-lucide="${ACTIVITY_KINDS[k].icon}"></i></span>
+                    <div class="activity-text"><strong>${escapeHtml(item.description || item.action)}</strong>
+                        <span>${escapeHtml(item.actorName)}${item.actorRole ? ' · ' + escapeHtml(item.actorRole) : ''}${item.ipAddress ? ' · IP ' + escapeHtml(item.ipAddress) : ''}</span></div>
+                    <div class="activity-time"><b>${escapeHtml(timeAgo(item.createdAt))}</b>${escapeHtml(formatDateTimeShort(item.createdAt))}</div>
+                </li>`;
+            }).join('') || '<li class="empty-state">No activity recorded for this filter.</li>';
+            lucide.createIcons();
+        }
+
+        function formatDateTimeShort(value) {
+            const d = new Date(String(value).replace(' ', 'T') + (String(value).includes('Z') ? '' : 'Z'));
+            return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+        }
+
+        function suggestSlug(name) {
+            return String(name || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '').slice(0, 40);
+        }
+
+        // Shrinks a picked image in the browser so uploads stay small (logos 512px, PNG keeps transparency).
+        function compressImage(file, maxSize = 512, quality = 0.85) {
+            return new Promise((resolve, reject) => {
+                if (!file || !/^image\//.test(file.type)) return reject(new Error('Choose an image file.'));
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = () => {
+                    const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.max(1, Math.round(img.width * scale));
+                    canvas.height = Math.max(1, Math.round(img.height * scale));
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    URL.revokeObjectURL(url);
+                    const keepAlpha = file.type === 'image/png' || file.type === 'image/webp' || file.type === 'image/svg+xml';
+                    resolve(canvas.toDataURL(keepAlpha ? 'image/webp' : 'image/jpeg', quality));
+                };
+                img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('This image could not be read.')); };
+                img.src = url;
+            });
+        }
 
         // ---- Utility ----
         async function api(url, options = {}) {
@@ -691,7 +1027,32 @@
         }
 
         // ---- RENDER: Shops list ----
+        function renderShopKpis() {
+            const today = todayIso();
+            const soon = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+            const shops = state.shops.filter(s => s.slug !== 'demo');
+            const active = shops.filter(s => s.is_active && s.subscription && s.subscription.end_date >= today);
+            const expiring = active.filter(s => s.subscription.end_date <= soon);
+            const lapsed = shops.filter(s => s.is_active && (!s.subscription || s.subscription.end_date < today));
+            const disabled = shops.filter(s => !s.is_active);
+            const monthSales = shops.reduce((sum, s) => sum + (s.stats?.monthSales || 0), 0);
+            const cards = [
+                { label: 'Total shops', value: shops.length, icon: 'store', tone: 'teal' },
+                { label: 'Active subscriptions', value: active.length, icon: 'badge-check', tone: 'green' },
+                { label: 'Expiring in 14 days', value: expiring.length, icon: 'alarm-clock', tone: 'amber' },
+                { label: 'Expired / no plan', value: lapsed.length, icon: 'circle-alert', tone: 'rose' },
+                { label: 'Disabled', value: disabled.length, icon: 'ban', tone: 'violet' },
+                { label: 'Sales this month (all shops)', value: formatKs(monthSales), icon: 'trending-up', tone: 'indigo' }
+            ];
+            document.getElementById('sa-kpis').innerHTML = cards.map(card => `
+                <div class="metric-card" data-tone="${card.tone}">
+                    <div><div class="metric-label">${card.label}</div><div class="metric-value">${escapeHtml(String(card.value))}</div></div>
+                    <div class="metric-icon"><i data-lucide="${card.icon}" class="h-6 w-6"></i></div>
+                </div>`).join('');
+        }
+
         function renderShops() {
+            renderShopKpis();
             const tbody = document.getElementById('shops-table');
             tbody.innerHTML = state.shops.map(shop => {
                 const subscriptionText = shop.subscription ? formatDaysLeft(shop.subscription.end_date) : 'No subscription';
@@ -704,11 +1065,22 @@
                 const statusText = !shop.is_active ? 'Disabled' : isExpired ? 'Suspended' : noPlan ? 'No Plan' : 'Active';
                 return `
                     <tr>
-                        <td data-label="Shop"><strong class="shop-name">${escapeHtml(shop.name)}</strong></td>
+                        <td data-label="Shop">
+                            <div class="shop-cell">
+                                ${shopMark(shop)}
+                                <div class="shop-cell-meta">
+                                    <strong class="shop-name">${escapeHtml(shop.name)}</strong>
+                                    ${shop.slug ? `<span class="url-line"><a href="/${encodeURIComponent(shop.slug)}" target="_blank" rel="noopener">${escapeHtml(shopUrl(shop))}</a><button type="button" class="copy-btn" data-copy="${escapeHtml(shopUrl(shop, true))}" title="Copy link" aria-label="Copy link"><i data-lucide="copy"></i></button></span>` : ''}
+                                </div>
+                            </div>
+                        </td>
+                        <td data-label="Type"><span class="biz-badge" data-type="${escapeHtml(shop.business_type || 'retail')}">${escapeHtml(BUSINESS_LABELS[shop.business_type] || 'Retail shop')}</span></td>
                         <td data-label="Status">
                             <span class="${statusClass}"><span class="status-dot" aria-hidden="true"></span>${statusText}</span>
                         </td>
-                        <td data-label="Subscription">${shop.subscription ? '<strong>' + escapeHtml(subscriptionText) + '</strong>' : '<span class="muted">No subscription</span>'}</td>
+                        <td data-label="Subscription">${subscriptionCell(shop)}</td>
+                        <td data-label="This month" class="text-right"><strong>${formatKs(shop.stats?.monthSales || 0)}</strong><span class="cell-sub">${shop.stats?.monthSaleCount || 0} sales</span></td>
+                        <td data-label="Last active">${shop.stats?.lastActivityAt ? `<strong>${escapeHtml(timeAgo(shop.stats.lastActivityAt))}</strong><span class="cell-sub">${shop.stats.users} users · ${shop.stats.products} products</span>` : '<span class="muted">Never</span>'}</td>
                         <td data-label="Actions" class="text-center">
                             <div class="table-actions-inline shop-actions">
                                 <button class="mini-btn edit-action" data-view-shop="${shop.id}" aria-label="Manage ${escapeHtml(shop.name)}"><i data-lucide="settings-2" class="h-3 w-3"></i><span>Manage</span></button>
@@ -717,7 +1089,7 @@
                             </div>
                         </td>
                     </tr>`;
-            }).join('') || '<tr><td colspan="4" class="empty-state">No shops found. Click "Add Shop" to create one.</td></tr>';
+            }).join('') || '<tr><td colspan="7" class="empty-state">No shops found. Click "Add Shop" to create one.</td></tr>';
             lucide.createIcons();
         }
 
@@ -726,7 +1098,7 @@
             const shop = state.selectedShop;
             if (!shop) return;
             document.getElementById('shop-name').textContent = shop.name;
-            document.getElementById('shop-detail-title').textContent = shop.name;
+            document.getElementById('shop-detail-title').textContent = 'Manage shop';
 
             document.getElementById('shops-view').classList.add('hidden');
             document.getElementById('shop-details-view').classList.remove('hidden');
@@ -734,14 +1106,17 @@
             if (pt) pt.textContent = shop.name;
             setActiveNav(null);
 
-            let shopsData, usersData, productsData, movementsData, subsData;
+            let shopsData, usersData, productsData, movementsData, subsData, overview, activityData, salesData;
             try {
-                [shopsData, usersData, productsData, movementsData, subsData] = await Promise.all([
+                [shopsData, usersData, productsData, movementsData, subsData, overview, activityData, salesData] = await Promise.all([
                     api('/api/super/shops'),
                     api('/api/super/shops/' + shop.id + '/users'),
                     api('/api/super/shops/' + shop.id + '/products'),
                     api('/api/super/shops/' + shop.id + '/stock-movements'),
-                    api('/api/super/shops/' + shop.id + '/subscriptions')
+                    api('/api/super/shops/' + shop.id + '/subscriptions'),
+                    api('/api/super/shops/' + shop.id + '/overview'),
+                    api('/api/super/shops/' + shop.id + '/activity'),
+                    api('/api/super/shops/' + shop.id + '/sales')
                 ]);
             } catch (err) {
                 notify(err.message, true);
@@ -756,9 +1131,54 @@
             if (updated) {
                 state.selectedShop = updated;
                 document.getElementById('shop-name').textContent = updated.name;
-                document.getElementById('shop-detail-title').textContent = updated.name;
+                document.getElementById('shop-detail-title').textContent = 'Manage shop';
                 if (pt) pt.textContent = updated.name;
             }
+
+            const current = state.selectedShop;
+            document.getElementById('sa-shop-hero').innerHTML = `
+                ${shopMark(current)}
+                <div class="sa-hero-main">
+                    <h2>${escapeHtml(current.name)}</h2>
+                    <div class="sa-hero-url">
+                        <code>${escapeHtml(shopUrl(current))}</code>
+                        <button type="button" data-copy="${escapeHtml(shopUrl(current, true))}"><i data-lucide="copy"></i>Copy link</button>
+                        <a href="/${encodeURIComponent(current.slug)}" target="_blank" rel="noopener"><i data-lucide="external-link"></i>Open</a>
+                    </div>
+                    <div class="sa-hero-tags">
+                        <span>${escapeHtml(BUSINESS_LABELS[current.business_type] || 'Retail shop')}</span>
+                        <span>${current.is_active ? 'Enabled' : 'Disabled'}</span>
+                        <span>${current.subscription ? 'Plan until ' + formatDate(current.subscription.end_date) : 'No subscription'}</span>
+                        <span>Created ${formatDate(current.created_at)}</span>
+                    </div>
+                </div>`;
+            const kpis = [
+                { label: "Today's sales", value: formatKs(overview.todaySales), sub: overview.todaySaleCount + ' sales', icon: 'banknote', tone: 'green' },
+                { label: 'Sales this month', value: formatKs(overview.monthSales), sub: overview.monthSaleCount + ' sales', icon: 'trending-up', tone: 'teal' },
+                { label: 'Net profit this month', value: formatKs(overview.monthNet), sub: 'after ' + formatKs(overview.monthExpenses) + ' expenses', icon: 'piggy-bank', tone: overview.monthNet < 0 ? 'rose' : 'indigo' },
+                { label: 'Products', value: overview.products, sub: overview.lowStock + ' low · ' + overview.expired + ' expired', icon: 'boxes', tone: 'amber' },
+                { label: 'Last sign-in', value: overview.lastLogin ? timeAgo(overview.lastLogin.at) : 'Never', sub: overview.lastLogin ? overview.lastLogin.name || '' : '', icon: 'log-in', tone: 'violet' },
+                { label: 'Last sale', value: overview.lastSale ? timeAgo(overview.lastSale.at) : 'None yet', sub: overview.lastSale ? formatKs(overview.lastSale.total) : '', icon: 'receipt', tone: 'teal' }
+            ];
+            document.getElementById('sa-shop-kpis').innerHTML = kpis.map(card => `
+                <div class="metric-card" data-tone="${card.tone}">
+                    <div><div class="metric-label">${card.label}</div><div class="metric-value">${escapeHtml(String(card.value))}</div><span class="cell-sub">${escapeHtml(card.sub)}</span></div>
+                    <div class="metric-icon"><i data-lucide="${card.icon}" class="h-6 w-6"></i></div>
+                </div>`).join('');
+
+            state.activity = activityData.activity;
+            renderActivity();
+
+            document.getElementById('sales-table').innerHTML = salesData.sales.slice(0, 200).map(sale => `
+                    <tr>
+                        <td data-label="Invoice"><strong>${escapeHtml(sale.invoiceNo)}</strong></td>
+                        <td data-label="Date">${escapeHtml(formatDateTimeShort(sale.createdAt))}</td>
+                        <td data-label="Cashier">${escapeHtml(sale.cashierName || '-')}</td>
+                        <td data-label="Items">${escapeHtml(sale.items.map(i => i.productName + ' ×' + i.quantity).join(', '))}</td>
+                        <td data-label="Total" class="text-right"><strong>${formatKs(sale.total)}</strong></td>
+                        <td data-label="Profit" class="text-right">${formatKs(sale.profit)}</td>
+                    </tr>
+                `).join('') || '<tr><td colspan="6" class="empty-state">No sales yet.</td></tr>';
 
             const hasSub = subsData.subscriptions.length > 0;
             document.getElementById('add-sub-btn').innerHTML = hasSub
@@ -912,11 +1332,18 @@
             state.shops = [];
             state.selectedShop = null;
             localStorage.removeItem('super_token');
+            showLogin();
+        }
+
+        function showLogin() {
             document.getElementById('app-shell').classList.add('hidden');
-            window.location.assign('/');
+            document.getElementById('login-screen').classList.remove('hidden');
+            if (location.pathname !== '/admin') history.replaceState(null, '', '/admin');
+            lucide.createIcons();
         }
 
         function showApp() {
+            document.getElementById('login-screen').classList.add('hidden');
             document.getElementById('app-shell').classList.remove('hidden');
             document.getElementById('current-user-name').textContent = state.user.fullName;
             loadShops();
@@ -944,8 +1371,64 @@
                     showApp();
                 }).catch(() => clearSession());
             } else {
-                window.location.replace('/');
+                showLogin();
             }
+
+            document.addEventListener('click', (e) => {
+                const copy = e.target.closest('[data-copy]');
+                if (copy) copyText(copy.dataset.copy);
+            });
+            document.getElementById('activity-search').addEventListener('input', renderActivity);
+            document.getElementById('activity-kind').addEventListener('change', renderActivity);
+
+            document.getElementById('sa-login-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const button = e.target.querySelector('button[type="submit"]');
+                button.disabled = true;
+                try {
+                    const data = await api('/api/auth/login', {
+                        method: 'POST',
+                        body: {
+                            username: document.getElementById('sa-login-username').value.trim(),
+                            password: document.getElementById('sa-login-password').value
+                        }
+                    });
+                    if (data.user.role !== 'super_admin') {
+                        throw new Error('This sign-in is for platform admins. Use your shop address instead.');
+                    }
+                    state.token = data.token;
+                    state.user = data.user;
+                    localStorage.setItem('super_token', data.token);
+                    document.getElementById('sa-login-password').value = '';
+                    showApp();
+                } catch (err) {
+                    notify(err.message, true);
+                } finally {
+                    button.disabled = false;
+                }
+            });
+
+            document.querySelectorAll('.host-prefix').forEach((el) => { el.textContent = location.host + '/'; });
+            const newShopName = document.getElementById('new-shop-name');
+            const newShopSlug = document.getElementById('new-shop-slug');
+            newShopName.addEventListener('input', () => {
+                if (!newShopSlug.dataset.touched) newShopSlug.value = suggestSlug(newShopName.value);
+                if (!state.newShopLogo) document.getElementById('new-shop-logo-preview').textContent = initialsOf(newShopName.value);
+            });
+            newShopSlug.addEventListener('input', () => {
+                newShopSlug.dataset.touched = newShopSlug.value ? '1' : '';
+                newShopSlug.value = newShopSlug.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+            });
+            document.getElementById('new-shop-logo').addEventListener('change', async (e) => {
+                try {
+                    state.newShopLogo = await compressImage(e.target.files[0]);
+                    const preview = document.getElementById('new-shop-logo-preview');
+                    preview.classList.add('has-logo');
+                    preview.innerHTML = `<img src="${state.newShopLogo}" alt="">`;
+                } catch (err) {
+                    notify(err.message, true);
+                }
+            });
 
             // Logout
             document.getElementById('logout-button').addEventListener('click', clearSession);
@@ -1003,6 +1486,14 @@
                     document.getElementById('new-shop-sub-end').value = '';
                     document.getElementById('new-shop-sub-remarks').value = '';
                     document.getElementById('new-shop-name').value = '';
+                    document.getElementById('new-shop-slug').value = '';
+                    delete document.getElementById('new-shop-slug').dataset.touched;
+                    document.getElementById('new-shop-type').value = 'retail';
+                    document.getElementById('new-shop-logo').value = '';
+                    state.newShopLogo = null;
+                    const logoPreview = document.getElementById('new-shop-logo-preview');
+                    logoPreview.classList.remove('has-logo');
+                    logoPreview.textContent = '?';
                     document.getElementById('new-shop-admin-fullname').value = '';
                     document.getElementById('new-shop-admin-username').value = '';
                     document.getElementById('new-shop-admin-password').value = '';
@@ -1029,8 +1520,16 @@
 
                     const { shopId } = await api('/api/super/shops', {
                         method: 'POST',
-                        body: { name }
+                        body: {
+                            name,
+                            slug: document.getElementById('new-shop-slug').value.trim(),
+                            businessType: document.getElementById('new-shop-type').value
+                        }
                     });
+
+                    if (state.newShopLogo) {
+                        await api('/api/super/shops/' + shopId + '/logo', { method: 'POST', body: { image: state.newShopLogo } });
+                    }
 
                     if (subEnd) {
                         await api('/api/super/shops/' + shopId + '/subscriptions', {
@@ -1104,6 +1603,29 @@
                             <input type="text" id="edit-shop-name" class="field-input" value="${escapeHtml(shop.name)}" required>
                         </div>
                         <div>
+                            <label class="field-label" for="edit-shop-slug">Shop Address</label>
+                            <div class="slug-input"><span>${escapeHtml(location.host)}/</span><input type="text" id="edit-shop-slug" class="field-input" value="${escapeHtml(shop.slug || '')}" required spellcheck="false" autocapitalize="off"></div>
+                            <p class="field-hint">Changing it breaks old bookmarks — tell the shop the new link.</p>
+                        </div>
+                        <div>
+                            <label class="field-label" for="edit-shop-type">Business Type</label>
+                            <select id="edit-shop-type" class="field-input">
+                                ${Object.entries(BUSINESS_LABELS).map(([value, label]) => `<option value="${value}" ${value === (shop.business_type || 'retail') ? 'selected' : ''}>${label}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="field-label">Shop Logo</label>
+                            <div class="logo-picker">
+                                <span id="edit-shop-logo-preview">${shopMark(shop)}</span>
+                                <div class="logo-picker-copy"><strong>${shop.logoUrl ? 'Custom logo' : 'Using initials'}</strong>Images are resized and compressed automatically.</div>
+                                <div class="logo-picker-actions">
+                                    <label class="secondary-btn" for="edit-shop-logo"><i data-lucide="image-plus" class="h-4 w-4"></i><span>Change</span></label>
+                                    <input type="file" id="edit-shop-logo" accept="image/*" class="hidden">
+                                    ${shop.logoUrl ? '<button type="button" class="ghost-btn" id="edit-shop-logo-remove">Remove</button>' : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div>
                             <label style="display: flex; align-items: center; gap: 0.5rem;">
                                 <input type="checkbox" id="edit-shop-active" ${shop.is_active ? 'checked' : ''}>
                                 Active
@@ -1115,6 +1637,23 @@
                         </div>
                     </form>
                 `);
+                let editLogo = null;
+                let removeLogo = false;
+                document.getElementById('edit-shop-logo').addEventListener('change', async (e) => {
+                    try {
+                        editLogo = await compressImage(e.target.files[0]);
+                        removeLogo = false;
+                        document.getElementById('edit-shop-logo-preview').innerHTML = `<span class="shop-initials has-logo"><img src="${editLogo}" alt=""></span>`;
+                    } catch (err) {
+                        notify(err.message, true);
+                    }
+                });
+                document.getElementById('edit-shop-logo-remove')?.addEventListener('click', () => {
+                    editLogo = null;
+                    removeLogo = true;
+                    document.getElementById('edit-shop-logo-preview').innerHTML = `<span class="shop-initials">${escapeHtml(initialsOf(shop.name))}</span>`;
+                });
+                lucide.createIcons();
                 document.getElementById('edit-shop-form').addEventListener('submit', async (e) => {
                     e.preventDefault();
                     try {
@@ -1122,9 +1661,16 @@
                             method: 'PUT',
                             body: {
                                 name: document.getElementById('edit-shop-name').value,
+                                slug: document.getElementById('edit-shop-slug').value.trim().toLowerCase(),
+                                businessType: document.getElementById('edit-shop-type').value,
                                 isActive: document.getElementById('edit-shop-active').checked
                             }
                         });
+                        if (editLogo) {
+                            await api('/api/super/shops/' + shop.id + '/logo', { method: 'POST', body: { image: editLogo } });
+                        } else if (removeLogo) {
+                            await api('/api/super/shops/' + shop.id + '/logo', { method: 'DELETE' });
+                        }
                         hideModal();
                         notify('Shop updated.');
                         await loadShops();
@@ -1309,8 +1855,8 @@
                     try {
                         const result = await api('/api/super/users/' + revealPwBtn.dataset.revealPassword + '/password');
                         cell.innerHTML = result.password
-                            ? `<code>${escapeHtml(result.password)}</code>`
-                            : '<span class="dim">Not captured yet (saved at next login or password reset)</span>';
+                            ? `<code class="pw-code">${escapeHtml(result.password)}</code>`
+                            : '<span class="dim">Appears after this user\'s next sign-in (account made before passwords were saved)</span>';
                     } catch (err) {
                         notify(err.message, true);
                     }
