@@ -400,11 +400,21 @@ function syncMobileFooterHeight() {
     document.documentElement.style.setProperty("--mobile-footer-h", `${height || 76}px`);
 }
 
+function observePinnedPanel() {
+    const panel = document.getElementById("pos-pinned");
+    if (!panel || !("ResizeObserver" in window)) return;
+    new ResizeObserver(() => {
+        const height = Math.round(panel.getBoundingClientRect().height);
+        document.documentElement.style.setProperty("--pos-pinned-h", `${height || 130}px`);
+    }).observe(panel);
+}
+
 window.addEventListener("resize", syncMobileFooterHeight);
 window.addEventListener("orientationchange", syncMobileFooterHeight);
 
 document.addEventListener("DOMContentLoaded", () => {
     syncMobileFooterHeight();
+    observePinnedPanel();
     setDefaultDates();
     bindEvents();
     initDeviceSettings();

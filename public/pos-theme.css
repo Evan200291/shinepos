@@ -1293,3 +1293,17 @@ tr.row-clickable:hover td { background: #f6f9fe; }
   .pos-checkout-bar { bottom: -8px; }
   .pos-cart.is-empty .pos-checkout-bar { display: none; }
 }
+
+/* ===== POS pinned panel (phones/tablets): subtotal, discount, total and checkout stay fixed above the menu bar ===== */
+@media (max-width: 980px) {
+  .pos-pinned { position: fixed; left: 0; right: 0; bottom: var(--mobile-footer-h, 76px); z-index: 40; display: grid; gap: 8px; padding: 8px 12px 10px; border-top: 1px solid #d5d9e2; background: #ffffff; box-shadow: 0 -6px 16px rgba(11, 47, 117, .10); }
+  .pos-cart.is-empty .pos-pinned { display: none; }
+  .pos-cart:not(.is-empty) { padding-bottom: calc(var(--pos-pinned-h, 130px) + 8px); }
+  .pos-pinned .pos-cart-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; align-items: center; margin: 0; padding: 0; border: 0; }
+  .pos-pinned .pos-cart-summary-row { display: grid; gap: 0; justify-content: start; }
+  .pos-pinned .pos-cart-summary-row span, .pos-pinned .pos-cart-discount span { color: #6b7a90; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  .pos-pinned .pos-cart-summary-row strong { font-size: 14px; }
+  .pos-pinned .pos-cart-discount { justify-content: flex-end; gap: 8px; }
+  .pos-pinned .pos-cart-discount input { width: 100px; height: 34px; min-height: 34px; }
+  .pos-pinned .pos-checkout-bar { position: static; margin: 0; padding: 0; border: 0; background: none; box-shadow: none; display: flex; align-items: center; gap: 12px; }
+}
