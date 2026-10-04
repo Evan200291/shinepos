@@ -92,8 +92,10 @@
             background-image: linear-gradient(rgba(15, 76, 92, .05) 1px, transparent 1px), linear-gradient(90deg, rgba(15, 76, 92, .05) 1px, transparent 1px);
             background-size: 36px 36px; -webkit-mask-image: radial-gradient(ellipse 70% 80% at 70% 30%, #000, transparent 75%); mask-image: radial-gradient(ellipse 70% 80% at 70% 30%, #000, transparent 75%); }
         .hero .wrap { position: relative; z-index: 1; }
+        /* Grid children may shrink below their content width (stops the hero spilling off phones). */
+        .hero .wrap > *, .demo-band .wrap > *, .mock-main, .mock-card, .demo-acc > * { min-width: 0; }
         .pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 999px; background: #fff; border: 1px solid var(--border); font-size: 13px; color: var(--text-2); box-shadow: var(--e1); }
-        .pill b { background: var(--brand-50); color: var(--brand-700); border-radius: 999px; padding: 2px 9px; font-size: 12px; }
+        .pill b { white-space: nowrap; background: var(--brand-50); color: var(--brand-700); border-radius: 999px; padding: 2px 9px; font-size: 12px; }
         .hero h1 { font-size: clamp(32px, 4vw, 50px); font-weight: 800; margin-top: 16px; line-height: 1.08; letter-spacing: -0.035em; }
         html[lang="my"] .hero h1 { font-size: clamp(22px, 3vw, 34px); line-height: 1.55; }
         html[lang="my"] body { font-size: 14px; }
@@ -104,6 +106,9 @@
         html[lang="my"] .btn { font-size: 13.5px; }
         html[lang="my"] .btn-lg { font-size: 14px; }
         html[lang="my"] .nav-links a, html[lang="my"] .guide-tab { font-size: 13px; }
+        html[lang="my"] .demo-band h2, html[lang="my"] .cta-band h2 { font-size: clamp(19px, 2.3vw, 26px); }
+        html[lang="my"] .demo-band .lead, html[lang="my"] .cta-band p { font-size: 14px; }
+        html[lang="my"] .demo-try, html[lang="my"] .demo-acc small { font-size: 13px; }
         .hero h1 em { font-style: normal; background: linear-gradient(90deg, var(--brand-600), var(--brand-500)); -webkit-background-clip: text; background-clip: text; color: transparent; }
         .hero-sub { margin-top: 14px; font-size: 16.5px; color: var(--text-2); max-width: 560px; }
         .hero-cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 22px; }
@@ -401,7 +406,10 @@
             .topbar .hide-sm { display: none; }
             .brand-pos { display: none; }
             .strip .wrap { grid-template-columns: 1fr 1fr; padding: 0; }
-            .strip div.item { border-bottom: 1px solid var(--border); }
+            .strip div.item { border-bottom: 1px solid var(--border); flex-direction: column; align-items: flex-start; gap: 8px; padding: 14px 16px; }
+            .strip .ic { width: 34px; height: 34px; }
+            .strip .ic svg { width: 18px; height: 18px; }
+            .strip strong { font-size: 14px; }
             .strip div.item:nth-child(2n) { border-right: 0; }
             .grid-3, .grid-2, .grid-4 { grid-template-columns: 1fr; }
             .guide-body { grid-template-columns: 1fr; padding: 18px 16px 20px; }
@@ -419,10 +427,20 @@
             .cta { padding: 34px 20px; border-radius: 18px; }
             .mock-body { grid-template-columns: 1fr; }
             .mock-side { display: none; }
-            .mock-float.f1 { left: 8px; bottom: -22px; }
+            .mock-float.f1 { display: none; }
+            .mock-bar em { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .mock-main { padding: 10px; gap: 8px; }
+            .mock-card { padding: 8px 9px; }
+            .mock-card strong { font-size: 13.5px; white-space: nowrap; }
+            .mock-chart { height: 72px; }
+            .mock-rows div { grid-template-columns: minmax(0, 1fr) auto; }
+            .mock-rows span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .mock-rows em { display: none; }
+            .pill { align-items: flex-start; border-radius: 14px; }
+            .hero-cta .btn { flex: 1 1 auto; }
             .mock-float.f2 { right: 8px; top: -22px; }
             .finder-row { flex-direction: column; }
-            .hero-cta .btn { flex: 1; }
+
         }
     </style>
 </head>
