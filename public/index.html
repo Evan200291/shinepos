@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="/application.css?v=20260718"><link rel="stylesheet" href="/pos-theme.css?v=20260718-operations">
-    <link rel="stylesheet" href="/theme.css?v=20261003g">
+    <link rel="stylesheet" href="/theme.css?v=20261003l">
 </head>
 <body class="theme-body">
     <div id="notification" class="notification hidden" role="status" aria-live="polite"></div>
@@ -301,6 +301,7 @@
                             </header>
 
                             <div id="cart-items" class="pos-cart-list" aria-live="polite"></div>
+                            <div id="cart-fees" class="pos-fees hidden" aria-live="polite"></div>
 
                             <div class="pos-pinned" id="pos-pinned">
                             <div class="pos-cart-summary">
@@ -408,6 +409,8 @@
 
                 <section data-view="sales" class="view-section section-stack hidden">
                     <div class="sales-report-page">
+                        <div class="sales-report-head">
+                        <div id="sales-summary-strip" class="summary-strip"></div>
                         <div class="sales-report-toolbar">
                                 <select id="sales-report-type" class="field-input">
                                     <option value="daily" data-i18n="daily">Daily</option>
@@ -420,15 +423,14 @@
                                     <span data-i18n="pdf_report">PDF Report</span>
                                 </button>
                         </div>
-
-                        <div id="sales-summary-strip" class="summary-strip"></div>
+                        </div>
 
                         <div class="sales-report-table-scroll">
                             <table class="data-table sales-table responsive-table">
                                 <thead>
                                     <tr>
                                         <th data-i18n="invoice">Invoice</th>
-                                        <th data-i18n="date">Date</th>
+                                        <th data-i18n="date_time">Time</th>
                                         <th data-i18n="cashier">Cashier</th>
                                         <th data-i18n="items">Items</th>
                                         <th class="text-right" data-i18n="total">Total</th>
@@ -998,6 +1000,22 @@
                             </div>
                         </div>
 
+                        <div class="surface-panel admin-only fees-panel">
+                            <div class="section-heading">
+                                <div>
+                                    <h3 id="fees-settings-title" data-i18n="fees_title">Service fees</h3>
+                                    <p class="section-sub" data-i18n="fees_settings_hint">Preset fees (doctor consultation, dressing, injection…) appear as one-tap buttons in the POS cart. Turn on "Every invoice" to add a fee automatically; cashiers can still change the amount on each invoice.</p>
+                                </div>
+                            </div>
+                            <div id="fees-settings-list" class="fees-settings-list"></div>
+                            <form id="fee-form" class="fee-form">
+                                <input id="fee-name" type="text" class="field-input" maxlength="80" required data-i18n-placeholder="fee_name_placeholder" placeholder="e.g. Doctor consultation">
+                                <input id="fee-amount" type="number" min="0" step="any" inputmode="numeric" class="field-input" required data-i18n-placeholder="amount" placeholder="Amount">
+                                <label class="fee-auto"><input id="fee-auto" type="checkbox"><span data-i18n="fee_auto">Every invoice</span></label>
+                                <button type="submit" class="primary-btn"><i data-lucide="plus" class="h-4 w-4"></i><span data-i18n="add_fee">Add fee</span></button>
+                            </form>
+                        </div>
+
                         <div class="surface-panel admin-only">
                             <div class="section-heading">
                                 <h3 data-i18n="system_tools">System Tools</h3>
@@ -1197,6 +1215,6 @@
         </div>
     </div>
 
-    <script src="/app.js?v=20261003f"></script>
+    <script src="/app.js?v=20261003k"></script>
 </body>
 </html>

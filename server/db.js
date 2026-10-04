@@ -39,6 +39,32 @@ function runMigrations() {
     ensureColumn("shops", "business_type", "TEXT NOT NULL DEFAULT 'clinic'");
     ensureColumn("shops", "logo_path", "TEXT");
     ensureColumn("products", "image_path", "TEXT");
+
+    // Doctor / service fees: preset per shop, added to invoices without touching stock.
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS service_fees (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            shop_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            amount REAL NOT NULL DEFAULT 0,
+            auto_add INTEGER NOT NULL DEFAULT 0,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS sale_fees (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sale_id INTEGER NOT NULL,
+            shop_id INTEGER NOT NULL,
+            fee_id INTEGER,
+            name TEXT NOT NULL,
+            amount REAL NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_service_fees_shop ON service_fees(shop_id);
+        CREATE INDEX IF NOT EXISTS idx_sale_fees_sale ON sale_fees(sale_id);
+    `);
     ensureColumn("expenses", "payment_method", "TEXT");
     ensureColumn("expenses", "paid_to", "TEXT");
     ensureColumn("expenses", "reference_no", "TEXT");

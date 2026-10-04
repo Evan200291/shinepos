@@ -283,13 +283,30 @@ function getSales(shopId, filter = {}) {
         total: sale.total,
         profit: sale.profit,
         createdAt: sale.created_at,
-        items: itemStmt.all(sale.id).map((item) => ({
-            productCode: item.product_code,
-            productName: item.product_name,
-            quantity: item.quantity,
-            sellPrice: item.sell_price,
-            lineTotal: item.line_total
-        }))
+        items: [
+            ...itemStmt.all(sale.id).map((item) => ({
+                productCode: item.product_code,
+                productName: item.product_name,
+                quantity: item.quantity,
+                sellPrice: item.sell_price,
+                lineTotal: item.line_total
+            })),
+            ...saleFeeLines(sale.id)
+        ]
+    }));
+}
+
+// Doctor / service fees on an invoice, shaped like product lines so receipts and reports list them.
+function saleFeeLines(saleId) {
+    return db.prepare("SELECT name, amount FROM sale_fees WHERE sale_id = ? ORDER BY id ASC").all(saleId).map((fee) => ({
+        productCode: "",
+        productName: fee.name,
+        quantity: 1,
+        costPrice: 0,
+        sellPrice: fee.amount,
+        lineTotal: fee.amount,
+        lineProfit: fee.amount,
+        isFee: true
     }));
 }
 
@@ -341,7 +358,7 @@ function getSaleById(shopId, saleId) {
         total: sale.total,
         profit: sale.profit,
         createdAt: sale.created_at,
-        items
+        items: [...items, ...saleFeeLines(sale.id)]
     };
 }
 
@@ -353,6 +370,8 @@ function getBackupSnapshot(shopId) {
         products: db.prepare("SELECT * FROM products WHERE shop_id = ? ORDER BY id ASC").all(shopId),
         sales: db.prepare("SELECT * FROM sales WHERE shop_id = ? ORDER BY id ASC").all(shopId),
         saleItems: db.prepare("SELECT si.* FROM sale_items si JOIN sales s ON si.sale_id = s.id WHERE s.shop_id = ? ORDER BY si.id ASC").all(shopId),
+        saleFees: db.prepare("SELECT * FROM sale_fees WHERE shop_id = ? ORDER BY id ASC").all(shopId),
+        serviceFees: db.prepare("SELECT * FROM service_fees WHERE shop_id = ? ORDER BY id ASC").all(shopId),
         stockMovements: db.prepare("SELECT * FROM stock_movements WHERE shop_id = ? ORDER BY id ASC").all(shopId),
         auditLogs: db.prepare("SELECT * FROM audit_logs WHERE shop_id = ? ORDER BY id ASC").all(shopId)
     };
@@ -366,6 +385,8 @@ function getSystemBackupSnapshot() {
         products: db.prepare("SELECT * FROM products ORDER BY id ASC").all(),
         sales: db.prepare("SELECT * FROM sales ORDER BY id ASC").all(),
         saleItems: db.prepare("SELECT * FROM sale_items ORDER BY id ASC").all(),
+        saleFees: db.prepare("SELECT * FROM sale_fees ORDER BY id ASC").all(),
+        serviceFees: db.prepare("SELECT * FROM service_fees ORDER BY id ASC").all(),
         stockMovements: db.prepare("SELECT * FROM stock_movements ORDER BY id ASC").all(),
         subscriptions: db.prepare("SELECT * FROM subscriptions ORDER BY id ASC").all(),
         auditLogs: db.prepare("SELECT * FROM audit_logs ORDER BY id ASC").all()
@@ -430,6 +451,9 @@ function exportExcel(req, res) {
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(snapshot.products), "Products");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(salesRows), "Sales");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(snapshot.saleItems), "SaleItems");
+    if (snapshot.saleFees?.length) {
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(snapshot.saleFees), "SaleFees");
+    }
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(snapshot.stockMovements), "StockMoves");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(snapshot.users), "Users");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(snapshot.auditLogs), "AuditLogs");
@@ -847,14 +871,85 @@ app.delete("/api/products/:id", authenticate, requireRole("admin", "super_admin"
 // ============================================
 // Sales endpoints
 // ============================================
+function mapServiceFee(row) {
+    return { id: row.id, name: row.name, amount: row.amount, autoAdd: Boolean(row.auto_add), sortOrder: row.sort_order };
+}
+
+app.get("/api/service-fees", authenticate, (req, res) => {
+    const shopId = getShopId(req);
+    const rows = db.prepare("SELECT * FROM service_fees WHERE shop_id = ? AND is_active = 1 ORDER BY sort_order ASC, id ASC").all(shopId);
+    res.json({ fees: rows.map(mapServiceFee) });
+});
+
+function readServiceFee(body) {
+    const name = String(body.name || "").trim().slice(0, 80);
+    const amount = Math.max(0, toNumber(body.amount));
+    if (!name) {
+        throw Object.assign(new Error("Enter a fee name, e.g. Doctor consultation."), { status: 400 });
+    }
+    return { name, amount, autoAdd: body.autoAdd ? 1 : 0 };
+}
+
+app.post("/api/service-fees", authenticate, requireRole("admin", "super_admin"), (req, res) => {
+    const shopId = getShopId(req);
+    let fee;
+    try {
+        fee = readServiceFee(req.body);
+    } catch (error) {
+        return res.status(error.status || 400).json({ message: error.message });
+    }
+    const order = db.prepare("SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM service_fees WHERE shop_id = ?").get(shopId).n;
+    const id = db.prepare("INSERT INTO service_fees (shop_id, name, amount, auto_add, sort_order) VALUES (?, ?, ?, ?, ?)")
+        .run(shopId, fee.name, fee.amount, fee.autoAdd, order).lastInsertRowid;
+    writeAuditLog({ actorId: req.user.id, shopId, action: "SERVICE_FEE_CREATED", entityType: "service_fee", entityId: id, description: `Fee "${fee.name}" set to ${fee.amount}`, ipAddress: getClientIp(req) });
+    res.status(201).json({ fee: mapServiceFee(db.prepare("SELECT * FROM service_fees WHERE id = ?").get(id)) });
+});
+
+app.put("/api/service-fees/:id", authenticate, requireRole("admin", "super_admin"), (req, res) => {
+    const shopId = getShopId(req);
+    const id = Number(req.params.id);
+    if (!db.prepare("SELECT id FROM service_fees WHERE id = ? AND shop_id = ? AND is_active = 1").get(id, shopId)) {
+        return res.status(404).json({ message: "Fee not found." });
+    }
+    let fee;
+    try {
+        fee = readServiceFee(req.body);
+    } catch (error) {
+        return res.status(error.status || 400).json({ message: error.message });
+    }
+    db.prepare("UPDATE service_fees SET name = ?, amount = ?, auto_add = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(fee.name, fee.amount, fee.autoAdd, id);
+    writeAuditLog({ actorId: req.user.id, shopId, action: "SERVICE_FEE_UPDATED", entityType: "service_fee", entityId: id, description: `Fee "${fee.name}" set to ${fee.amount}`, ipAddress: getClientIp(req) });
+    res.json({ fee: mapServiceFee(db.prepare("SELECT * FROM service_fees WHERE id = ?").get(id)) });
+});
+
+app.delete("/api/service-fees/:id", authenticate, requireRole("admin", "super_admin"), (req, res) => {
+    const shopId = getShopId(req);
+    const id = Number(req.params.id);
+    // Soft delete: past invoices keep their own copy of the fee name and amount.
+    const result = db.prepare("UPDATE service_fees SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND shop_id = ?").run(id, shopId);
+    if (!result.changes) {
+        return res.status(404).json({ message: "Fee not found." });
+    }
+    res.json({ message: "Fee removed." });
+});
+
 app.post("/api/sales", authenticate, (req, res) => {
     const shopId = getShopId(req);
     const items = Array.isArray(req.body.items) ? req.body.items : [];
     const discount = Math.max(0, toNumber(req.body.discount));
     const saleDate = String(req.body.saleDate || todayString()).trim();
+    // Doctor / service fees: name + amount per line (amount may be changed on each invoice).
+    const fees = (Array.isArray(req.body.fees) ? req.body.fees : [])
+        .slice(0, 20)
+        .map((fee) => ({
+            feeId: fee.feeId ? Number(fee.feeId) : null,
+            name: String(fee.name || "").trim().slice(0, 80),
+            amount: Math.max(0, toNumber(fee.amount))
+        }))
+        .filter((fee) => fee.name);
 
-    if (items.length === 0) {
-        return res.status(400).json({ message: "At least one cart item is required." });
+    if (items.length === 0 && fees.length === 0) {
+        return res.status(400).json({ message: "At least one cart item or fee is required." });
     }
 
     try {
@@ -917,6 +1012,12 @@ app.post("/api/sales", authenticate, (req, res) => {
                 });
             }
 
+            // Fees have no cost, so the whole amount is profit.
+            for (const fee of fees) {
+                subtotal += fee.amount;
+                profit += fee.amount;
+            }
+
             const total = Math.max(0, subtotal - discount);
             const finalProfit = profit - discount;
             const invoiceNo = generateInvoiceNo(shopId);
@@ -946,6 +1047,11 @@ app.post("/api/sales", authenticate, (req, res) => {
                     `Sold via ${invoiceNo}`,
                     req.user.id
                 );
+            }
+
+            const insertFee = db.prepare("INSERT INTO sale_fees (sale_id, shop_id, fee_id, name, amount) VALUES (?, ?, ?, ?, ?)");
+            for (const fee of fees) {
+                insertFee.run(saleId, shopId, fee.feeId, fee.name, fee.amount);
             }
 
             writeAuditLog({
@@ -1896,7 +2002,7 @@ app.delete("/api/super/shops/:id", authenticate, requireSuperAdmin, (req, res) =
         const userIds = db.prepare("SELECT id FROM users WHERE shop_id = ?").all(shopId).map((row) => row.id);
 
         db.prepare("DELETE FROM sale_items WHERE sale_id IN (SELECT id FROM sales WHERE shop_id = ?)").run(shopId);
-        ["sale_items", "stock_movements", "sales", "supplier_ledger", "suppliers", "customer_ledger", "customers", "expenses", "products"].forEach(byShop);
+        ["sale_items", "sale_fees", "service_fees", "stock_movements", "sales", "supplier_ledger", "suppliers", "customer_ledger", "customers", "expenses", "products"].forEach(byShop);
 
         db.prepare("UPDATE audit_logs SET shop_id = NULL WHERE shop_id = ?").run(shopId);
         if (userIds.length) {

@@ -92,6 +92,9 @@ const state = {
     expensePhoto: null,
     chart: { weeklySales: [], monthly: [], bestSellers: [] },
     cart: [],
+    serviceFees: [],
+    cartFees: [],
+    cartFeesReady: false,
     posCategory: "all",
     posCategoryOpen: false,
     posSearchOpen: false,
@@ -283,6 +286,22 @@ const translations = {
         login_point_2: "Live stock, expiry and low-stock alerts",
         login_point_3: "Daily sales and profit reports",
         login_home_link: "Exabyte POS home",
+        date_time: "Time",
+        fees_title: "Service fees",
+        fees_title_clinic: "Doctor & service fees",
+        fees_settings_hint: "Preset fees (doctor consultation, dressing, injection…) appear as one-tap buttons in the POS cart. Turn on \"Every invoice\" to add a fee automatically; the amount can still be changed on each invoice.",
+        fee_name: "Fee name",
+        fee_name_placeholder: "e.g. Doctor consultation",
+        fee_auto: "Every invoice",
+        add_fee: "Add fee",
+        add_custom_fee: "Other fee",
+        fee_default_name: "Service fee",
+        fee_line: "Service / doctor fee",
+        no_fees: "No fees yet. Add your doctor or service fees below.",
+        msg_fee_saved: "Fee saved.",
+        confirm_delete_fee: "Remove this fee preset? Past invoices keep their fees.",
+        view_receipt: "View receipt",
+        save: "Save",
         product_photo: "Product photo (optional)",
         product_photo_title: "Shown on the POS product card",
         choose_photo: "Choose",
@@ -491,6 +510,22 @@ const translations = {
         login_point_2: "ကုန်လက်ကျန်၊ သက်တမ်းကုန်ခြင်းနှင့် လက်ကျန်နည်းခြင်း သတိပေးချက်များ",
         login_point_3: "နေ့စဉ် အရောင်းနှင့် အမြတ် အစီရင်ခံစာများ",
         login_home_link: "Exabyte POS ပင်မစာမျက်နှာ",
+        date_time: "အချိန်",
+        fees_title: "ဝန်ဆောင်ခများ",
+        fees_title_clinic: "ဆရာဝန်ခ / ဝန်ဆောင်ခ",
+        fees_settings_hint: "သတ်မှတ်ထားသော ကြေးများ (ဆရာဝန်ပြခ၊ ပတ်တီးစည်းခ၊ ဆေးထိုးခ…) ကို POS ခြင်းတွင် တစ်ချက်နှိပ်ရုံဖြင့် ထည့်နိုင်ပါသည်။ \"ဘောက်ချာတိုင်း\" ကိုဖွင့်ထားပါက အလိုအလျောက် ထည့်ပေးပြီး ဘောက်ချာတိုင်းတွင် ပမာဏ ပြင်နိုင်ပါသည်။",
+        fee_name: "ကြေးအမည်",
+        fee_name_placeholder: "ဥပမာ ဆရာဝန်ပြခ",
+        fee_auto: "ဘောက်ချာတိုင်း",
+        add_fee: "ကြေးထည့်ရန်",
+        add_custom_fee: "အခြားကြေး",
+        fee_default_name: "ဝန်ဆောင်ခ",
+        fee_line: "ဆရာဝန်ခ / ဝန်ဆောင်ခ",
+        no_fees: "ကြေးမရှိသေးပါ။ ဆရာဝန်ခ သို့ ဝန်ဆောင်ခများကို အောက်တွင် ထည့်ပါ။",
+        msg_fee_saved: "ကြေး သိမ်းပြီးပါပြီ။",
+        confirm_delete_fee: "ဤကြေးကို ဖယ်မလား? ယခင်ဘောက်ချာများတွင် ကျန်ရှိပါမည်။",
+        view_receipt: "ဘောက်ချာကြည့်ရန်",
+        save: "သိမ်းရန်",
         product_photo: "ပစ္စည်းဓာတ်ပုံ (မထည့်လည်းရ)",
         product_photo_title: "POS ပစ္စည်းကတ်တွင် ပြပါမည်",
         choose_photo: "ရွေးရန်",
@@ -663,6 +698,11 @@ function bindEvents() {
     $("account-backup-json").addEventListener("click", () => downloadAuthenticatedFile("/api/export/backup"));
     $("user-form").addEventListener("submit", handleCreateUser);
     $("product-form").addEventListener("submit", handleSaveProduct);
+    $("cart-fees").addEventListener("click", handleCartFeeClick);
+    $("cart-fees").addEventListener("input", handleCartFeeInput);
+    $("fee-form").addEventListener("submit", handleAddFee);
+    $("fees-settings-list").addEventListener("submit", handleFeeRowSubmit);
+    $("fees-settings-list").addEventListener("click", handleFeeRowClick);
     $("product-photo").addEventListener("change", handleProductPhoto);
     $("product-photo-remove").addEventListener("click", removeProductPhoto);
     $("close-product-modal").addEventListener("click", closeProductModal);
@@ -879,8 +919,9 @@ function parseDateValue(value) {
         return new Date(year, month - 1, day);
     }
 
+    // SQLite CURRENT_TIMESTAMP values ("YYYY-MM-DD HH:MM:SS") are UTC; show them in local time.
     if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) {
-        return new Date(value.replace(" ", "T"));
+        return new Date(`${value.replace(" ", "T")}Z`);
     }
 
     return new Date(value);
@@ -892,6 +933,28 @@ function formatDate(value) {
         return "-";
     }
     return date.toLocaleDateString(state.language === "mm" ? "my-MM" : "en-GB");
+}
+
+function formatTime(value) {
+    const date = parseDateValue(value);
+    if (!date || Number.isNaN(date.getTime())) {
+        return "";
+    }
+    return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatShortDate(value) {
+    const date = parseDateValue(value);
+    if (!date || Number.isNaN(date.getTime())) {
+        return "-";
+    }
+    return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+}
+
+// Invoices look like INV-<shop>-<yyyymmdd>-<number>; the last part is enough to tell them apart on screen.
+function shortInvoice(invoiceNo) {
+    const parts = String(invoiceNo || "").split("-");
+    return parts.length > 2 ? `#${parts[parts.length - 1]}` : String(invoiceNo || "");
 }
 
 function formatDateTime(value) {
@@ -1395,7 +1458,15 @@ async function loadInitialData() {
         state.expenses = [];
     }
 
+    try {
+        state.serviceFees = (await api("/api/service-fees")).fees || [];
+    } catch (_error) {
+        state.serviceFees = [];
+    }
+    prepareCartFees();
+
     renderAll();
+    renderFeeSettings();
 }
 
 async function loadFilteredSalesData() {
@@ -1572,7 +1643,7 @@ function renderRecentSales() {
     const showProfit = canSeeProfit();
     $("dashboard-sales-body").innerHTML = rows.length
         ? rows.map((sale) => `
-            <tr>
+            <tr class="row-clickable" data-sale-row="${sale.id}" title="${escapeHtml(t("view_receipt"))}">
                 <td data-label="${escapeHtml(t("invoice"))}">
                     <strong>${escapeHtml(sale.invoiceNo)}</strong>
                 </td>
@@ -1879,7 +1950,8 @@ function removeFromCart(productId) {
 }
 
 function getCartTotals() {
-    const subtotal = state.cart.reduce((sum, item) => sum + (item.sellPrice * item.quantity), 0);
+    const subtotal = state.cart.reduce((sum, item) => sum + (item.sellPrice * item.quantity), 0)
+        + state.cartFees.reduce((sum, fee) => sum + (Number(fee.amount) || 0), 0);
     const discount = Math.max(0, Number($("pos-discount").value) || 0);
     return { subtotal, discount, total: Math.max(0, subtotal - discount) };
 }
@@ -1891,7 +1963,8 @@ function renderCart() {
 
     $("cart-subtotal").textContent = formatCurrency(subtotal);
     $("cart-total").textContent = formatCurrency(total);
-    $("checkout-button").disabled = state.cart.length === 0;
+    $("checkout-button").disabled = state.cart.length === 0 && state.cartFees.length === 0;
+    renderCartFees();
     $("pos-cart").classList.toggle("is-empty", state.cart.length === 0);
     $("cart-item-count").textContent = `${itemCount} ${itemCount === 1 ? "item" : "items"}`;
 
@@ -1947,8 +2020,166 @@ function renderCart() {
     lucide.createIcons();
 }
 
+// ---- Doctor / service fees ----
+function feesTitle() {
+    return t(shopProfile.businessType === "clinic" ? "fees_title_clinic" : "fees_title");
+}
+
+// A new invoice starts with the fees marked "Every invoice" (e.g. the doctor's consultation fee).
+function prepareCartFees() {
+    if (state.cartFeesReady || state.cart.length || state.cartFees.length) {
+        state.cartFeesReady = true;
+        return;
+    }
+    state.cartFees = state.serviceFees.filter((fee) => fee.autoAdd).map((fee) => ({
+        key: `fee-${fee.id}`, feeId: fee.id, name: fee.name, amount: fee.amount
+    }));
+    state.cartFeesReady = true;
+}
+
+function renderCartFees() {
+    const box = $("cart-fees");
+    if (!box) return;
+    const show = state.serviceFees.length > 0 || state.cartFees.length > 0;
+    box.classList.toggle("hidden", !show);
+    if (!show) {
+        box.innerHTML = "";
+        return;
+    }
+    const addedIds = new Set(state.cartFees.map((fee) => fee.feeId).filter(Boolean));
+    const available = state.serviceFees.filter((fee) => !addedIds.has(fee.id));
+    box.innerHTML = `
+        <div class="pos-fees-head">
+            <span><i data-lucide="stethoscope" class="h-4 w-4"></i>${escapeHtml(feesTitle())}</span>
+        </div>
+        ${state.cartFees.map((fee) => `
+            <div class="pos-fee-row" data-fee-key="${escapeHtml(fee.key)}">
+                ${fee.feeId
+                    ? `<span class="pos-fee-name">${escapeHtml(fee.name)}</span>`
+                    : `<input class="pos-fee-name-input" data-fee-name value="${escapeHtml(fee.name)}" maxlength="80" aria-label="${escapeHtml(t("fee_name"))}">`}
+                <input class="pos-fee-amount" data-fee-amount type="number" min="0" step="any" inputmode="numeric" value="${escapeHtml(fee.amount)}" aria-label="${escapeHtml(t("amount"))}">
+                <button type="button" class="pos-fee-remove" data-fee-remove aria-label="Remove fee"><i data-lucide="x" class="h-4 w-4"></i></button>
+            </div>`).join("")}
+        <div class="pos-fee-chips">
+            ${available.map((fee) => `
+                <button type="button" class="pos-fee-chip" data-fee-add="${fee.id}">
+                    <i data-lucide="plus" class="h-3 w-3"></i>${escapeHtml(fee.name)} <b>${escapeHtml(formatCurrency(fee.amount))}</b>
+                </button>`).join("")}
+            <button type="button" class="pos-fee-chip ghost" data-fee-custom><i data-lucide="plus" class="h-3 w-3"></i>${escapeHtml(t("add_custom_fee"))}</button>
+        </div>`;
+    lucide.createIcons();
+}
+
+function updateCartTotalsOnly() {
+    const { subtotal, total } = getCartTotals();
+    $("cart-subtotal").textContent = formatCurrency(subtotal);
+    $("cart-total").textContent = formatCurrency(total);
+    $("checkout-button").disabled = state.cart.length === 0 && state.cartFees.length === 0;
+}
+
+function handleCartFeeClick(event) {
+    const add = event.target.closest("[data-fee-add]");
+    if (add) {
+        const fee = state.serviceFees.find((item) => item.id === Number(add.dataset.feeAdd));
+        if (fee) state.cartFees.push({ key: `fee-${fee.id}`, feeId: fee.id, name: fee.name, amount: fee.amount });
+        renderCart();
+        return;
+    }
+    if (event.target.closest("[data-fee-custom]")) {
+        state.cartFees.push({ key: `custom-${Date.now()}`, feeId: null, name: t("fee_default_name"), amount: 0 });
+        renderCart();
+        $("cart-fees").querySelector(".pos-fee-row:last-of-type [data-fee-name]")?.select();
+        return;
+    }
+    const remove = event.target.closest("[data-fee-remove]");
+    if (remove) {
+        const key = remove.closest("[data-fee-key]").dataset.feeKey;
+        state.cartFees = state.cartFees.filter((fee) => fee.key !== key);
+        renderCart();
+    }
+}
+
+function handleCartFeeInput(event) {
+    const row = event.target.closest("[data-fee-key]");
+    if (!row) return;
+    const fee = state.cartFees.find((item) => item.key === row.dataset.feeKey);
+    if (!fee) return;
+    if (event.target.matches("[data-fee-amount]")) fee.amount = Math.max(0, Number(event.target.value) || 0);
+    if (event.target.matches("[data-fee-name]")) fee.name = event.target.value.trim() || t("fee_default_name");
+    updateCartTotalsOnly();
+}
+
+function renderFeeSettings() {
+    const list = $("fees-settings-list");
+    if (!list) return;
+    $("fees-settings-title").textContent = feesTitle();
+    list.innerHTML = state.serviceFees.length
+        ? state.serviceFees.map((fee) => `
+            <form class="fee-row" data-fee-id="${fee.id}">
+                <input class="field-input" name="name" value="${escapeHtml(fee.name)}" maxlength="80" required aria-label="${escapeHtml(t("fee_name"))}">
+                <input class="field-input" name="amount" type="number" min="0" step="any" value="${escapeHtml(fee.amount)}" required aria-label="${escapeHtml(t("amount"))}">
+                <label class="fee-auto"><input name="autoAdd" type="checkbox" ${fee.autoAdd ? "checked" : ""}><span>${escapeHtml(t("fee_auto"))}</span></label>
+                <div class="fee-row-actions">
+                    <button type="submit" class="secondary-btn">${escapeHtml(t("save"))}</button>
+                    <button type="button" class="ghost-btn" data-fee-delete="${fee.id}" aria-label="Delete"><i data-lucide="trash-2" class="h-4 w-4"></i></button>
+                </div>
+            </form>`).join("")
+        : `<p class="empty-state">${escapeHtml(t("no_fees"))}</p>`;
+    lucide.createIcons();
+}
+
+async function reloadServiceFees() {
+    state.serviceFees = (await api("/api/service-fees")).fees || [];
+    // Keep fees already on the open invoice, but refresh their preset names.
+    state.cartFees = state.cartFees.filter((fee) => !fee.feeId || state.serviceFees.some((item) => item.id === fee.feeId));
+    renderFeeSettings();
+    renderCart();
+}
+
+async function handleAddFee(event) {
+    event.preventDefault();
+    try {
+        await api("/api/service-fees", {
+            method: "POST",
+            body: { name: $("fee-name").value.trim(), amount: Number($("fee-amount").value) || 0, autoAdd: $("fee-auto").checked }
+        });
+        $("fee-form").reset();
+        await reloadServiceFees();
+        showNotification(t("msg_fee_saved"));
+    } catch (error) {
+        showNotification(error.message, "error");
+    }
+}
+
+async function handleFeeRowSubmit(event) {
+    const form = event.target.closest(".fee-row");
+    if (!form) return;
+    event.preventDefault();
+    try {
+        await api(`/api/service-fees/${form.dataset.feeId}`, {
+            method: "PUT",
+            body: { name: form.elements.name.value.trim(), amount: Number(form.elements.amount.value) || 0, autoAdd: form.elements.autoAdd.checked }
+        });
+        await reloadServiceFees();
+        showNotification(t("msg_fee_saved"));
+    } catch (error) {
+        showNotification(error.message, "error");
+    }
+}
+
+async function handleFeeRowClick(event) {
+    const button = event.target.closest("[data-fee-delete]");
+    if (!button || !window.confirm(t("confirm_delete_fee"))) return;
+    try {
+        await api(`/api/service-fees/${button.dataset.feeDelete}`, { method: "DELETE" });
+        await reloadServiceFees();
+    } catch (error) {
+        showNotification(error.message, "error");
+    }
+}
+
 async function handleCheckout() {
-    if (!state.cart.length || state.checkingOut) {
+    if ((!state.cart.length && !state.cartFees.length) || state.checkingOut) {
         return;
     }
 
@@ -1964,13 +2195,16 @@ async function handleCheckout() {
                     productId: item.productId,
                     quantity: item.quantity,
                     sellPrice: item.sellPrice
-                }))
+                })),
+                fees: state.cartFees.map((fee) => ({ feeId: fee.feeId, name: fee.name, amount: Number(fee.amount) || 0 }))
             }
         });
 
         const saleResponse = await api(`/api/sales/${response.saleId}`);
         state.receiptSale = saleResponse.sale;
         state.cart = [];
+        state.cartFees = [];
+        state.cartFeesReady = false;
         $("pos-discount").value = 0;
         await loadInitialData();
         voucherPrinter.onSaleComplete(state.receiptSale);
@@ -2501,6 +2735,7 @@ function renderSales() {
     const totalProfit = state.sales.reduce((sum, sale) => sum + sale.profit, 0);
     const page = getPageSlice(state.sales, "sales");
     const showProfit = canSeeProfit();
+    const isMonthly = $("sales-report-type")?.value === "monthly";
 
     $("sales-summary-strip").innerHTML = `
         <div class="sales-report-metric sales-metric-count">
@@ -2519,15 +2754,18 @@ function renderSales() {
 
     $("sales-table-body").innerHTML = state.sales.length
         ? page.rows.map((sale) => {
-            const itemSummary = sale.items.map((item) => `${item.productName} x${item.quantity}`).join(", ");
-            const itemCount = sale.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+            const itemSummary = sale.items.map((item) => item.isFee ? item.productName : `${item.productName} ×${item.quantity}`).join(", ");
+            // Count products on the invoice, not units (30 tablets of one medicine is one item) and not fees.
+            const itemCount = sale.items.filter((item) => !item.isFee).length;
+            const time = formatTime(sale.createdAt);
+            const when = isMonthly ? `${formatShortDate(sale.saleDate)} · ${time}` : time;
             return `
                 <tr class="row-clickable" data-sale-row="${sale.id}">
                     <td data-label="${escapeHtml(t("invoice"))}">
-                        <strong>${escapeHtml(sale.invoiceNo)}</strong>
-                        <div class="table-sub sale-sub">${escapeHtml(sale.saleDate)} &middot; ${escapeHtml(sale.cashierName)} &middot; ${escapeHtml(itemCount)} ${itemCount === 1 ? "item" : "items"}</div>
+                        <strong title="${escapeHtml(sale.invoiceNo)}">${escapeHtml(shortInvoice(sale.invoiceNo))}</strong>
+                        <div class="table-sub sale-sub">${escapeHtml(when)} &middot; ${escapeHtml(sale.cashierName)} &middot; ${escapeHtml(itemCount)} ${itemCount === 1 ? "item" : "items"}</div>
                     </td>
-                    <td data-label="${escapeHtml(t("date"))}">${escapeHtml(sale.saleDate)}</td>
+                    <td data-label="${escapeHtml(t("date_time"))}" class="sale-when"><strong>${escapeHtml(time)}</strong><span>${escapeHtml(formatShortDate(sale.saleDate))}</span></td>
                     <td data-label="${escapeHtml(t("cashier"))}">${escapeHtml(sale.cashierName)}</td>
                     <td data-label="${escapeHtml(t("items"))}">${escapeHtml(itemSummary)}</td>
                     <td data-label="${escapeHtml(t("total"))}" class="text-right">${escapeHtml(formatCurrency(sale.total))}</td>
@@ -2601,7 +2839,7 @@ function renderMovements() {
     $("history-table-body").innerHTML = movements.length
         ? page.rows.map((movement) => `
             <tr class="row-clickable">
-                <td data-label="${escapeHtml(t("time"))}">${escapeHtml(formatDateTime(movement.createdAt))}</td>
+                <td data-label="${escapeHtml(t("time"))}" class="sale-when"><strong>${escapeHtml(formatTime(movement.createdAt))}</strong><span>${escapeHtml(formatShortDate(movement.createdAt))}</span></td>
                 <td data-label="${escapeHtml(t("product_name"))}">
                     <strong>${escapeHtml(movement.productName)}</strong>
                     <div class="table-sub">${escapeHtml(movement.productCode)}</div>
@@ -3335,14 +3573,16 @@ document.addEventListener("mousedown", (event) => {
 });
 
 function buildReceiptPaper(sale, options = {}) {
-    const itemCount = sale.items.reduce((sum, item) => sum + Number(item.quantity), 0);
+    const itemCount = sale.items.filter((item) => !item.isFee).length;
     const when = sale.createdAt ? formatDateTime(sale.createdAt) : formatDate(sale.saleDate);
     const footer = voucherPrinter.footerText || "Thank you!";
     const discount = Number(sale.discount || 0);
     return `
         <div class="rc-paper">
             <header class="rc-head">
-                <img class="rc-logo" src="/logo.svg" alt="" width="32" height="32">
+                ${shopProfile.logoUrl
+                    ? `<img class="rc-logo" src="${escapeHtml(shopProfile.logoUrl)}" alt="" width="32" height="32">`
+                    : `<span class="rc-logo rc-initials">${escapeHtml(shopInitials(VENDOR_NAME))}</span>`}
                 <div>
                     <h3>${escapeHtml(VENDOR_NAME)}</h3>
                     <p class="rc-kicker">Sales receipt</p>
@@ -3361,8 +3601,8 @@ function buildReceiptPaper(sale, options = {}) {
                 </div>
                 <div class="rc-items-body">
                     ${sale.items.map((item) => `
-                        <div class="rc-item" role="row">
-                            <span class="rc-item-name">${escapeHtml(item.productName)}<small>@ ${escapeHtml(formatCurrency(item.sellPrice))}</small></span>
+                        <div class="rc-item ${item.isFee ? "rc-fee" : ""}" role="row">
+                            <span class="rc-item-name">${escapeHtml(item.productName)}<small>${item.isFee ? escapeHtml(t("fee_line")) : `@ ${escapeHtml(formatCurrency(item.sellPrice))}`}</small></span>
                             <span class="rc-r rc-num">${escapeHtml(item.quantity)}</span>
                             <span class="rc-r rc-num rc-amount">${escapeHtml(formatCurrency(item.lineTotal))}</span>
                         </div>
@@ -3385,7 +3625,7 @@ function buildReceiptPaper(sale, options = {}) {
 }
 
 function buildReceiptMarkup(sale, options = {}) {
-    const itemCount = sale.items.reduce((sum, item) => sum + Number(item.quantity), 0);
+    const itemCount = sale.items.filter((item) => !item.isFee).length;
     const profitRow = options.showProfit
         ? `<div class="receipt-total-row receipt-profit-row"><span>${escapeHtml(t("profit"))}</span><strong>${escapeHtml(formatCurrency(sale.profit))}</strong></div>`
         : "";
@@ -3506,7 +3746,7 @@ function printSalesReport() {
             <td>${escapeHtml(sale.invoiceNo)}</td>
             <td>${escapeHtml(formatDate(sale.saleDate))}</td>
             <td>${escapeHtml(sale.cashierName)}</td>
-            <td>${escapeHtml(sale.items.map((item) => `${item.productName} x${item.quantity}`).join(", "))}</td>
+            <td>${escapeHtml(sale.items.map((item) => item.isFee ? item.productName : `${item.productName} x${item.quantity}`).join(", "))}</td>
             <td>${escapeHtml(formatCurrency(sale.total))}</td>
             ${showProfit ? `<td>${escapeHtml(formatCurrency(sale.profit))}</td>` : ""}
         </tr>
@@ -4176,6 +4416,10 @@ const voucherPrinter = {
         textLine(`${t("cashier")}: ${sale.cashierName}`);
         hr();
         sale.items.forEach((item) => {
+            if (item.isFee) {
+                textLine(twoCol(item.productName, formatCurrency(item.lineTotal)));
+                return;
+            }
             textLine(item.productName);
             textLine(twoCol(`${item.quantity} x ${formatCurrency(item.sellPrice)}`, formatCurrency(item.lineTotal)));
         });
@@ -4283,7 +4527,7 @@ const voucherPrinter = {
         const width = this.paperWidth();
         const isThermal = this.printerType !== "a4";
         const rows = sale.items.map((item) => `<tr>
-                <td>${escapeHtml(item.productName)}<br><span class="dim">${item.quantity} x ${escapeHtml(formatCurrency(item.sellPrice))}</span></td>
+                <td>${escapeHtml(item.productName)}${item.isFee ? "" : `<br><span class="dim">${item.quantity} x ${escapeHtml(formatCurrency(item.sellPrice))}</span>`}</td>
                 <td class="right">${escapeHtml(formatCurrency(item.lineTotal))}</td>
             </tr>`).join("");
 

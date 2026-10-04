@@ -18,6 +18,12 @@ function localDate(offsetDays = 0) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+// Timestamps are stored like SQLite's CURRENT_TIMESTAMP: UTC "YYYY-MM-DD HH:MM:SS".
+function utcStamp(localDay, hour, minute) {
+    const [y, m, d] = localDay.split("-").map(Number);
+    return new Date(y, m - 1, d, hour, minute).toISOString().slice(0, 19).replace("T", " ");
+}
+
 const PRODUCTS = [
     // code, brand, name, category, expiry offset (days), cost, sell, qty, low-stock threshold
     ["BEV001", "Coca-Cola", "Coca-Cola 330ml Can", "Beverages", 240, 500, 800, 144, 24],
@@ -71,7 +77,7 @@ function resetDemoShop(db) {
 
     const tx = db.transaction(() => {
         db.prepare("DELETE FROM sale_items WHERE sale_id IN (SELECT id FROM sales WHERE shop_id = ?)").run(shopId);
-        for (const table of ["sales", "stock_movements", "supplier_ledger", "customer_ledger", "suppliers", "customers", "expenses", "audit_logs"]) {
+        for (const table of ["sale_fees", "service_fees", "sales", "stock_movements", "supplier_ledger", "customer_ledger", "suppliers", "customers", "expenses", "audit_logs"]) {
             db.prepare(`DELETE FROM ${table} WHERE shop_id = ?`).run(shopId);
         }
         db.prepare("DELETE FROM products WHERE shop_id = ?").run(shopId);
@@ -88,7 +94,7 @@ function resetDemoShop(db) {
             // Opening stock covers ~10 weeks of sales history; fast movers end up low, as in a real shop.
             const opening = qty * 6;
             const id = insertProduct.run(shopId, code, brand, name, category, localDate(expiryOffset), cost, sell, opening, threshold).lastInsertRowid;
-            insertMove.run(id, shopId, "inbound", opening, opening, "Opening stock", user.id, `${localDate(-76)} 08:00:00`);
+            insertMove.run(id, shopId, "inbound", opening, opening, "Opening stock", user.id, utcStamp(localDate(-76), 8, 0));
             return { id, code, name, cost, sell, qty: opening };
         });
 
@@ -118,7 +124,7 @@ function resetDemoShop(db) {
                 if (!lines.length) continue;
                 const subtotal = lines.reduce((sum, line) => sum + line.product.sell * line.qty, 0);
                 const profit = lines.reduce((sum, line) => sum + (line.product.sell - line.product.cost) * line.qty, 0);
-                const time = `${date} ${String(9 + rand(11)).padStart(2, "0")}:${String(rand(60)).padStart(2, "0")}:00`;
+                const time = utcStamp(date, 9 + rand(11), rand(60));
                 const saleId = insertSale.run(shopId, `DEMO-${date.replaceAll("-", "")}-${String(invoice).padStart(3, "0")}`, user.id, date, subtotal, 0, subtotal, profit, time).lastInsertRowid;
                 invoice += 1;
                 for (const { product, qty } of lines) {
