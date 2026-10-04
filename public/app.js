@@ -1652,19 +1652,22 @@ function handlePagerClick(event) {
 }
 
 function renderSummary() {
+    // Counts first (three to a row on phones), then money figures (two to a row, odd one full width).
     const cards = [
-        { key: "metric_total_products", value: state.summary.totalProducts || 0, icon: "boxes", target: "inventory", tone: "teal" },
-        { key: "metric_inventory_value", value: formatCurrency(state.summary.inventoryValue || 0), icon: "wallet", target: "inventory", tone: "indigo" },
-        { key: "metric_low_stock", value: state.summary.lowStockCount || 0, icon: "triangle-alert", target: "low", tone: "amber" },
-        { key: "metric_expired", value: state.summary.expiredCount || 0, icon: "shield-alert", target: "expired", tone: "rose" },
-        { key: "metric_today_sales", value: formatCurrency(state.summary.todaySales || 0), icon: "banknote", target: "sales", tone: "green" }
+        { key: "metric_total_products", value: state.summary.totalProducts || 0, icon: "boxes", target: "inventory", tone: "teal", size: "count" },
+        { key: "metric_low_stock", value: state.summary.lowStockCount || 0, icon: "triangle-alert", target: "low", tone: "amber", size: "count" },
+        { key: "metric_expired", value: state.summary.expiredCount || 0, icon: "shield-alert", target: "expired", tone: "rose", size: "count" },
+        { key: "metric_today_sales", value: formatCurrency(state.summary.todaySales || 0), icon: "banknote", target: "sales", tone: "green", size: "money" }
     ];
     if (canSeeProfit()) {
-        cards.push({ key: "metric_today_profit", value: formatCurrency(state.summary.todayProfit || 0), icon: "trending-up", target: "sales", tone: "violet" });
+        cards.push({ key: "metric_today_profit", value: formatCurrency(state.summary.todayProfit || 0), icon: "trending-up", target: "sales", tone: "violet", size: "money" });
     }
+    cards.push({ key: "metric_inventory_value", value: formatCurrency(state.summary.inventoryValue || 0), icon: "wallet", target: "inventory", tone: "indigo", size: "money" });
+    const moneyCards = cards.filter((card) => card.size === "money");
+    if (moneyCards.length % 2) moneyCards[moneyCards.length - 1].size = "money wide";
 
     $("summary-cards").innerHTML = cards.map((card) => `
-        <button type="button" class="metric-card metric-card-button" data-tone="${card.tone}" data-summary-target="${card.target}" aria-label="View ${escapeHtml(t(card.key))} details">
+        <button type="button" class="metric-card metric-card-button metric-${card.size.replace(" ", " metric-")}" data-tone="${card.tone}" data-summary-target="${card.target}" aria-label="View ${escapeHtml(t(card.key))} details">
             <div>
                 <div class="metric-label">${escapeHtml(t(card.key))}</div>
                 <div class="metric-value">${escapeHtml(card.value)}</div>

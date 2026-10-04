@@ -1000,3 +1000,17 @@ html[lang="my"] .expense-detail-list dt { text-transform: none; letter-spacing: 
   .expense-detail-card .voucher-viewer-actions { position: sticky; bottom: 0; margin: 10px -16px 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--border); }
   .expense-detail-card .voucher-viewer-actions > * { flex: 1; justify-content: center; }
 }
+
+/* ---------- Dashboard cards on phones: 3 counts per row, money 2 per row ---------- */
+@media (max-width: 720px) {
+  #summary-cards { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; gap: 8px !important; }
+  #summary-cards .metric-card { grid-column: span 3; min-height: 0 !important; padding: 10px 12px !important; }
+  #summary-cards .metric-card.metric-count { grid-column: span 2; position: relative; display: block !important; padding: 10px !important; }
+  #summary-cards .metric-card.metric-wide { grid-column: 1 / -1; }
+  #summary-cards .metric-card .metric-value { font-size: 15px !important; }
+  #summary-cards .metric-card.metric-count .metric-value { font-size: 20px !important; margin-top: 4px; }
+  #summary-cards .metric-card.metric-count .metric-label { font-size: 11px !important; white-space: normal !important; line-height: 1.3 !important; padding-right: 26px; min-height: 2.6em; }
+  #summary-cards .metric-card.metric-count .metric-icon { position: absolute; top: 8px; right: 8px; width: 24px !important; height: 24px !important; border-radius: 7px !important; }
+  #summary-cards .metric-card.metric-count .metric-icon svg { width: 14px; height: 14px; }
+  #summary-cards .metric-card .metric-icon { width: 32px !important; height: 32px !important; }
+}
