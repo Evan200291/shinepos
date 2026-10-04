@@ -336,6 +336,13 @@ const translations = {
         exp_records: "Records this month",
         exp_top_category: "Top category",
         view_voucher: "Voucher",
+        view: "View",
+        close: "Close",
+        delete: "Delete",
+        month: "Month",
+        all_months: "All months",
+        no_voucher_photo: "No voucher photo attached.",
+        voucher_missing: "The voucher photo could not be loaded.",
         no_expenses: "No expenses match these filters.",
         confirm_delete_expense: "Delete this expense? Its voucher photo is deleted too.",
         biz_clinic: "Clinic & pharmacy",
@@ -565,6 +572,13 @@ const translations = {
         exp_records: "ယခုလ မှတ်တမ်း",
         exp_top_category: "အများဆုံး အမျိုးအစား",
         view_voucher: "ဘောက်ချာ",
+        view: "ကြည့်ရန်",
+        close: "ပိတ်ရန်",
+        delete: "ဖျက်ရန်",
+        month: "လ",
+        all_months: "လအားလုံး",
+        no_voucher_photo: "ဘောက်ချာဓာတ်ပုံ မပါပါ။",
+        voucher_missing: "ဘောက်ချာဓာတ်ပုံ ဖွင့်၍မရပါ။",
         no_expenses: "ကိုက်ညီသော အသုံးစရိတ် မရှိပါ။",
         confirm_delete_expense: "ဤအသုံးစရိတ်ကို ဖျက်မလား? ဘောက်ချာဓာတ်ပုံပါ ဖျက်ပါမည်။",
         biz_clinic: "ဆေးခန်း / ဆေးဆိုင်",
@@ -825,6 +839,18 @@ function bindEvents() {
         if (deleteButton) handleDeleteExpense(Number(deleteButton.dataset.deleteExpense));
         const voucherButton = event.target.closest("[data-view-voucher]");
         if (voucherButton) openVoucher(Number(voucherButton.dataset.viewVoucher));
+        const viewButton = event.target.closest("[data-view-expense]");
+        if (viewButton) openExpenseDetails(Number(viewButton.dataset.viewExpense));
+    });
+    $("expense-cards").addEventListener("click", (event) => {
+        const card = event.target.closest("[data-view-expense]");
+        if (card) openExpenseDetails(Number(card.dataset.viewExpense));
+    });
+    $("expense-form-toggle").addEventListener("click", () => {
+        const panel = $("expense-form-panel");
+        const open = panel.classList.toggle("is-collapsed") === false;
+        $("expense-form-toggle").setAttribute("aria-expanded", String(open));
+        if (open) $("expense-amount").focus();
     });
     $("expense-category-chips").addEventListener("click", (event) => {
         const chip = event.target.closest("[data-expense-category]");
@@ -3120,6 +3146,10 @@ function renderExpenseFormOptions() {
         </button>`).join("");
     const used = [...new Set([...EXPENSE_CATEGORIES.map((item) => item.value), ...state.expenses.map((expense) => expense.category)])];
     $("expense-category-options").innerHTML = used.map((value) => `<option value="${escapeHtml(value)}"></option>`).join("");
+    // Month filter lists only months that have expenses (newest first).
+    const months = [...new Set(state.expenses.map((expense) => String(expense.expenseDate).slice(0, 7)))].sort().reverse();
+    $("expense-filter-month").innerHTML = `<option value="">${escapeHtml(t("all_months"))}</option>` +
+        months.map((month) => `<option value="${month}" ${month === state.expenseFilters.month ? "selected" : ""}>${escapeHtml(monthLabel(month, "long"))}</option>`).join("");
     const filter = $("expense-filter-category");
     filter.innerHTML = `<option value="">${escapeHtml(t("all_categories"))}</option>` +
         used.map((value) => `<option value="${escapeHtml(value)}" ${value === state.expenseFilters.category ? "selected" : ""}>${escapeHtml(expenseCategoryLabel(value))}</option>`).join("");
@@ -3154,13 +3184,32 @@ function renderExpenses() {
                 <td data-label="${escapeHtml(t("amount"))}" class="text-right"><strong>${escapeHtml(formatCurrency(expense.amount))}</strong></td>
                 <td data-label="${escapeHtml(t("actions"))}" class="text-center">
                     <div class="table-actions-inline">
-                        ${expense.hasAttachment ? `<button type="button" class="mini-btn" data-view-voucher="${expense.id}"><i data-lucide="image" class="h-3 w-3"></i><span>${escapeHtml(t("view_voucher"))}</span></button>` : ""}
+                        <button type="button" class="mini-btn" data-view-expense="${expense.id}"><i data-lucide="eye" class="h-3 w-3"></i><span>${escapeHtml(t("view"))}</span></button>
+                        ${expense.hasAttachment ? `<button type="button" class="mini-btn" data-view-voucher="${expense.id}" aria-label="${escapeHtml(t("view_voucher"))}"><i data-lucide="image" class="h-3 w-3"></i></button>` : ""}
                         <button type="button" class="mini-btn delete-action" data-delete-expense="${expense.id}" aria-label="Delete"><i data-lucide="trash-2" class="h-3 w-3"></i></button>
                     </div>
                 </td>
             </tr>
         `).join("")
         : `<tr><td colspan="6" class="empty-state">${escapeHtml(t("no_expenses"))}</td></tr>`;
+    $("expense-cards").innerHTML = rows.length
+        ? page.rows.map((expense) => {
+            const preset = EXPENSE_CATEGORIES.find((item) => item.value === expense.category);
+            return `
+            <article class="expense-card" data-view-expense="${expense.id}">
+                <span class="expense-card-icon"><i data-lucide="${preset?.icon || "receipt-text"}" class="h-5 w-5"></i></span>
+                <div class="expense-card-main">
+                    <strong>${escapeHtml(expenseCategoryLabel(expense.category))}</strong>
+                    <span>${escapeHtml([formatShortDate(expense.expenseDate), expense.paidTo, expense.paymentMethod].filter(Boolean).join(" · "))}</span>
+                    ${expense.description ? `<em>${escapeHtml(expense.description)}</em>` : ""}
+                </div>
+                <div class="expense-card-side">
+                    <b>${escapeHtml(formatCurrency(expense.amount))}</b>
+                    ${expense.hasAttachment ? `<span class="expense-card-photo"><i data-lucide="image" class="h-3 w-3"></i>${escapeHtml(t("view_voucher"))}</span>` : ""}
+                </div>
+            </article>`;
+        }).join("")
+        : `<p class="empty-state">${escapeHtml(t("no_expenses"))}</p>`;
     renderPager("expenses-pager", "expenses", page.totalPages);
     lucide.createIcons();
 }
@@ -3246,6 +3295,8 @@ async function handleCreateExpense(event) {
         });
         $("expense-form").reset();
         clearExpensePhoto();
+        $("expense-form-panel").classList.add("is-collapsed");
+        $("expense-form-toggle").setAttribute("aria-expanded", "false");
         const response = await api("/api/expenses");
         state.expenses = response.expenses;
         renderExpenses();
@@ -3268,6 +3319,66 @@ async function refreshDashboardFigures() {
         renderMonthlyProfit();
     } catch (_error) {
         // The dashboard reloads on the next visit anyway.
+    }
+}
+
+async function openExpenseDetails(id) {
+    const expense = state.expenses.find((item) => item.id === id);
+    if (!expense) return;
+    const viewer = document.createElement("div");
+    viewer.className = "voucher-viewer";
+    const field = (label, value) => value ? `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>` : "";
+    viewer.innerHTML = `
+        <div class="voucher-viewer-card expense-detail-card" role="dialog" aria-modal="true" aria-label="${escapeHtml(t("expenses"))}">
+            <header class="expense-detail-head">
+                <div>
+                    <span>${escapeHtml(expenseCategoryLabel(expense.category))}</span>
+                    <strong>${escapeHtml(formatCurrency(expense.amount))}</strong>
+                </div>
+                <button type="button" class="icon-btn" data-close-voucher aria-label="Close"><i data-lucide="x" class="h-5 w-5"></i></button>
+            </header>
+            <dl class="expense-detail-list">
+                ${field(t("date"), formatDate(expense.expenseDate))}
+                ${field(t("payment_method"), expense.paymentMethod)}
+                ${field(t("paid_to"), expense.paidTo)}
+                ${field(t("reference_no"), expense.referenceNo)}
+                ${field(t("description"), expense.description)}
+                ${field(t("actor"), expense.actorName)}
+            </dl>
+            <div class="expense-detail-photo">${expense.hasAttachment ? `<p class="empty-state">…</p>` : `<p class="empty-state">${escapeHtml(t("no_voucher_photo"))}</p>`}</div>
+            <div class="voucher-viewer-actions">
+                <button type="button" class="ghost-btn danger-text" data-detail-delete="${expense.id}"><i data-lucide="trash-2" class="h-4 w-4"></i><span>${escapeHtml(t("delete"))}</span></button>
+                <button type="button" class="primary-btn" data-close-voucher>${escapeHtml(t("close"))}</button>
+            </div>
+        </div>`;
+    let photoUrl = null;
+    const close = () => {
+        viewer.remove();
+        if (photoUrl) URL.revokeObjectURL(photoUrl);
+        document.removeEventListener("keydown", onKey);
+    };
+    const onKey = (event) => { if (event.key === "Escape") close(); };
+    viewer.addEventListener("click", (event) => {
+        if (event.target === viewer || event.target.closest("[data-close-voucher]")) close();
+        const del = event.target.closest("[data-detail-delete]");
+        if (del) {
+            close();
+            handleDeleteExpense(Number(del.dataset.detailDelete));
+        }
+        if (event.target.closest(".expense-detail-photo img")) window.open(photoUrl, "_blank");
+    });
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(viewer);
+    lucide.createIcons();
+    if (expense.hasAttachment) {
+        try {
+            const response = await fetch(`/api/expenses/${id}/attachment`, { headers: { Authorization: `Bearer ${state.token}` } });
+            if (!response.ok) throw new Error();
+            photoUrl = URL.createObjectURL(await response.blob());
+            viewer.querySelector(".expense-detail-photo").innerHTML = `<img src="${photoUrl}" alt="Voucher photo">`;
+        } catch (_error) {
+            viewer.querySelector(".expense-detail-photo").innerHTML = `<p class="empty-state">${escapeHtml(t("voucher_missing"))}</p>`;
+        }
     }
 }
 

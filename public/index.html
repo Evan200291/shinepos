@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="/application.css?v=20260718"><link rel="stylesheet" href="/pos-theme.css?v=20260718-operations">
-    <link rel="stylesheet" href="/theme.css?v=20261004a">
+    <link rel="stylesheet" href="/theme.css?v=20261004d">
 </head>
 <body class="theme-body">
     <div id="notification" class="notification hidden" role="status" aria-live="polite"></div>
@@ -631,12 +631,15 @@
                 <section data-view="expenses" class="view-section section-stack hidden">
                     <div id="expense-summary" class="metric-grid expense-summary"></div>
                     <div class="expense-layout">
-                        <div class="surface-panel expense-form-panel">
-                            <div class="section-heading">
+                        <div id="expense-form-panel" class="surface-panel expense-form-panel is-collapsed">
+                            <div class="section-heading row">
                                 <div>
                                     <h3 data-i18n="add_expense">Add Expense</h3>
                                     <p class="section-sub" data-i18n="expense_form_hint">Record every shop cost so monthly net profit stays accurate.</p>
                                 </div>
+                                <button id="expense-form-toggle" type="button" class="primary-btn expense-form-toggle" aria-expanded="false" aria-controls="expense-form">
+                                    <i data-lucide="plus" class="h-4 w-4"></i><span data-i18n="add_expense">Add Expense</span>
+                                </button>
                             </div>
                             <form id="expense-form" class="stack-form">
                                 <div>
@@ -717,7 +720,7 @@
                                     <i data-lucide="search" class="h-4 w-4" aria-hidden="true"></i>
                                     <input id="expense-search" type="text" class="pos-search-input" data-i18n-placeholder="search_expenses" placeholder="Search description, paid to, ref no." autocomplete="off">
                                 </label>
-                                <input id="expense-filter-month" type="month" class="field-input list-filter-select" aria-label="Month">
+                                <select id="expense-filter-month" class="field-input list-filter-select" aria-label="Month"></select>
                                 <select id="expense-filter-category" class="field-input list-filter-select" aria-label="Category"></select>
                             </div>
                             <div class="table-wrap">
@@ -735,6 +738,7 @@
                                     <tbody id="expenses-table-body"></tbody>
                                 </table>
                             </div>
+                            <div id="expense-cards" class="expense-cards"></div>
                             <div id="expenses-pager" class="pager"></div>
                         </div>
                     </div>
@@ -1230,6 +1234,6 @@
         </div>
     </div>
 
-    <script src="/app.js?v=20261004a"></script>
+    <script src="/app.js?v=20261004c"></script>
 </body>
 </html>
