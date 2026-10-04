@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="/application.css?v=20260718"><link rel="stylesheet" href="/pos-theme.css?v=20260718-operations">
-    <link rel="stylesheet" href="/theme.css?v=20261003l">
+    <link rel="stylesheet" href="/theme.css?v=20261004a">
 </head>
 <body class="theme-body">
     <div id="notification" class="notification hidden" role="status" aria-live="polite"></div>
@@ -1000,6 +1000,21 @@
                             </div>
                         </div>
 
+                        <div class="surface-panel admin-only logo-panel">
+                            <div class="shop-logo-setting">
+                                <span id="shop-logo-preview" class="shop-initials shop-logo-preview" data-shop-initials aria-hidden="true">·</span>
+                                <div class="shop-logo-copy">
+                                    <h3 data-i18n="shop_logo">Shop logo</h3>
+                                    <p class="section-sub" data-i18n="shop_logo_hint">Shown on your sign-in page, sidebar and receipts. Square images work best; large files are compressed automatically.</p>
+                                </div>
+                                <div class="shop-logo-actions">
+                                    <label class="secondary-btn" for="shop-logo-input"><i data-lucide="image-plus" class="h-4 w-4"></i><span data-i18n="upload_logo">Upload logo</span></label>
+                                    <button id="shop-logo-remove" type="button" class="ghost-btn hidden" data-i18n="remove">Remove</button>
+                                    <input id="shop-logo-input" type="file" accept="image/*" class="hidden">
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="surface-panel admin-only fees-panel">
                             <div class="section-heading">
                                 <div>
@@ -1215,6 +1230,6 @@
         </div>
     </div>
 
-    <script src="/app.js?v=20261003k"></script>
+    <script src="/app.js?v=20261004a"></script>
 </body>
 </html>

@@ -894,3 +894,37 @@ html[lang="my"] .pos-fees-head span { text-transform: none; letter-spacing: 0; }
 .fee-row, .fee-form { grid-template-columns: minmax(180px, 1fr) 140px auto auto; }
 .fee-row > .field-input, .fee-form > .field-input { min-width: 0; }
 @media (max-width: 640px) { .fee-row, .fee-form { grid-template-columns: 1fr 1fr; } .fee-row > .field-input:first-child, .fee-form > .field-input:first-child { grid-column: 1 / -1; } }
+
+/* ---------- Phone: keep the last panel clear of the bottom navigation ---------- */
+@media (max-width: 720px) {
+  .content-scroll { padding-bottom: calc(var(--mobile-footer-h, 76px) + 28px + env(safe-area-inset-bottom)) !important; }
+}
+
+/* ---------- Shop logo (Account) ---------- */
+.logo-panel { grid-column: 1 / -1; }
+.shop-logo-setting { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.shop-logo-preview { width: 64px !important; height: 64px !important; border-radius: 16px !important; font-size: 22px !important; }
+.shop-logo-copy { flex: 1 1 240px; min-width: 0; }
+.shop-logo-copy h3 { margin: 0; font-size: 16px; }
+.shop-logo-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.shop-logo-actions .hidden { display: none !important; }
+
+/* ---------- Phone: compact fee rows (name + amount, then toggle + actions) ---------- */
+@media (max-width: 640px) {
+  .fee-row, .fee-form {
+    grid-template-columns: minmax(0, 1fr) 104px !important;
+    grid-template-areas: "name amount" "auto actions";
+    gap: 8px; padding: 10px;
+  }
+  .fee-form { padding: 12px 0 0; }
+  .fee-row > .field-input:first-child, .fee-form > #fee-name { grid-area: name; grid-column: auto !important; }
+  .fee-row > .field-input:nth-child(2), .fee-form > #fee-amount { grid-area: amount; text-align: right; }
+  .fee-row .fee-auto, .fee-form .fee-auto { grid-area: auto; grid-column: auto !important; }
+  .fee-row .fee-row-actions, .fee-form > button { grid-area: actions; justify-self: end; }
+  .fee-row .field-input, .fee-form .field-input { min-height: 40px; height: 40px; }
+  .fee-row-actions .secondary-btn, .fee-row-actions .ghost-btn { min-height: 36px; padding: 0 12px; }
+  .fee-form > button { min-height: 40px; padding: 0 14px; }
+  .shop-logo-setting { gap: 12px; }
+  .shop-logo-actions { width: 100%; }
+  .shop-logo-actions > * { flex: 1; justify-content: center; }
+}

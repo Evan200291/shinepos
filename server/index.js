@@ -1885,6 +1885,36 @@ app.delete("/api/super/shops/:id/logo", authenticate, requireSuperAdmin, (req, r
     res.json({ message: "Logo removed." });
 });
 
+// Shop admins manage their own logo from Account (the super admin can also set it per shop).
+app.post("/api/shop/logo", authenticate, requireRole("admin"), blockInDemo, (req, res) => {
+    const shopId = getShopId(req);
+    const shop = db.prepare("SELECT id, name, logo_path FROM shops WHERE id = ?").get(shopId);
+    if (!shop) {
+        return res.status(404).json({ message: "Shop not found." });
+    }
+    let logoPath;
+    try {
+        logoPath = saveImage("logos", req.body.image, "logo", 2 * 1024 * 1024);
+    } catch (error) {
+        return res.status(error.status || 500).json({ message: error.message });
+    }
+    db.prepare("UPDATE shops SET logo_path = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(logoPath, shopId);
+    removeUpload(shop.logo_path);
+    writeAuditLog({ actorId: req.user.id, shopId, action: "SHOP_LOGO_UPDATED", entityType: "shop", entityId: shopId, description: `${req.user.fullName} updated the shop logo`, ipAddress: getClientIp(req) });
+    res.json({ message: "Logo updated.", shop: shopInfo(db, shopId) });
+});
+
+app.delete("/api/shop/logo", authenticate, requireRole("admin"), blockInDemo, (req, res) => {
+    const shopId = getShopId(req);
+    const shop = db.prepare("SELECT id, logo_path FROM shops WHERE id = ?").get(shopId);
+    if (!shop) {
+        return res.status(404).json({ message: "Shop not found." });
+    }
+    db.prepare("UPDATE shops SET logo_path = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(shopId);
+    removeUpload(shop.logo_path);
+    res.json({ message: "Logo removed.", shop: shopInfo(db, shopId) });
+});
+
 app.get("/api/super/business-types", authenticate, requireSuperAdmin, (_req, res) => {
     res.json({ businessTypes: BUSINESS_TYPES });
 });

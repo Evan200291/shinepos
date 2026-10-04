@@ -287,6 +287,11 @@ const translations = {
         login_point_3: "Daily sales and profit reports",
         login_home_link: "Exabyte POS home",
         date_time: "Time",
+        shop_logo: "Shop logo",
+        shop_logo_hint: "Shown on your sign-in page, sidebar and receipts. Square images work best; large files are compressed automatically.",
+        upload_logo: "Upload logo",
+        msg_logo_saved: "Logo updated.",
+        confirm_remove_logo: "Remove the shop logo? Your initials will be shown instead.",
         fees_title: "Service fees",
         fees_title_clinic: "Doctor & service fees",
         fees_settings_hint: "Preset fees (doctor consultation, dressing, injection…) appear as one-tap buttons in the POS cart. Turn on \"Every invoice\" to add a fee automatically; the amount can still be changed on each invoice.",
@@ -511,6 +516,11 @@ const translations = {
         login_point_3: "နေ့စဉ် အရောင်းနှင့် အမြတ် အစီရင်ခံစာများ",
         login_home_link: "Exabyte POS ပင်မစာမျက်နှာ",
         date_time: "အချိန်",
+        shop_logo: "ဆိုင်လိုဂို",
+        shop_logo_hint: "ဝင်ရောက်ရန်စာမျက်နှာ၊ ဘေးဘားနှင့် ဘောက်ချာတွင် ပြပါမည်။ စတုရန်းပုံ အကောင်းဆုံးဖြစ်ပြီး ဖိုင်ကြီးများကို အလိုအလျောက် ချုံ့ပေးပါသည်။",
+        upload_logo: "လိုဂိုတင်ရန်",
+        msg_logo_saved: "လိုဂို ပြောင်းပြီးပါပြီ။",
+        confirm_remove_logo: "ဆိုင်လိုဂိုကို ဖယ်မလား? အတိုကောက်စာလုံး ပြပါမည်။",
         fees_title: "ဝန်ဆောင်ခများ",
         fees_title_clinic: "ဆရာဝန်ခ / ဝန်ဆောင်ခ",
         fees_settings_hint: "သတ်မှတ်ထားသော ကြေးများ (ဆရာဝန်ပြခ၊ ပတ်တီးစည်းခ၊ ဆေးထိုးခ…) ကို POS ခြင်းတွင် တစ်ချက်နှိပ်ရုံဖြင့် ထည့်နိုင်ပါသည်။ \"ဘောက်ချာတိုင်း\" ကိုဖွင့်ထားပါက အလိုအလျောက် ထည့်ပေးပြီး ဘောက်ချာတိုင်းတွင် ပမာဏ ပြင်နိုင်ပါသည်။",
@@ -701,6 +711,8 @@ function bindEvents() {
     $("cart-fees").addEventListener("click", handleCartFeeClick);
     $("cart-fees").addEventListener("input", handleCartFeeInput);
     $("fee-form").addEventListener("submit", handleAddFee);
+    $("shop-logo-input").addEventListener("change", handleShopLogo);
+    $("shop-logo-remove").addEventListener("click", handleRemoveShopLogo);
     $("fees-settings-list").addEventListener("submit", handleFeeRowSubmit);
     $("fees-settings-list").addEventListener("click", handleFeeRowClick);
     $("product-photo").addEventListener("change", handleProductPhoto);
@@ -1112,6 +1124,7 @@ function renderShopIdentity() {
     if (productExpiry) productExpiry.required = profile.expiryRequired;
     const printerHeader = $("printer-header");
     if (printerHeader) printerHeader.placeholder = name;
+    $("shop-logo-remove")?.classList.toggle("hidden", !shopProfile.logoUrl);
 }
 
 async function loadShopProfile() {
@@ -2178,6 +2191,31 @@ async function handleFeeRowClick(event) {
     }
 }
 
+async function handleShopLogo(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    try {
+        const image = await compressImage(file, 512, 0.9, true);
+        const response = await api("/api/shop/logo", { method: "POST", body: { image } });
+        applyShop(response.shop);
+        showNotification(t("msg_logo_saved"));
+    } catch (error) {
+        showNotification(error.message, "error");
+    } finally {
+        event.target.value = "";
+    }
+}
+
+async function handleRemoveShopLogo() {
+    if (!window.confirm(t("confirm_remove_logo"))) return;
+    try {
+        const response = await api("/api/shop/logo", { method: "DELETE" });
+        applyShop(response.shop);
+    } catch (error) {
+        showNotification(error.message, "error");
+    }
+}
+
 async function handleCheckout() {
     if ((!state.cart.length && !state.cartFees.length) || state.checkingOut) {
         return;
@@ -3128,7 +3166,8 @@ function renderExpenses() {
 }
 
 // Resizes a photo in the browser before upload so phone pictures stay small (≈200–400 KB).
-function compressImage(file, maxSize = 1600, quality = 0.8) {
+// keepAlpha keeps transparent backgrounds (logos) by saving WebP instead of JPEG.
+function compressImage(file, maxSize = 1600, quality = 0.8, keepAlpha = false) {
     return new Promise((resolve, reject) => {
         if (!file || !/^image\//.test(file.type)) {
             reject(new Error("Choose an image file."));
@@ -3142,11 +3181,13 @@ function compressImage(file, maxSize = 1600, quality = 0.8) {
             canvas.width = Math.max(1, Math.round(img.width * scale));
             canvas.height = Math.max(1, Math.round(img.height * scale));
             const context = canvas.getContext("2d");
-            context.fillStyle = "#ffffff";
-            context.fillRect(0, 0, canvas.width, canvas.height);
+            if (!keepAlpha) {
+                context.fillStyle = "#ffffff";
+                context.fillRect(0, 0, canvas.width, canvas.height);
+            }
             context.drawImage(img, 0, 0, canvas.width, canvas.height);
             URL.revokeObjectURL(url);
-            resolve(canvas.toDataURL("image/jpeg", quality));
+            resolve(canvas.toDataURL(keepAlpha ? "image/webp" : "image/jpeg", quality));
         };
         img.onerror = () => {
             URL.revokeObjectURL(url);
