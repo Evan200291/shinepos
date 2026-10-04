@@ -1253,7 +1253,9 @@ function showLogin({ unavailable = false } = {}) {
             </span>`;
         note.classList.remove("hidden");
         note.classList.add("is-demo");
-        fillDemoAccount($("login-username").value || shopProfile.demoAccounts[0].username);
+        const requested = new URLSearchParams(location.search).get("as");
+        const known = shopProfile.demoAccounts.some((account) => account.username === requested);
+        fillDemoAccount(known ? requested : ($("login-username").value || shopProfile.demoAccounts[0].username));
     } else {
         note.classList.add("hidden");
     }
